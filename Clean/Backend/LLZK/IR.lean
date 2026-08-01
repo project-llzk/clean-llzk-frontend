@@ -1,3 +1,4 @@
+import Clean.Backend.LLZK.Basic
 /-!
 # A backend-local IR for the LLZK subset Clean emits
 
@@ -375,4 +376,213 @@ def component {ε : Type} (members : Array Member) (inputs : Array ParamSpec)
     | _, _ => none
 
 end Builder
+
+/-- A field-valued expression the backend can emit.
+
+`var` indices are Clean circuit variable indices; `Circuit.lean` resolves them
+against the SSA values bound for the inputs and witness cells. -/
+inductive FieldExpr where
+  | var (index : Nat)
+  /-- A field constant as its canonical representative in `[0, p)`. -/
+  | const (value : Nat)
+  | add (a b : FieldExpr)
+  | mul (a b : FieldExpr)
+  /-- Unsigned quotient of the canonical representative of `a` by the literal
+  `divisor`. Witness-only: `Witness.ofFExpr` is the only recognizer that produces
+  it, so it cannot appear in a constraint. See D011 for why the divisor is a
+  literal and what makes the lowering faithful. -/
+  | uintdiv (a : FieldExpr) (divisor : Nat)
+  /-- Unsigned remainder of the canonical representative of `a` modulo the
+  literal `divisor`. Witness-only; see `uintdiv`. -/
+  | umod (a : FieldExpr) (divisor : Nat)
+deriving DecidableEq, Repr
+
+namespace FieldExpr
+
+/-- The first circuit variable this expression reads at or above `bound`, if there
+is one.
+
+Used by `Analyze` to enforce the discipline Clean calls
+`Operations.ComputableWitnesses`: a `.witness m` block is evaluated by
+`FlatOperation.dynamicWitnesses` against the environment *before* the block, so
+none of its `m` cells may read another. Checking it needs the block boundary,
+which `Recognized.witnesses` has already flattened away, so it happens at
+recognition time rather than in the lowering. See R2-03. -/
+def firstVarAtLeast (bound : Nat) : FieldExpr → Option Nat
+  | .var index => if index ≥ bound then some index else none
+  | .const _ => none
+  | .add a b | .mul a b => (firstVarAtLeast bound a).orElse fun _ => firstVarAtLeast bound b
+  | .uintdiv a _ | .umod a _ => firstVarAtLeast bound a
+
+/-- SSA values bound for circuit variables, indexed by circuit variable index.
+
+Built by pushing: the inputs occupy `0 .. inputSize - 1`, then one entry per
+witness cell in allocation order. Clean allocates witness offsets sequentially
+from the input size, so an entry's position in this array *is* its circuit
+variable index, and `size` is the next index a witness may define. -/
+abbrev Env := Array Value
+
+/-- Lowering monad: emits into a function body and may refuse. -/
+abbrev LowerM := ExceptT Diagnostic BuilderM
+
+/-- Emit the operations computing this expression, and return the SSA value
+holding its result.
+
+The only failure is a reference to a circuit variable that no input or earlier
+witness defines. That is a real possibility rather than an impossible case:
+`Witgen.FExpr.expr` may hold any `Expression`, including one naming a later
+witness cell, and nothing in Clean's types rules that out. -/
+def lower (context : String) (fieldTy : Ty) (env : Env) : FieldExpr → LowerM Value
+  | .var index =>
+    match env[index]? with
+    | some value => pure value
+    | none =>
+      throw { context
+              message :=
+                if env.size = 0 then
+                  s!"expression reads circuit variable {index}, but nothing is in scope here: \
+                     the circuit has no inputs and no earlier witness cells"
+                else
+                  s!"expression reads circuit variable {index}, which no input or earlier \
+                     witness defines; variables 0 to {env.size - 1} are in scope here" }
+  | .const value => Builder.feltConst value fieldTy
+  | .add a b => do
+    Builder.feltBin .add (← lower context fieldTy env a) (← lower context fieldTy env b) fieldTy
+  | .mul a b => do
+    Builder.feltBin .mul (← lower context fieldTy env a) (← lower context fieldTy env b) fieldTy
+  | .uintdiv a divisor => do
+    Builder.feltBin .uintdiv (← lower context fieldTy env a) (← Builder.feltConst divisor fieldTy)
+      fieldTy
+  | .umod a divisor => do
+    Builder.feltBin .umod (← lower context fieldTy env a) (← Builder.feltConst divisor fieldTy)
+      fieldTy
+
+end FieldExpr
+
+/-! ## S20: the expression lowering emits exactly what a reader reads back
+
+D018 records that G9 *validates each translation* — `compile` compares its own
+output against the circuit and refuses a mismatch — rather than verifying the
+translator. This is the reusable core of the stronger statement: that for the one
+function which emits every constraint expression, a reader walking the emitted
+statements recovers precisely the expression's denotation, so a mismatch there
+cannot arise.
+
+It lives in this module rather than beside `ofExpression` for the reason D021
+records: `Value`'s constructor and the builder's internals are private, and
+deliberately so, and a proof about what an emission *does* has to see them.
+That is why `FieldExpr` and its lowering moved here.
+
+The reader is stated over an arbitrary `ExprAlgebra` so that this module keeps
+its independence from `Poly` and from any notion of a field;
+`Clean/Backend/LLZK/Constraints.lean` instantiates it.
+
+**What is proved and what is not.** The expression level is proved. The loops
+that assemble a whole `@constrain` — the member reads, the lookups, the assertion
+and output passes — are not, and `ConstraintSet.agree` is still what establishes
+them. So this strengthens D018's argument without yet retiring the check. -/
+
+/-- What an emitted expression can be read into: a carrier with the four
+operations `FieldExpr` is built from. -/
+structure ExprAlgebra (A : Type) where
+  var : Nat → A
+  const : Nat → A
+  add : A → A → A
+  mul : A → A → A
+
+namespace FieldExpr
+
+/-- The value an expression denotes in an algebra.
+
+`uintdiv` and `umod` are witness-only and cannot appear in a constraint, so
+`none` there is the same fail-closed answer the gate's reader gives. -/
+def denote {A : Type} (alg : ExprAlgebra A) : FieldExpr → Option A
+  | .var i => some (alg.var i)
+  | .const c => some (alg.const c)
+  | .add a b => (denote alg a).bind fun x => (denote alg b).map (alg.add x)
+  | .mul a b => (denote alg a).bind fun x => (denote alg b).map (alg.mul x)
+  | .uintdiv .. | .umod .. => none
+
+end FieldExpr
+
+/-- What each SSA index has been read as, where it has been read at all. -/
+abbrev Assign (A : Type) := Nat → Option A
+
+/-- Bind one index. -/
+def Assign.set {A : Type} (σ : Assign A) (i : Nat) (a : A) : Assign A :=
+  fun j => if j = i then some a else σ j
+
+/-- The index a statement defines, if it defines one. -/
+def Stmt.dst? : Stmt → Option Nat
+  | .feltConst dst _ _ | .feltBin dst _ _ _ _ | .structNew dst
+  | .readMember dst _ _ _ | .globalRead dst _ _ => some dst.index
+  | .writeMember .. | .constrainEq .. | .constrainIn .. => none
+
+/-- Read one statement. Only the two forms the expression lowering emits are
+modelled; the rest leave the assignment alone, which is sound because the theorem
+below quantifies over exactly the statements that lowering produced. -/
+def readStmt {A : Type} (alg : ExprAlgebra A) (σ : Assign A) : Stmt → Assign A
+  | .feltConst dst value _ => σ.set dst.index (alg.const value)
+  | .feltBin dst op lhs rhs _ =>
+    match σ lhs.index, σ rhs.index with
+    | some x, some y =>
+      match op with
+      | .add => σ.set dst.index (alg.add x y)
+      | .mul => σ.set dst.index (alg.mul x y)
+      | _ => σ
+    | _, _ => σ
+  | _ => σ
+
+/-- Read a statement list, left to right. -/
+def readStmts {A : Type} (alg : ExprAlgebra A) (σ : Assign A) (l : List Stmt) : Assign A :=
+  l.foldl (readStmt alg) σ
+
+@[simp] theorem readStmts_nil {A} (alg : ExprAlgebra A) (σ : Assign A) :
+    readStmts alg σ [] = σ := rfl
+
+theorem readStmts_append {A} (alg : ExprAlgebra A) (σ : Assign A) (a b : List Stmt) :
+    readStmts alg σ (a ++ b) = readStmts alg (readStmts alg σ a) b := by
+  simp [readStmts]
+
+/-- Reading one statement changes only the index it defines. -/
+theorem readStmt_ne {A} (alg : ExprAlgebra A) (σ : Assign A) (s : Stmt) (i : Nat)
+    (h : ∀ d ∈ s.dst?, i ≠ d) : readStmt alg σ s i = σ i := by
+  cases s with
+  | feltConst dst value ty =>
+    have hne : i ≠ dst.index := h _ (by simp [Stmt.dst?])
+    simp [readStmt, Assign.set, hne]
+  | feltBin dst op lhs rhs ty =>
+    have hne : i ≠ dst.index := h _ (by simp [Stmt.dst?])
+    cases hl : σ lhs.index <;> cases hr : σ rhs.index <;> cases op <;>
+      simp [readStmt, Assign.set, hne, hl, hr]
+  | _ => rfl
+
+/-- Statements that define only indices at or above `bound` cannot change what
+the assignment says below it. This is what makes an earlier subexpression's value
+survive a later one's emission. -/
+theorem readStmts_ne {A} (alg : ExprAlgebra A) (σ : Assign A) (l : List Stmt) (i : Nat)
+    (h : ∀ s ∈ l, ∀ d ∈ s.dst?, i ≠ d) : readStmts alg σ l i = σ i := by
+  induction l generalizing σ with
+  | nil => rfl
+  | cons s rest ih =>
+    rw [readStmts, List.foldl_cons, ← readStmts,
+      ih _ (fun s hs => h s (List.mem_cons_of_mem _ hs))]
+    exact readStmt_ne alg σ s i (h s (by simp))
+
+theorem readStmts_below {A} (alg : ExprAlgebra A) (σ : Assign A) (l : List Stmt) (bound : Nat)
+    (h : ∀ s ∈ l, ∀ d ∈ s.dst?, bound ≤ d) : ∀ i < bound, readStmts alg σ l i = σ i :=
+  fun i hi => readStmts_ne alg σ l i fun s hs d hd => Nat.ne_of_lt (Nat.lt_of_lt_of_le hi (h s hs d hd))
+
+/-- Sequencing, made visible. The linchpin: if this is `rfl`, every inductive
+case of the theorem below is a rewrite rather than a monadic unfolding. -/
+theorem Builder.run_bind {ε α β : Type} (f : ExceptT ε BuilderM α)
+    (g : α → ExceptT ε BuilderM β) (s : BuilderState) :
+    (f >>= g).run s = match f.run s with
+      | (.ok a, s') => (g a).run s'
+      | (.error e, s') => (.error e, s') := by
+  show (ExceptT.bind f g) s = _
+  unfold ExceptT.bind ExceptT.bindCont
+  rcases h : f s with ⟨r, s'⟩
+  cases r <;> simp [ExceptT.run, ExceptT.mk, bind, StateT.bind, pure, StateT.pure, h]
+
 end LLZK

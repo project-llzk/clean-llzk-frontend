@@ -650,7 +650,7 @@ Two things this does not do:
 
 ## D021 — S20 is blocked on where the private boundary goes, not on effort
 
-**Status:** accepted — option (1); the proof itself is scheduled, not open
+**Status:** accepted — option (1), **enacted**; the theorem itself is in progress
 **Date:** 2026-08-01
 **Enacted by:** the S20 attempt
 
@@ -719,25 +719,32 @@ expected: `BuilderState`'s constructor is private too, so the theorem's
 …)` is expressible, but the frame lemma every sequencing case needs must mention
 `{ nextIndex := …, stmts := … }`, and cannot.
 
-So the session that does this works inside `IR.lean` throughout, with transient
-`sorry`s in the working tree that never reach a commit. That is a normal way to
-develop a proof and a bad way to end a session, which is why the move is not
-merged here: without the theorem it is cost — `IR.lean` grows, cohesion drops —
-with no benefit yet. It is kept on the stash
-(`S20 attempt: FieldExpr move + reader infrastructure`) so the next session can
-`git stash pop` rather than redo it.
+So the work happens inside `IR.lean`, and it is now **started and committed**
+rather than stashed: the move is done, the reader is defined, and the three
+lemmas the inductive cases turn on are proved. What remains is the induction
+itself — two helper cases, one for the binary operations and one for the two
+division shapes. G0–G10 are green throughout, and nothing carries a `sorry`.
 
-Two things the attempt established, recorded so they are not rediscovered:
+Three things established, recorded so they are not rediscovered:
 
 - **The monadic machinery reduces definitionally.** `rfl` discharges
   `Builder.run start (FieldExpr.lower ctx ty env (.const c))`. No `simp`
   incantation for `ExceptT`/`StateT` is needed, which was the risk D018's
   "simulation argument over the `BuilderM` state monad" implied.
-- **The reader's two stability lemmas are short and compiled first try**: that
-  reading one statement changes only the index it defines, and that statements
-  defining only high indices leave low ones alone. The second is what makes an
-  earlier subexpression's value survive a later one's emission, and it is the
-  lemma the sequencing cases turn on.
+- **The reader's stability lemmas are short**: that reading one statement changes
+  only the index it defines (`readStmt_ne`), that a list defining no index equal
+  to `i` leaves `i` alone (`readStmts_ne`), and the `bound`-shaped corollary
+  (`readStmts_below`). The second is what makes an earlier subexpression's value
+  survive a later one's emission.
+- **`Builder.run_bind` is the linchpin, and it holds.** Sequencing is *not* `rfl`
+  — the match needs the scrutinee's shape — but it falls to one case split. With
+  it, every inductive case of the theorem is a rewrite rather than a monadic
+  unfolding, which is what makes the remaining induction ordinary work.
+
+**Stating the reading claim conditionally on the expression having a denotation**
+is what makes `uintdiv`/`umod` free: they are witness-only, they denote nothing
+in an `ExprAlgebra`, and the claim is vacuous for them. That removes the
+freshness side condition an unconditional statement would need.
 
 This is a session of its own with its own review. Two
 partial artefacts from the attempt are *not* kept, deliberately: a `readStmt`/
