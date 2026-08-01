@@ -26,8 +26,8 @@ echo "== G11: harness error paths =="
 bash "${script_dir}/test-scripts.sh"
 echo
 
-echo "== G12: the unchecked table path is confined =="
-bash "${script_dir}/check-unsafe-config.sh"
+echo "== G12: the gate-skipping entry points are confined =="
+bash "${script_dir}/check-confinement.sh"
 echo
 
 echo "== G0: state and pins =="

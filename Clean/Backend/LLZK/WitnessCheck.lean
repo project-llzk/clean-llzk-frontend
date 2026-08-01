@@ -382,17 +382,34 @@ private def witnessMismatch : Diagnostic where
               side). This is a defect in the backend, not in the circuit: please report it with \
               the circuit that triggered it. See Clean/Backend/LLZK/WitnessCheck.lean"
 
-/-- Check a module against the circuit it claims to be, and refuse it if it is
-not.
+/-- Check a module against the circuit it claims to be — **both** halves of G9 —
+and refuse it if it is not.
 
 Factored out of `compileSourceVerified` so that the *refusal* is reachable from a
-test. Nothing the emitter produces can fail this — that is the point of it — so
-without a function that takes the module as an argument, the error branch would
-be dead code, and "the check refuses a wrong module" would be an untested claim
+test: without a function taking the module as an argument, the error branch would
+be dead code and "the check refuses a wrong module" would be an untested claim
 about the one path that matters. `Test/WitnessCheck.lean` calls it with one
-circuit's module and another circuit's source. -/
-def verify (src : Source F) (m : Module) : Except (Array Diagnostic) Module :=
-  if WitnessSet.agree src m then .ok m else .error #[witnessMismatch]
+circuit's module and another circuit's source.
+
+Two things this docstring used to get wrong, both found by R5c.
+
+It said *"nothing the emitter produces can fail this"*. Something did: a bare
+copy of a variable, which the witness reader misread. That claim is also what
+justified never running the branch against real emitter output. The cause is
+fixed — see "Canonicalising copies" — but the claim is not reinstated, because
+the same sentence is what stopped anyone looking.
+
+And it checked only the witness half while promising to refuse any module that
+is not the circuit, which is exactly R2's empty-`@constrain` attack. It runs both
+halves now. `compileSourceVerified` reaches it through `compileSource'`, which
+has already checked the constraint half, so that half runs twice on the compile
+path; it is a pure comparison of two normal forms, and paying for it is better
+than a public function that means less than its name. -/
+def verify [CanonicalRepr F] (cfg : Config) (src : Source F) (m : Module) :
+    Except (Array Diagnostic) Module :=
+  if !ConstraintSet.agree cfg src m then .error #[ConstraintSet.mismatch]
+  else if !WitnessSet.agree src m then .error #[witnessMismatch]
+  else .ok m
 
 /-- Compile a flattened circuit and verify **both** halves of G9 before returning
 it. -/
@@ -400,7 +417,7 @@ def compileSourceVerified [CanonicalRepr F] (cfg : Config) (src : Source F) :
     Except (Array Diagnostic) Module :=
   match ConstraintSet.compileSource' cfg src with
   | .error diagnostics => .error diagnostics
-  | .ok m => verify src m
+  | .ok m => verify cfg src m
 
 /-- **Every module this backend emits computes the circuit's witnesses.** -/
 theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
@@ -410,10 +427,13 @@ theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
   split at h
   · exact absurd h (by simp)
   · split at h
-    · rename_i ha
-      simp only [Except.ok.injEq] at h
-      exact h ▸ ha
     · exact absurd h (by simp)
+    · split at h
+      · exact absurd h (by simp)
+      · rename_i hw
+        simp only [Except.ok.injEq] at h
+        subst h
+        simpa using hw
 
 /-- **…and carries its constraint system.** The other half, lifted through the
 same entry point. -/
@@ -425,9 +445,11 @@ theorem constraintsAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Confi
   · exact absurd h (by simp)
   · rename_i m' hc
     split at h
-    · simp only [Except.ok.injEq] at h
-      exact h ▸ ConstraintSet.agree_of_compileSource' hc
     · exact absurd h (by simp)
+    · split at h
+      · exact absurd h (by simp)
+      · simp only [Except.ok.injEq] at h
+        exact h ▸ ConstraintSet.agree_of_compileSource' hc
 
 /-- Compile a circuit to an LLZK module, or report every reason it cannot be.
 

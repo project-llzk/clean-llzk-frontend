@@ -115,11 +115,16 @@ structure ConstraintSet (F : Type) where
   lookups : List (String × Poly F)
   /-- The lookup tables the module materializes, name and values.
 
-  Compared, because otherwise nothing does. R4 found that a `Config` supplying a
-  one-row `@Bytes` instead of 256 compiled and passed G9: the comparison recorded
-  which *table* each `constrain.in` names and the polynomial it queries, and never
-  looked at what the table contains. A `constrain.in` against the wrong set of
-  rows is a different constraint. -/
+  **This does not check that the rows are the Clean table's rows.** Both sides
+  derive from `cfg.tables`, so on the path `compile` takes it is a tautology —
+  R5's X1, and the reason an earlier version of this docstring, which claimed it
+  closed R4's one-row-`@Bytes` finding, was withdrawn. `Test/Constraints.lean`
+  pins the tautology rather than describing it.
+
+  What it does establish is that the emitter did not drop, rename or reorder a
+  table relative to the operations that look into it. Tying the rows to the Clean
+  table is `ExportTable.Certifies`, demanded by `Config.ofCertified` and confined
+  by G12. -/
   globals : List (String × Array Nat)
 deriving Repr
 
@@ -359,7 +364,7 @@ rows — and the latter is discharged for every table in use by
 /-- What the emitter reports when its own output fails the comparison. Reaching
 this is a bug in the lowering, not in the circuit, which is why the message says
 so. -/
-private def mismatch : Diagnostic where
+def mismatch : Diagnostic where
   context := "constraints"
   message := "the emitted @constrain is not the same constraint system as the circuit's \
               (gate G9). This is a defect in the backend, not in the circuit: please report \

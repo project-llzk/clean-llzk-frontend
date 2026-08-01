@@ -17,7 +17,7 @@ accumulated gates from a clean checkout.
 | G9 — Semantics | The emitted `@constrain` and `@compute` are the circuit's |
 | G10 — Pipeline | Every artifact is admissible to LLZK's analysis pipeline |
 | G11 — Harness | The scripts' own failure branches behave as written |
-| G12 — Confinement | No non-test module supplies uncertified lookup tables |
+| G12 — Confinement | Every entry point that skips a gate is confined to the modules with a reason to name it |
 
 ## G0 — State
 
@@ -134,16 +134,28 @@ another circuit — and pins that the comparison goes red for each.
 
 **G9 is not a property of the corpus.** Since S17 the comparison is a
 *precondition of emission*: `ConstraintSet.compileSource'` runs it and refuses to
-return a module that fails, and `compile`/`emit` — the only public entry points —
-go through it. `agree_of_compileSource'` is the theorem, and
-`eqs_iff_of_compileSource'` gives its meaning. So this holds for every circuit,
-not for the five in the corpus.
+return a module that fails, and `compile`/`emit` go through it.
+`agree_of_compileSource'` is the theorem, `witnessAgree_of_compileSourceVerified`
+its witness-side counterpart, and `eqs_iff_of_compileSource'` gives the first its
+meaning. So this holds for every circuit, not for the five in the corpus.
+
+This paragraph used to say `compile`/`emit` were "the only public entry points".
+D018 retracted that in the R4 round and this file was not updated, so R5 found
+the retracted claim still standing here. The accurate statement is the one above:
+**no module obtained through `compile` or `emit` has gone unchecked.** Other
+public entry points return a module without both halves — `compileSource`,
+`compileSource'`, `lowerRecognized` — and G12 confines them to the modules with a
+reason to name them, none of which is reachable from ordinary circuit code.
+`Module.render` is public too, and G9 compares `Module`s rather than text; see
+the renderer entry in `GAPS.md`.
 
 That is translation validation rather than a verified translator: a lowering bug
 would surface as a refusal to compile rather than as a compile-time
 impossibility. The stronger statement — a preservation theorem about `lower`
-itself — needs a simulation argument over the `BuilderM` state monad and is not
-done.
+itself — needs a simulation argument over the `BuilderM` state monad.
+`FieldExpr.lower_spec` is the fragment of it that exists, and R5a showed it is
+much weaker than it reads; `GAPS.md` records exactly what it does and does not
+say.
 
 **G9 has two halves, and both are preconditions of emission.**
 `Constraints.lean` compares `@constrain` against the circuit's constraints;

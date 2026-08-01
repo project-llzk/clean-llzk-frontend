@@ -83,6 +83,23 @@ structure Recognized where
   outputs : Array FieldExpr
 deriving Repr
 
+/-- Check every expression a lowering will emit, against the configured prime.
+
+See `FieldExpr.checkLowerable` for what this rules out and for the two modules
+R5c got out of the backend without it. Applied to all four expression positions,
+because `Recognized` is public and a hand-built one can put a bad constant
+anywhere — R5c's counterexamples were in `witnesses`, but an assertion or a
+lookup entry would emit the same wrong text. -/
+def Recognized.checkLowerable (prime : Nat) (r : Recognized) : Except Diagnostic Unit := do
+  for (e, k) in r.witnesses.zipIdx do
+    FieldExpr.checkLowerable prime s!"witness cell {k}" e
+  for (e, i) in r.asserts.zipIdx do
+    FieldExpr.checkLowerable prime s!"assertion {i}" e
+  for (l, i) in r.lookups.zipIdx do
+    FieldExpr.checkLowerable prime s!"lookup {i} into @{l.tableName}" l.entry
+  for (e, j) in r.outputs.zipIdx do
+    FieldExpr.checkLowerable prime s!"output {j}" e
+
 /-- Split per-item results into all the failures, or all the successes.
 
 Used to report every unsupported construct in one pass instead of making the

@@ -177,18 +177,36 @@ private def moduleOf (cfg : Config) (src : Source Bab) : Option Module :=
 
 -- Its own module is accepted…
 #guard match moduleOf babybear mulSrc with
-  | some m => (verify mulSrc m).toOption.isSome
+  | some m => (verify babybear mulSrc m).toOption.isSome
   | none => false
 
--- …and another circuit's is refused, with the diagnostic that says it is a
--- backend defect rather than a circuit one.
+-- …and another circuit's is refused.
 #guard match moduleOf babybear decSrc with
-  | some m => (verify mulSrc m).toOption.isNone
+  | some m => (verify babybear mulSrc m).toOption.isNone
   | none => false
 
-#guard match moduleOf babybear mulSrc with
-  | some m => match verify sq m with
+-- `verify` checks the constraint half first, so reaching the witness diagnostic
+-- needs a module whose constraints are right and whose `@compute` is not. `sq`
+-- and `dbl` are exactly that pair: neither constrains its cell, so both have the
+-- constraint system `@out0 - v1` and differ only in what `@compute` writes.
+--
+-- Worth having for its own sake, not just to cover a branch: it is the case that
+-- shows the two halves are independent, and that the witness half catches a
+-- wrong `@compute` the constraint half cannot see.
+#guard match moduleOf babybear dbl with
+  | some m => ConstraintSet.agree babybear sq m && !WitnessSet.agree sq m
+  | none => false
+
+#guard match moduleOf babybear dbl with
+  | some m => match verify babybear sq m with
     | .error ds => ds.map (·.context) == #["witness"]
+    | .ok _ => false
+  | none => false
+
+-- And the constraint diagnostic, for a module that fails that half.
+#guard match moduleOf babybear decSrc with
+  | some m => match verify babybear mulSrc m with
+    | .error ds => ds.map (·.context) == #["constraints"]
     | .ok _ => false
   | none => false
 

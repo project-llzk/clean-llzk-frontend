@@ -43,6 +43,16 @@ is now pinned below, in this order:
 | a table row value at or above the prime | `unreducedTable` |
 | an empty table | `emptyTable` |
 | a duplicated table name | `duplicateTables` |
+| a field that is not in `FieldSpec.registry` | `unregisteredField` |
+| a divisor of `0` reaching `lower` unrecognized | `recognizedWith #[.umod _ 0]` |
+| a divisor at or above the prime, likewise | `recognizedWith #[.umod _ (p+5)]` |
+| a constant at or above the prime, in an output | `recognizedWith #[] #[.const (p+7)]` |
+| the same, in an assertion | the `asserts` guard below |
+
+The last five are R5's. The registry-membership branch was R4b-1's own repair and
+had no fixture; the other four are D011's side conditions, which were enforced by
+the *recognizer* and so did not hold of `lowerRecognized`, the door the six
+`Square_*` corpus entries go through.
 
 One path listed in R2-07 has no fixture because it is unreachable, not because it
 is untested: `recognizeLookup`'s "lookup queries n values" branch. `Lookup.entry`
@@ -425,6 +435,17 @@ private def duplicateTables : Config :=
     #[{ name := "Bytes", arity := 1, rows := #[#[0]] },
       { name := "Bytes", arity := 1, rows := #[#[1]] }]
 
+/-- A field that is not in LLZK's registry. `FieldSpec` is a public structure, so
+this is a pair anyone can write down, and `{ name := "bn254", prime := <babybear
+prime> }` was R4b-1: a babybear circuit emitted as `!felt.type<"bn254">`, accepted
+by `llzk-opt`, both witgen backends, both halves of G9 and G10.
+
+The repair was a registry-membership check. R5 pointed out that the repair itself
+had no fixture — the one branch this project most needed to stay working was the
+one nothing exercised. -/
+private def unregisteredField : Config :=
+  .forField { name := "babybear-ish", prime := pBabybear }
+
 /-! ### The diagnostics -/
 
 -- mersenne on multiply: a configured field whose prime is not the circuit's is a
@@ -563,5 +584,81 @@ table 'Bytes': is registered more than once; a lookup could not be resolved unam
 -/
 #guard_msgs in
 #eval IO.print (emitSource duplicateTables oneLookup)
+
+/--
+info: compilation failed:
+field: configured field 'babybear-ish' with prime 2013265921 is not an entry of `FieldSpec.registry`; LLZK owns the prime for a field name, so a pair it does not know would be emitted as `!felt.type<"babybear-ish">` and interpreted in whatever field LLZK has under that name
+-/
+#guard_msgs in
+#eval IO.print (emit unregisteredField multiply)
+
+/-! ## D011's side conditions hold of every lowering, not just recognized ones
+
+`Witness.ofFExpr` checks the divisor conditions, so `recognize`'s output always
+satisfies them — and D011 stated them as though that settled it. It did not:
+`Recognized` is public and `lowerRecognized` takes one built by hand, which is
+how the six `Square_*` registry entries are built. R5c drove two modules out
+through that door, both with an empty diagnostic array:
+
+* a divisor of `0`, which `llzk-opt` parses, verifies, round-trips *and*
+  product-programs without complaint, and which `llzk-witgen` then traps on;
+* a divisor of `p + 5`, emitted as `felt.const 2013265926`, which LLZK reduces to
+  `5` — so the module silently computes `7 % 5 = 2` where the author wrote
+  `7 % (p + 5) = 7`, on both backends, with every static gate green.
+
+The check now sits inside the private `lower`, below both doors. -/
+
+private def recognizedWith (witnesses outputs : Array FieldExpr) : Recognized :=
+  { inputSize := 1, witnesses, asserts := #[], lookups := #[], tables := #[], outputs }
+
+private def viaRecognized (r : Recognized) : String :=
+  renderResult (lowerRecognized (.forField .babybear) r)
+
+-- Baseline: a well-formed divisor still lowers, so the guards below are not red
+-- for some unrelated reason.
+#guard (lowerRecognized (.forField .babybear)
+  (recognizedWith #[.umod (.var 0) 256] #[.var 1])).toOption.isSome
+
+/--
+info: compilation failed:
+witness cell 0: witness modulo has divisor 0; Lean's natural modulo by zero is total but LLZK's is not, so this shape is refused
+-/
+#guard_msgs in
+#eval IO.print (viaRecognized (recognizedWith #[.umod (.var 0) 0] #[.var 1]))
+
+/--
+info: compilation failed:
+witness cell 0: witness division has divisor 0; Lean's natural division by zero is total but LLZK's is not, so this shape is refused
+-/
+#guard_msgs in
+#eval IO.print (viaRecognized (recognizedWith #[.uintdiv (.var 0) 0] #[.var 1]))
+
+/--
+info: compilation failed:
+witness cell 0: witness modulo has divisor 2013265926, which is not below the field prime 2013265921; `felt.const` would reduce it modulo the prime
+-/
+#guard_msgs in
+#eval IO.print (viaRecognized (recognizedWith #[.umod (.var 0) (pBabybear + 5)] #[.var 1]))
+
+-- A constant at or above the prime, which `felt.const` would reduce. Not one of
+-- R5c's two, but the same defect in the third expression position -- and
+-- `outputs` reaches the renderer through `@constrain`, where no witgen backend
+-- would ever execute it.
+/--
+info: compilation failed:
+output 0: constant 2013265928 is not below the field prime 2013265921; `felt.const` reduces its operand modulo the prime, so the emitted module would not denote what this expression says
+-/
+#guard_msgs in
+#eval IO.print (viaRecognized (recognizedWith #[] #[.const (pBabybear + 7)]))
+
+-- And in an assertion, the fourth position.
+/--
+info: compilation failed:
+assertion 0: constant 2013265928 is not below the field prime 2013265921; `felt.const` reduces its operand modulo the prime, so the emitted module would not denote what this expression says
+-/
+#guard_msgs in
+#eval IO.print (renderResult (lowerRecognized (.forField .babybear)
+  { inputSize := 1, witnesses := #[], asserts := #[.const (pBabybear + 7)],
+    lookups := #[], tables := #[], outputs := #[] }))
 
 end LLZK.Test.Circuit

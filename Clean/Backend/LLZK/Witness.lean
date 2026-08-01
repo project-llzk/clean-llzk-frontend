@@ -152,6 +152,45 @@ private def checkDivisor (context : String) (operation : String) (prime divisor 
                            field prime {prime}; `felt.const` would reduce it modulo the prime" }
   else .ok ()
 
+/-- Check that a `FieldExpr` can be lowered faithfully: every constant is already
+a canonical representative, and every literal divisor satisfies D011's two side
+conditions.
+
+Everything `ofFExpr` produces satisfies this by construction, so on the
+`recognize` path the check never fires. `Recognized` is a public structure
+though, and `Circuit.lowerRecognized` accepts one built by hand — where until now
+nothing checked it at all, because the conditions were enforced *by the
+recognizer* rather than *before the lowering*. R5c walked through that gap twice:
+
+* `.uintdiv (.var 0) 0` emits `felt.uintdiv %v0, %zero`, which `llzk-opt` parses,
+  verifies, round-trips and product-programs without complaint, and which
+  `llzk-witgen` then traps on. Text produced with an empty diagnostic array that
+  no static gate rejects.
+* `.umod (.var 0) (p + 5)` emits `felt.const 2013265926`, which LLZK reduces to
+  `5`, so the module computes `7 % 5 = 2` where the caller wrote `7 % (p + 5) =
+  7`. Silent, on both witgen backends, with `llzk-opt` clean.
+
+Both are now refused before any text exists. `Circuit.lower` runs this, so the
+check sits below every door rather than beside one of them. -/
+def checkLowerable (prime : Nat) (context : String) :
+    FieldExpr → Except Diagnostic Unit
+  | .var _ => .ok ()
+  | .const c =>
+    if c < prime then .ok ()
+    else .error { context
+                  message := s!"constant {c} is not below the field prime {prime}; \
+                                `felt.const` reduces its operand modulo the prime, so the \
+                                emitted module would not denote what this expression says" }
+  | .add a b | .mul a b => do
+    checkLowerable prime context a
+    checkLowerable prime context b
+  | .uintdiv a d => do
+    checkDivisor context "division" prime d
+    checkLowerable prime context a
+  | .umod a d => do
+    checkDivisor context "modulo" prime d
+    checkLowerable prime context a
+
 /-- Recognize a field-sorted witness expression.
 
 `.expr` delegates to `ofExpression`, which is total, so an embedded circuit

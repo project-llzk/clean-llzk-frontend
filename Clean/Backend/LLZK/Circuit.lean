@@ -140,6 +140,11 @@ Each used table becomes one `global.def const`. Only single-column tables reach
 here — `ExportTable.diagnose` rejects wider ones — so flattening the rows is the
 identity on their shape and the emitted array length is the row count. -/
 private def lower (cfg : Config) (r : Recognized) : Except Diagnostic Module := do
+  -- Below every door, not beside one of them: `recognize` establishes these
+  -- conditions for the circuits it accepts, but `lowerRecognized` takes a
+  -- `Recognized` built by hand, and D011 stated them as though they held of
+  -- every lowering. R5c showed they did not. See `FieldExpr.checkLowerable`.
+  r.checkLowerable cfg.field.prime
   let fieldTy := Ty.felt cfg.field.name
   let globals := r.tables.map fun table => {
     name := table.name

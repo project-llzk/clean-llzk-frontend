@@ -113,6 +113,42 @@ expect "happy path" 0 "pin check:  PASS" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
 echo
+echo "== check-confinement.sh =="
+
+# G12 is a grep, which is the kind of check that silently stops matching. Each
+# case adds a call site the gate is supposed to catch, in a module that is not
+# on its allowlist.
+clone="$(make_clone confine-tables)"
+printf 'import Clean.Backend.LLZK.Basic\ndef sneaky := Config.unsafeWithTables\n' \
+  > "${clone}/Clean/Backend/LLZK/Sneaky.lean"
+expect "unsafeWithTables outside its modules" 1 "Config.unsafeWithTables outside" \
+  -- bash "${clone}/scripts/llzk/check-confinement.sh"
+
+clone="$(make_clone confine-lower)"
+printf 'import Clean.Backend.LLZK.Circuit\ndef sneaky := lowerRecognized\n' \
+  > "${clone}/Clean/Backend/LLZK/Sneaky.lean"
+expect "lowerRecognized outside its modules" 1 "G9-skipping entry points outside" \
+  -- bash "${clone}/scripts/llzk/check-confinement.sh"
+
+clone="$(make_clone confine-compile)"
+printf 'import Clean.Backend.LLZK.Circuit\ndef sneaky := compileSource\n' \
+  > "${clone}/Clean/Gadgets/Sneaky.lean"
+expect "compileSource outside its modules" 1 "G9-skipping entry points outside" \
+  -- bash "${clone}/scripts/llzk/check-confinement.sh"
+
+# The gate must not fire on the *verified* door, or it would push authors back
+# towards the unverified ones to keep the build green.
+clone="$(make_clone confine-verified)"
+printf 'import Clean.Backend.LLZK.WitnessCheck\ndef fine := compileSourceVerified\n' \
+  > "${clone}/Clean/Gadgets/Fine.lean"
+expect "compileSourceVerified is not confined" 0 "every gate-skipping entry point is confined" \
+  -- bash "${clone}/scripts/llzk/check-confinement.sh"
+
+clone="$(make_clone confine-happy)"
+expect "confinement happy path" 0 "every gate-skipping entry point is confined" \
+  -- bash "${clone}/scripts/llzk/check-confinement.sh"
+
+echo
 echo "== lib.sh tool checks =="
 
 # Each helper is called in a subshell so its `exit 1` is observable.
