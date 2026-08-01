@@ -474,13 +474,19 @@ deliberately so, and a proof about what an emission *does* has to see them.
 That is why `FieldExpr` and its lowering moved here.
 
 The reader is stated over an arbitrary `ExprAlgebra` so that this module keeps
-its independence from `Poly` and from any notion of a field;
-`Clean/Backend/LLZK/Constraints.lean` instantiates it.
+its independence from `Poly` and from any notion of a field. This paragraph used
+to add that `Clean/Backend/LLZK/Constraints.lean` instantiates it. It does not,
+and nothing else does either — R5a checked, and the algebra has exactly one
+consumer, the theorem below.
 
-**What is proved and what is not.** The expression level is proved. The loops
-that assemble a whole `@constrain` — the member reads, the lookups, the assertion
-and output passes — are not, and `ConstraintSet.agree` is still what establishes
-them. So this strengthens D018's argument without yet retiring the check. -/
+**What is proved and what is not.** A fragment of the expression level is proved;
+read `lower_spec`'s own docstring for how much smaller that fragment is than its
+name suggests. The loops that assemble a whole `@constrain` — the member reads,
+the lookups, the assertion and output passes — are not proved, `ConstraintSet.agree`
+is still what establishes them, and R5a-4 shows the conjuncts here cannot be
+lifted through those loops without being restated first. So this does not yet
+strengthen D018's argument as much as it was written to. `GAPS.md` is the
+register. -/
 
 /-- What an emitted expression can be read into: a carrier with the four
 operations `FieldExpr` is built from. -/
@@ -597,9 +603,7 @@ theorem Builder.run_bind {ε α β : Type} (f : ExceptT ε BuilderM α)
 theorem Builder.run_lift {ε α : Type} (m : BuilderM α) (s : BuilderState) :
     (liftM m : ExceptT ε BuilderM α).run s = (.ok (m s).1, (m s).2) := rfl
 
-/-- **The expression lowering emits exactly what the reader reads back.**
-
-Running the lowering from a fresh index and then reading the statements it
+/-- Running the lowering from a fresh index and then reading the statements it
 emitted recovers the expression's denotation at the value it returned. The
 bookkeeping travels with it: the index only advances, every statement defines an
 index in the range consumed, and the returned value is in scope.
@@ -607,7 +611,28 @@ index in the range consumed, and the returned value is in scope.
 The reading claim is conditional on the expression *having* a denotation, which
 is what makes `uintdiv` and `umod` fall out — they are witness-only, they denote
 nothing in an `ExprAlgebra`, and the claim is vacuous for them. An unconditional
-statement would need a freshness side condition on the assignment. -/
+statement would need a freshness side condition on the assignment.
+
+**Read the statement, not this docstring.** It used to open "the expression
+lowering emits exactly what the reader reads back", and R5a took that at its
+word: it abstracted the statement over the lowering function and proved it, with
+no `sorry` and clean axioms, of five alternatives — one that throws on every
+expression, one that ignores `ty` and emits everything as `bn254`, one that
+appends a bogus `constrain.eq %v, 0` for every subexpression, one that emits junk
+`struct.writem`s, and one that redefines an already-allocated SSA index.
+
+They all pass because `readStmt` is the identity on `structNew`, `readMember`,
+`writeMember`, `globalRead`, `constrainEq` and `constrainIn`, and `Stmt.dst?` is
+`none` for three of those — so a lowering may emit arbitrarily many of them
+invisibly — and because the reading conjunct sits entirely under `out = .ok v`,
+so refusing everything satisfies it.
+
+What the theorem does establish is the `feltConst`/`feltBin` fragment: *if* the
+lowering returns a value, the arithmetic statements it emitted denote the
+expression at that value, and the indices it allocated are the ones it consumed.
+That is real and is what the assembly loops need from it, but it is not a
+preservation theorem and does not compose into one — R5a-4 gives three concrete
+obstructions. `GAPS.md` records them. Nothing outside this file uses it. -/
 theorem FieldExpr.lower_spec {A : Type} (alg : ExprAlgebra A) (ctx : String) (ty : Ty)
     (env : FieldExpr.Env) :
     ∀ (e : FieldExpr) (start : Nat) (S : Array Stmt),
