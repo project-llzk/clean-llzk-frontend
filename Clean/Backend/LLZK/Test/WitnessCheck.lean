@@ -118,4 +118,32 @@ modules whose `@compute` is in the modelled subset, and every corpus module is. 
 #guard (Corpus.corpus.filterMap (fun e => e.module.toOption)).all
   fun m => (WitnessSet.ofModule m).isSome
 
+/-! ## The refusal is reachable, and reached
+
+`D018`'s weakness is that a correct emitter never triggers the refusal, so the
+error branch would otherwise be dead code and "the emitter refuses a wrong
+module" an untested claim about the one path that matters. `verify` takes the
+module as an argument, so a test can hand it one circuit's module and another
+circuit's source. -/
+
+private def moduleOf (cfg : Config) (src : Source Bab) : Option Module :=
+  (compileSource cfg src).toOption
+
+-- Its own module is accepted…
+#guard match moduleOf babybear mulSrc with
+  | some m => (verify mulSrc m).toOption.isSome
+  | none => false
+
+-- …and another circuit's is refused, with the diagnostic that says it is a
+-- backend defect rather than a circuit one.
+#guard match moduleOf babybear decSrc with
+  | some m => (verify mulSrc m).toOption.isNone
+  | none => false
+
+#guard match moduleOf babybear mulSrc with
+  | some m => match verify sq m with
+    | .error ds => ds.map (·.context) == #["witness"]
+    | .ok _ => false
+  | none => false
+
 end LLZK.Test.WitnessCheck

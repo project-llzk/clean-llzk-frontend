@@ -98,10 +98,11 @@ Two things, and neither is closable by more of this kind of work.
    has none.
 2. **G9 validates each translation; it does not verify the translator** (D018,
    D020). A lowering bug surfaces as a refusal to compile, not as a compile-time
-   impossibility, and the refusal branch is therefore unreachable while the
-   lowering is correct — the *checks* are tested in both directions, the
-   *refusals* are not. Closing this is S20: a simulation argument over the
-   `BuilderM` state monad.
+   impossibility. The refusal itself *is* tested — `verify` takes the module as
+   an argument precisely so a test can hand it one circuit's module and another
+   circuit's source — but a verified translator would make the refusal provably
+   dead instead. Closing this is S20: a simulation argument over the `BuilderM`
+   state monad.
 
 Two smaller things, stated so they are not mistaken for gaps:
 

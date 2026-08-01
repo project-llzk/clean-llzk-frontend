@@ -293,18 +293,30 @@ private def witnessMismatch : Diagnostic where
               side). This is a defect in the backend, not in the circuit: please report it with \
               the circuit that triggered it. See Clean/Backend/LLZK/WitnessCheck.lean"
 
+/-- Check a module against the circuit it claims to be, and refuse it if it is
+not.
+
+Factored out of `compileSourceVerified` so that the *refusal* is reachable from a
+test. Nothing the emitter produces can fail this — that is the point of it — so
+without a function that takes the module as an argument, the error branch would
+be dead code, and "the check refuses a wrong module" would be an untested claim
+about the one path that matters. `Test/WitnessCheck.lean` calls it with one
+circuit's module and another circuit's source. -/
+def verify (src : Source F) (m : Module) : Except (Array Diagnostic) Module :=
+  if WitnessSet.agree src m then .ok m else .error #[witnessMismatch]
+
 /-- Compile a flattened circuit and verify **both** halves of G9 before returning
 it. -/
 def compileSourceVerified (cfg : Config) (src : Source F) : Except (Array Diagnostic) Module :=
   match ConstraintSet.compileSource' cfg src with
   | .error diagnostics => .error diagnostics
-  | .ok m => if WitnessSet.agree src m then .ok m else .error #[witnessMismatch]
+  | .ok m => verify src m
 
 omit [CanonicalRepr F] in
 /-- **Every module this backend emits computes the circuit's witnesses.** -/
 theorem witnessAgree_of_compileSourceVerified {cfg : Config} {src : Source F} {m : Module}
     (h : compileSourceVerified cfg src = .ok m) : WitnessSet.agree src m = true := by
-  unfold compileSourceVerified at h
+  unfold compileSourceVerified verify at h
   split at h
   · exact absurd h (by simp)
   · split at h
@@ -318,7 +330,7 @@ omit [CanonicalRepr F] in
 same entry point. -/
 theorem constraintsAgree_of_compileSourceVerified {cfg : Config} {src : Source F} {m : Module}
     (h : compileSourceVerified cfg src = .ok m) : ConstraintSet.agree src m = true := by
-  unfold compileSourceVerified at h
+  unfold compileSourceVerified verify at h
   split at h
   · exact absurd h (by simp)
   · rename_i m' hc
