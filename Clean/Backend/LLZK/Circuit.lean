@@ -85,8 +85,11 @@ private def lowerCompute (structTy fieldTy : Ty) (r : Recognized) : Except Diagn
       let value ← FieldExpr.lower s!"output {j}" fieldTy env expr
       Builder.writeMember self structTy (outputMember j) value fieldTy
 
-/-- `@constrain`: read the state back, then emit one equality per assertion and
-one per output.
+/-- `@constrain`: read the state back, then emit the lookups, the assertions, and
+the output equalities, in that order.
+
+The grouping does not follow the circuit's operation order. Constraints are a
+conjunction, so it carries no meaning — see `Recognized`.
 
 Clean's `assert e` means `e = 0`, so each assertion becomes `constrain.eq %e,
 %zero`. The zero constant is emitted only when there is at least one assertion,

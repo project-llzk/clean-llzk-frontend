@@ -48,7 +48,19 @@ structure RecognizedLookup where
 deriving Repr
 
 /-- A circuit recognized into the Stage-1 subset: everything the lowering needs,
-and nothing it has to re-check. -/
+and nothing it has to re-check.
+
+Splitting the operation list by kind loses the interleaving between witnesses,
+assertions and lookups, and keeps only the order *within* each kind. That is
+sound and deliberate:
+
+* witness order is the layout and is preserved exactly — cell `k` is circuit
+  variable `inputSize + k`, and a cell may only read earlier ones;
+* assertions and lookups are a conjunction, so their relative order carries no
+  meaning.
+
+The visible consequence is that `@constrain` groups all lookups, then all
+assertions, then the output equalities, rather than following source order. -/
 structure Recognized where
   inputSize : Nat
   /-- One expression per witness cell, in allocation order. Entry `k` computes

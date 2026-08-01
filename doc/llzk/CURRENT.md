@@ -1,11 +1,10 @@
 # Clean → LLZK current state
 
 Updated: 2026-08-01  
-Active milestone: P1 — Lean skeleton and assertion-only circuit (Lean side done,
-tool side unverified)  
-Last accepted session: S04 — analysis, layout, and the assertion-only vertical slice  
+Active milestone: P2 complete on the Lean side; **no LLZK tool has run**  
+Last accepted session: S07 — emitter command and conformance harness  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: `c3b9a769dfdcb83a202f39726cdb14207868f748`  
+Integration commit: filled in by the commit that follows this one  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
@@ -21,13 +20,18 @@ Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 - Completed:
   - S00 — control plane, pin checker, doctor, baseline build.
   - S03 — backend-local LLZK IR and deterministic renderer.
-  - S04 — analysis, layout, and the assertion-only vertical slice. A real
-    `FormalCircuit` compiles to textual LLZK; everything outside the Stage-1
-    subset is refused with named diagnostics.
+  - S04 — analysis, layout, and the assertion-only vertical slice.
+  - S05 — the two justified natural division/modulo witness shapes.
+  - S06 — table export registry, lookups, and `Gadgets.Addition8FullCarry`.
+  - S07 — the emitter command and the fail-closed conformance harness.
+
+  The whole Stage-1 emitter exists and is golden-tested. `Addition8FullCarry`
+  compiles end to end.
 - In progress:
   - none.
 - Blocked:
   - **S01 — provisioning the LLZK 3.0 tools.** One command away; see below.
+    S02, R0, R1 and R2 all wait on it.
 
 ## The one open blocker
 
@@ -58,20 +62,36 @@ a silent multi-hour source build. Expect ~363 MiB of fetches and no compilation.
 
 ## Last green gates
 
-Evidence: `doc/llzk/evidence/S00/`, `S03/`, `S04/`.
+Evidence: `doc/llzk/evidence/{S00,S03,S04,S05,S06,S07}/`.
 
 - G0: `bash scripts/llzk/check-pins.sh` — PASS.
-- G1: lint + `lake build --wfail Clean` (1818 jobs) + `lake build CleanTests`
-  (1716 jobs) — PASS.
-- G2: `Clean/Backend/LLZK/Test/Print.lean` and `Test/Circuit.lean` goldens — PASS.
-- G8: three negative fixtures pin exact diagnostics — PASS.
+- G1: lint + `lake build --wfail Clean` (1820 jobs) + `lake build CleanTests`
+  (1718 jobs) — PASS.
+- G2: the goldens in `Clean/Backend/LLZK/Test/{Print,Circuit}.lean` — PASS.
+  They pin the renderer over every IR constructor, and the full emitted module
+  for `Multiply`, `Decompose` and `Addition8FullCarry`.
+- G8: eight negative fixtures pin exact diagnostics — PASS. `scripts/llzk/e2e.sh`
+  and `doctor.sh` verified to reject a missing tool and the installed LLZK 2.0
+  binary.
 
-## Not proved yet
+## Not proved yet — read this before trusting the output
 
 **G3, G4, G5, G6, G7 have never run.** No LLZK tool has seen the backend's
 output. Its syntax was read from test fixtures in the pinned LLZK revision, not
-confirmed by the pinned binaries. Treat the two goldens as *proposals* about
-LLZK syntax until S02 validates them.
+confirmed by the pinned binaries. Treat every golden as a *proposal* about LLZK
+syntax until `e2e.sh` runs.
+
+G5/G6/G7 are also not implemented: they need a per-circuit input corpus and a
+Clean-side witness comparison. `e2e.sh` says so rather than passing silently.
+
+Two semantic arguments in the backend are prose, not proof, and are exactly what
+G5/G6 would test:
+
+- D011 — that `felt.umod`/`felt.uintdiv` on canonical representatives agree with
+  Clean's `ofNat (mod (val x) c)`.
+- D012 — that the rows in `Config.tables` are the table's rows. The backend
+  cannot check this; `ExportTable.ofStatic` is the mitigation where a
+  `StaticTable` is in scope, and `Gadgets.ByteTable` is not such a case.
 
 ## Known constraints
 
@@ -84,7 +104,20 @@ LLZK syntax until S02 validates them.
 ## Next session
 
 - Packet: `doc/llzk/sessions/S01-llzk-tooling.md`, then S02.
-- Objective: provision the pinned tools, then validate the two existing goldens
-  with `llzk-opt` **before** writing any new fixture — the emitter's output is
-  now the more useful subject than a handwritten one.
-- First command: `sudo systemctl restart nix-daemon`
+- Objective: provision the pinned tools, then run the harness against the
+  emitted corpus. Do **not** write a fresh handwritten fixture first: the
+  emitter's output is now the more useful subject, and S02's job is to find out
+  where it is wrong.
+- First commands:
+
+```bash
+sudo systemctl restart nix-daemon
+nix build --no-link --max-jobs 0 --print-out-paths \
+  github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk
+export LLZK_OPT=<that path>/bin/llzk-opt
+export LLZK_WITGEN=<that path>/bin/llzk-witgen
+bash scripts/llzk/e2e.sh
+```
+
+Expect that first `e2e.sh` run to fail somewhere in the syntax. That is the
+point of it, and the fix belongs in `Print.lean` plus a golden update.
