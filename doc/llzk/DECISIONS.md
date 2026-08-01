@@ -647,3 +647,52 @@ Two things this does not do:
   emitter's own recognizer; using it would make the comparison a self-check. It
   is a separate traversal whose correctness is proved, which is the property
   `ofFExpr` has only by inspection.
+
+## D021 — S20 is blocked on where the private boundary goes, not on effort
+
+**Status:** open, with the obstacle identified
+**Date:** 2026-08-01
+**Enacted by:** the S20 attempt
+
+D018 and D020 record that G9 *validates each translation* rather than verifying
+the translator, and name the preservation theorem about `lower` as the thing that
+would replace it. An attempt at its reusable core — that running
+`FieldExpr.lower` on an expression and then reading the emitted statements yields
+that expression's polynomial — ran into a structural obstacle worth recording,
+because it is not the one the earlier entries implied.
+
+The obstacle is **not** the `BuilderM` state monad. It is that every handle the
+proof needs is private:
+
+- `Value`'s constructor, so a proof cannot name the value an emission returns;
+- `Builder.fresh`, `Builder.emit` and `Builder.emitValue`, so it cannot unfold
+  what the typed emitters do;
+- `BuilderState`'s fields, so it cannot state what the state became.
+
+All of them are private *on purpose*: they are D005's first invariant, which
+R4b-3 tightened only hours before, and un-privating them would restore exactly
+the hole the reviewer exploited. Meanwhile `FieldExpr` lives in
+`Expression.lean`, which imports `IR.lean`, so the proof cannot live in either
+module.
+
+So S20 needs a decision before it needs a proof, and there are three shapes:
+
+1. **Move `FieldExpr` into `IR.lean`** and prove there. Keeps every invariant;
+   costs the clean separation between the accepted source language and the
+   emitter IR, which D009 is about.
+2. **Give `IR.lean` a proof-facing interface** — a read-only `Builder.run`, and
+   `Stmt`-level lemmas about each typed emitter, stated inside `IR.lean` and
+   exported. Keeps both boundaries; costs a second API to maintain in step with
+   the first.
+3. **Restructure the emitters as pure functions** from `(nextIndex, args)` to
+   `(statements, value)`, with the monad as a thin wrapper. Makes the theorem a
+   plain structural induction with no state reasoning at all, and is probably the
+   right answer; costs a rewrite of `IR.lean` and `Expression.lean`.
+
+(3) is the one to take, and it is a session of its own with its own review. Two
+partial artefacts from the attempt are *not* kept, deliberately: a `readStmt`/
+`readStmts` pair and their two lemmas compiled cleanly, but a lemma with no
+theorem above it is the speculative generality R2-08 removed elsewhere, and it
+would have to be rewritten under whichever shape above is chosen.
+
+Recorded because "S20 is large" was an estimate, and this is the actual reason.

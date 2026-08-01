@@ -117,6 +117,15 @@ on both sides, so a lowering bug yields a *refusal*, never a wrong module. S20
 would make that refusal impossible rather than merely never-observed: better
 robustness and diagnosis, not better soundness of what is emitted.
 
+It was attempted, and the attempt found that the obstacle is not the one D018
+implied. It is not the state monad: it is that `Value.mk`, `Builder.fresh`,
+`Builder.emit` and `BuilderState`'s fields are all private — D005's first
+invariant, which R4b-3 had just tightened — while `FieldExpr` lives in a module
+that imports them, so the proof has nowhere to live. **D021** records the three
+ways out and recommends one (make the emitters pure functions and keep the monad
+as a wrapper). The attempt was reverted rather than left half-built; nothing in
+the tree carries a `sorry`.
+
 Two smaller facts, stated so they are not mistaken for gaps: the whole-vector
 witness statement rests on the block-prefix discipline `Analyze` enforces rather
 than proves; and no solver has run on an emitted module, because `llzk-smt-check`

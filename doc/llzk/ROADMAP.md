@@ -146,10 +146,11 @@ One command, `bash scripts/llzk/e2e.sh`, reproduces all of it.
 - **The witness side has no G9.** `@compute` is covered by G5–G7 differentially,
   on 27 vectors, and by nothing else. The class its preservation theorem needs
   now exists (`CanonicalRepr`, D019), so it is statable; it is not stated.
-- **G9 validates each translation; it does not verify the translator** (D018). A
-  lowering bug would surface as a refusal to compile rather than as a
-  compile-time impossibility. The stronger statement needs a simulation argument
-  over the `BuilderM` state monad.
+- **G9 validates each translation; it does not verify the translator** (D018,
+  D020). A lowering bug surfaces as a refusal to compile rather than as a
+  compile-time impossibility. D021 records what actually blocks the stronger
+  statement — the emitter's privacy boundary, not the state monad — and the three
+  ways out.
 - **The reading of LLZK is an assumption** (D017): that `felt.add` is `+`,
   `constrain.eq` is equality, `constrain.in` is membership, and
   `!felt.type<"babybear">` is `ZMod 2013265921`. Nothing in Lean can settle it
