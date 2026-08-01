@@ -7,3 +7,4 @@ measurements.jsonl
 .bench-baseline-worktree/
 .bench-baseline-worktree.lock
 .claude/settings.local.json
+.llzk-worktree-owner
