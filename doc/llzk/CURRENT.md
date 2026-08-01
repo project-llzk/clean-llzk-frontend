@@ -92,42 +92,29 @@ rather than notes about it:
 
 ## What is still not established
 
-Two boundaries, and four residual risks R4's reviewers named.
+One boundary, and one improvement. Everything else R4 named is either closed or
+covered by another gate — see `review/R4-findings.md` for the risk-by-risk
+verdict, each pinned by a control rather than asserted.
 
-**Boundaries.** Neither is closable by more checking.
+**D017 — the reading of LLZK — cannot be closed from this repository.**
+`llzk-witgen`'s help text says it outright: *"llzk-witgen v1 ignores constrain()
+and traps on bool.assert."* There is no executor for `@constrain` in the pinned
+toolchain, and no formal LLZK semantics in Lean, so the assumption that
+`constrain.eq` is equality and `constrain.in` is membership has no empirical
+check and cannot acquire one here. Closing it means formalising LLZK, which is
+VeIR's project (D003). The `@compute` half of the same reading *does* have
+evidence: 30 vectors across two independent LLZK backends.
 
-1. **D017 — the reading of LLZK.** That `felt.add` is `+`, `constrain.eq` is
-   equality, `constrain.in` is membership, `felt.umod` reads its operands as
-   canonical representatives, and `!felt.type<"babybear">` is `ZMod 2013265921`.
-   Every emitted operation rests on it; settling it needs a formal LLZK model,
-   which is VeIR's job (D003). G5–G7 are the empirical evidence for the
-   `@compute` half, on 30 vectors and two independent LLZK backends; `@constrain`
-   has no executor, so its half has none.
-2. **G9 validates each translation; it does not verify the translator** (D018,
-   D020). A lowering bug surfaces as a refusal to compile, not as a compile-time
-   impossibility. Closing it is S20: a simulation argument over the `BuilderM`
-   state monad.
+**S20 — the preservation theorem — is an improvement, not a gap in the
+artifacts.** Every module `compile` returns has been compared against its circuit
+on both sides, so a lowering bug yields a *refusal*, never a wrong module. S20
+would make that refusal impossible rather than merely never-observed: better
+robustness and diagnosis, not better soundness of what is emitted.
 
-**Residual risks inside G9**, named by R4 and not closed:
-
-- Nothing checks that the member `@w{k}` `@compute` writes is the one
-  `@constrain` reads, beyond both readers applying the same `witnessMember`.
-- "Witness cell `k` ↔ circuit variable `inputSize + k`" is a tautology inside the
-  check, so G9 cannot detect an error in `Analyze`'s offset bookkeeping. That is
-  covered by fixtures instead (R2-03's `selfReadingBlock`, and R4's three
-  offset-threading probes).
-- Constant encoding is a *shared* convention of the two readers — the emitter
-  writes `val`, the reader reads `fromNat` — so it is the one thing the
-  cross-check cannot see. `CanonicalRepr` (D019) is what pins it, which is why
-  that class had to be genuinely required rather than nominally present.
-- `ConstraintSet.ofModule` does not check the `Ty` operands, nor the length or
-  values of the global a `constrain.in` points at. `llzk-opt` (G3) does the
-  former; the latter is D012's territory.
-
-**Two smaller things**, stated so they are not mistaken for gaps: the
-whole-vector witness statement needs the block-prefix argument `Analyze`
-enforces rather than proves; and no solver has run on an emitted module, because
-`llzk-smt-check` needs SMT-LIB that no pass in the pinned `llzk-opt` produces.
+Two smaller facts, stated so they are not mistaken for gaps: the whole-vector
+witness statement rests on the block-prefix discipline `Analyze` enforces rather
+than proves; and no solver has run on an emitted module, because `llzk-smt-check`
+needs SMT-LIB that no pass in the pinned `llzk-opt` produces.
 
 ## Known constraints
 

@@ -335,7 +335,7 @@ theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
 same entry point. -/
 theorem constraintsAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
     {src : Source F} {m : Module}
-    (h : compileSourceVerified cfg src = .ok m) : ConstraintSet.agree src m = true := by
+    (h : compileSourceVerified cfg src = .ok m) : ConstraintSet.agree cfg src m = true := by
   unfold compileSourceVerified verify at h
   split at h
   · exact absurd h (by simp)

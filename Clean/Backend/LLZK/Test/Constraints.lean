@@ -70,7 +70,7 @@ otherwise drop out of the gate silently. -/
 private def cross (cfg : Config) (built reference : Source Bab) : Bool :=
   match compileSource cfg built with
   | .error _ => false
-  | .ok m => agree reference m
+  | .ok m => agree cfg reference m
 
 /-- Remove every assertion. -/
 private def noAsserts (s : Source Bab) : Source Bab :=
@@ -132,6 +132,52 @@ private def renameTable (s : Source Bab) : Source Bab :=
       | .lookup l => .lookup { l with table := { l.table with name := "Other" } }
       | o => o }
 #guard !cross withBytes addSrc (renameTable addSrc)
+
+/-! ### The two R4 named as residual risks, and which are real
+
+R4's reviewers listed four risks inside G9. Two are covered by other gates and
+two were genuine; the genuine ones are pinned here. -/
+
+/-- The emitted `@constrain` reads a member `@compute` did not write to. Caught,
+because the constraint's polynomial then names a different cell than Clean's. -/
+private def felt : Ty := .felt "babybear"
+
+private def crossedWires : Except Diagnostic (Option StructDef) :=
+  Builder.component (ε := Diagnostic)
+    #[{ name := "w0", ty := felt, visibility := .signal },
+      { name := "w1", ty := felt, visibility := .signal },
+      { name := "out0", ty := felt, visibility := .pub }]
+    #[{ ty := felt, argName := "arg0" }]
+    (fun self args => do
+      let some x := args[0]? | pure ()
+      Builder.writeMember self "w0" x felt
+      Builder.writeMember self "w1" x felt
+      Builder.writeMember self "out0" x felt)
+    (fun self _ => do
+      let w1 ← Builder.readMember self "w1" felt
+      let o ← Builder.readMember self "out0" felt
+      Builder.constrainEq o w1 felt)
+
+/-- The circuit that module claims to be: two cells, `out0` equal to cell 0. -/
+private def twoCellSrc : Source Bab :=
+  { inputSize := 1
+    operations := [.witness 2 (.ir [] (.lit #v[.expr (.var ⟨0⟩), .expr (.var ⟨0⟩)]))]
+    outputs := #[.var ⟨1⟩] }
+
+#guard match crossedWires.toOption.getD none with
+  | some root => !(agree (F := Bab) babybear twoCellSrc { globals := #[], root })
+  | none => false
+
+-- The lookup table's *contents*. Before this the comparison recorded which table
+-- each `constrain.in` names and never what the table holds, so a `@Bytes` global
+-- with one row instead of 256 passed (R4).
+private def oneRowBytes : Config :=
+  { field := .babybear, tables := #[{ name := "Bytes", arity := 1, rows := #[#[0]] }] }
+
+#guard cross withBytes addSrc addSrc
+#guard match compileSource withBytes addSrc with
+  | .ok m => !(agree oneRowBytes addSrc m)
+  | .error _ => false
 
 /-! ## Canonicity
 

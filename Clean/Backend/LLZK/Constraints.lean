@@ -113,6 +113,14 @@ structure ConstraintSet (F : Type) where
   eqs : List (Poly F)
   /-- Each queried polynomial must be a row of the table of that name. -/
   lookups : List (String × Poly F)
+  /-- The lookup tables the module materializes, name and values.
+
+  Compared, because otherwise nothing does. R4 found that a `Config` supplying a
+  one-row `@Bytes` instead of 256 compiled and passed G9: the comparison recorded
+  which *table* each `constrain.in` names and the polynomial it queries, and never
+  looked at what the table contains. A `constrain.in` against the wrong set of
+  rows is a different constraint. -/
+  globals : List (String × Array Nat)
 deriving Repr
 
 namespace ConstraintSet
@@ -129,7 +137,7 @@ def outputEqs (outputs : List (Expression F)) : List (Poly F) :=
 extractors, and they are the ones `constraintsHoldFlat_iff_forall_mem` is stated
 over — so this reader is not a re-reading of the operation list that could
 disagree with Clean about which operations are constraints. -/
-def ofSource (src : Source F) : ConstraintSet F where
+def ofSource (cfg : Config) (src : Source F) : ConstraintSet F where
   inputs := src.inputSize
   eqs :=
     (FlatOperation.constraints src.operations).map Expression.toPoly
@@ -137,6 +145,12 @@ def ofSource (src : Source F) : ConstraintSet F where
   lookups :=
     (FlatOperation.lookups src.operations).flatMap
       fun l => (l.entry.toArray.map fun e => (l.table.name, Expression.toPoly e)).toList
+  -- The tables the circuit actually looks into, found by walking the operations
+  -- rather than by asking the emitter which ones it kept.
+  globals :=
+    (cfg.tables.filter fun table =>
+      (FlatOperation.lookups src.operations).any (·.table.name = table.name)).toList.map
+        fun table => (table.name, table.rows.flatten)
 
 /-- **The Clean side is exactly `ConstraintsHoldFlat`, plus the output
 definitions.**
@@ -148,8 +162,8 @@ counterpart. So once `ofModule` agrees with
 `ofSource`, the emitted `constrain.eq`s are satisfied by exactly the assignments
 that satisfy Clean's assertions — with the output members pinned to the output
 expressions, which is what D008 says they are for and what A4 argued informally. -/
-theorem ofSource_eqs_iff (src : Source F) (env : Environment F) (outs : Nat → F) :
-    (∀ p ∈ (ofSource src).eqs, Poly.eval (assign env outs) p = 0)
+theorem ofSource_eqs_iff (cfg : Config) (src : Source F) (env : Environment F) (outs : Nat → F) :
+    (∀ p ∈ (ofSource cfg src).eqs, Poly.eval (assign env outs) p = 0)
       ↔ (∀ e ∈ FlatOperation.constraints src.operations, e.eval env = 0)
         ∧ (∀ e j, (e, j) ∈ src.outputs.toList.zipIdx → outs j = e.eval env) := by
   simp only [ofSource, List.forall_mem_append, List.forall_mem_map, outputEqs, Prod.forall]
@@ -284,7 +298,8 @@ def ofModule (m : Module) : Option (ConstraintSet F) := do
   for stmt in m.root.constrain.body do
     let some next := step inputSize numWitnesses numOutputs declared globals reader stmt | none
     reader := next
-  return { inputs := inputSize, eqs := reader.eqs, lookups := reader.lookups }
+  return { inputs := inputSize, eqs := reader.eqs, lookups := reader.lookups
+           globals := (m.globals.map fun g => (g.name, g.values)).toList }
 
 /-! ## The comparison -/
 
@@ -294,12 +309,13 @@ circuit's, up to the order of the constraints.
 Order is deliberately not compared: constraints are a conjunction, and the
 emitter groups them lookups-first (A6). Multiplicity *is* compared — `isPerm`,
 not set equality — so a dropped or duplicated constraint is a mismatch. -/
-def agree (src : Source F) (m : Module) : Bool :=
+def agree (cfg : Config) (src : Source F) (m : Module) : Bool :=
   match ofModule (F := F) m with
   | none => false
   | some emitted =>
-    let clean := ofSource src
+    let clean := ofSource cfg src
     emitted.inputs == clean.inputs
+      && emitted.globals == clean.globals
       && emitted.eqs.isPerm clean.eqs && emitted.lookups.isPerm clean.lookups
 
 /-- The check, run through the whole compilation rather than on a module handed
@@ -307,7 +323,7 @@ in — so what is compared is what the emitter actually produces. -/
 def agreeCompiled [CanonicalRepr F] (cfg : Config) (src : Source F) : Bool :=
   match compileSource cfg src with
   | .error _ => false
-  | .ok m => agree src m
+  | .ok m => agree cfg src m
 
 /-! ## Emission is verified, not merely checked
 
@@ -343,14 +359,14 @@ def compileSource' [CanonicalRepr F] (cfg : Config) (src : Source F) :
     Except (Array Diagnostic) Module :=
   match compileSource cfg src with
   | .error diagnostics => .error diagnostics
-  | .ok m => if agree src m then .ok m else .error #[mismatch]
+  | .ok m => if agree cfg src m then .ok m else .error #[mismatch]
 
 /-- **Every module this backend emits carries its circuit's constraint system.**
 
 Not "every module in the corpus" — the comparison is a precondition of emission,
 so this is a theorem about all circuits. -/
 theorem agree_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F} {m : Module}
-    (h : compileSource' cfg src = .ok m) : agree src m = true := by
+    (h : compileSource' cfg src = .ok m) : agree cfg src m = true := by
   unfold compileSource' at h
   split at h
   · exact absurd h (by simp)
@@ -379,8 +395,8 @@ theorem eqs_iff_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source
         ∧ (∀ e j, (e, j) ∈ src.outputs.toList.zipIdx → outs j = e.eval env) := by
   have ha := agree_of_compileSource' h
   simp only [agree, hm, Bool.and_eq_true] at ha
-  have hperm : C.eqs.Perm (ofSource src).eqs := List.isPerm_iff.mp ha.1.2
-  rw [← ofSource_eqs_iff src env outs]
+  have hperm : C.eqs.Perm (ofSource cfg src).eqs := List.isPerm_iff.mp ha.1.2
+  rw [← ofSource_eqs_iff cfg src env outs]
   exact ⟨fun hh p hp => hh p (hperm.mem_iff.mpr hp),
          fun hh p hp => hh p (hperm.mem_iff.mp hp)⟩
 
@@ -393,7 +409,7 @@ membership in the emitted array is Clean's `Contains` — is
 theorem lookups_perm_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F}
     {m : Module} {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
     (hm : ofModule (F := F) m = some C) :
-    C.lookups.Perm (ofSource src).lookups := by
+    C.lookups.Perm (ofSource cfg src).lookups := by
   have ha := agree_of_compileSource' h
   simp only [agree, hm, Bool.and_eq_true] at ha
   exact List.isPerm_iff.mp ha.2

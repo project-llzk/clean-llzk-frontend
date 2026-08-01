@@ -96,20 +96,36 @@ Worth recording, because a review that finds nothing sound is not a review.
   site matched to a `#guard_msgs` fixture, except the three genuinely
   unreachable ones.
 
-## Residual risks the reviewers named and this session did not close
+## Residual risks the reviewers named, and what became of them
 
-- The `@compute`/`@constrain` link: nothing checks that the member `@w{k}` one
-  writes is the one the other reads, beyond both readers applying the same
-  `witnessMember` function.
-- "Witness cell `k` ↔ circuit variable `inputSize + k`" is a tautology inside the
-  check: `FieldExpr.lower` resolves `.var i` to `env[i]` and `memberVar` maps the
-  member back to `.circuit i`, so G9 cannot detect an error in `Analyze`'s
-  offset bookkeeping. The offset logic is covered by fixtures, not by G9.
-- Constant encoding is a shared convention of both readers (R4a-1's second half),
-  now pinned by `CanonicalRepr` rather than free, but still shared.
-- `ofModule` does not check the `Ty` operands, nor the length or values of the
-  global a `constrain.in` points at.
+The reviewers listed four risks inside G9. Two were real and are now closed; two
+are covered by a different gate, which the list did not say. Checked rather than
+asserted — `Test/Constraints.lean` pins the first two.
 
-These are recorded in `CURRENT.md`. They are the honest edge of what a
-two-reader comparison can establish; closing them needs the preservation theorem
-(S20), not more checking.
+| Risk | Verdict |
+|---|---|
+| Nothing links the member `@compute` writes to the one `@constrain` reads | **Covered.** A constraint reading `@w1` where the circuit names cell 0 gives a polynomial over a different cell, so the comparison goes red. Pinned by the `crossedWires` control. A cell that appears in *no* constraint would slip past G9, and is caught by G5–G7, which compare `w{k}` by name. |
+| The emitted lookup table's *contents* are never compared | **Was real; closed.** `ConstraintSet` now carries the module's globals and compares them against the rows the registry declares. Before this, compiling `Addition8FullCarry` with a one-row `@Bytes` instead of 256 passed G9. Pinned by the `oneRowBytes` control. |
+| "Witness cell `k` ↔ circuit variable `inputSize + k`" is a tautology inside the check, so G9 cannot see an error in `Analyze`'s offset bookkeeping | **Covered elsewhere, and stated.** The offset logic is covered by fixtures (`selfReadingBlock`) and by R4's own three threading probes, and differentially by G5–G7. G9 is not the gate for it. |
+| Constant encoding is a convention *shared* by both readers | **Irreducible in this design, and pinned by a class.** The emitter writes `val`, the reader reads `fromNat`, and `fromNat_val` makes the round trip exact — so no two-reader comparison can cross-check it. `CanonicalRepr` (D019) is what fixes the convention, which is why R4a-1 mattered so much: the class had to be genuinely required, not nominally present. |
+| `ofModule` does not check the `Ty` operands | **Covered by G3.** `llzk-opt` type-checks every operand; a module that got there would not verify. |
+
+## What is genuinely left
+
+One boundary and one improvement, and they are different kinds of thing.
+
+**D017 — the reading of LLZK — cannot be closed here.** `llzk-witgen`'s own help
+text says it: *"llzk-witgen v1 ignores constrain() and traps on bool.assert."*
+There is no executor for `@constrain` in the pinned toolchain and no formal LLZK
+semantics in Lean, so the `@constrain` half of the reading has no empirical
+check and cannot acquire one from this repository. Closing it means formalising
+LLZK, which is VeIR's project (D003). The `@compute` half does have evidence: 30
+vectors across two independent LLZK backends.
+
+**S20 — the preservation theorem — is an improvement, not a gap in the
+artifacts.** It is worth being precise about what it would buy, because the
+residual list read as though emitted modules were at risk. They are not: every
+module `compile` returns has been compared against its circuit on both sides, so
+a lowering bug produces a *refusal*, never a wrong module. S20 would make the
+refusal impossible rather than merely never-observed. That is robustness and
+diagnosis quality, not soundness of output.
