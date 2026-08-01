@@ -161,9 +161,15 @@ structure CertifiedTable (F : Type) [FiniteField F] where
 /-- Build a configuration from tables that carry their certificates.
 
 Since R5's X1 this is the only way to supply tables without naming
-`Config.unsafeWithTables`, which `scripts/llzk/check-unsafe-config.sh` forbids
-outside `Test/`. Still not a guarantee about the circuit's table; see the
-section comment above. -/
+`Config.unsafeWithTables`, which `scripts/llzk/check-confinement.sh` forbids
+outside `Test/`.
+
+Two things it does **not** do, both in `GAPS.md` item 1. It is not a guarantee
+about the circuit's table — the caller picks both sides of `Certifies`; see the
+section comment above. And it **erases the proof it demands**: the `map` below
+keeps only `exported`, so `compile` never sees a certificate and the obligation
+survives as a convention rather than as data. `sessions/S23-x1-closure.md`
+closes the second of those without touching Clean's core. -/
 def Config.ofCertified (spec : FieldSpec) (tables : Array (CertifiedTable F)) : Config :=
   Config.unsafeWithTables spec (tables.map (·.exported))
 

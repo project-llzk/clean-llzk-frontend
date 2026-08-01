@@ -207,7 +207,7 @@ private def fatBytes : Config :=
 
 -- What changed is that this can no longer be written by accident. The only
 -- public way to put tables in a `Config` is `unsafeWithTables`, named so that
--- `scripts/llzk/check-unsafe-config.sh` can forbid it outside `Test/`, and
+-- `scripts/llzk/check-confinement.sh` can forbid it outside `Test/`, and
 -- `Config.ofCertified` — which cannot express `fatBytes`, because
 -- `ExportTable.Certifies` is false for it and there is no proof to supply.
 

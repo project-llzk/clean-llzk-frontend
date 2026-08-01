@@ -34,11 +34,31 @@ a protection.
 What exists instead: `ExportTable.Certifies`, a proof obligation tying an export
 table to a Clean `Table`, discharged for `Gadgets.ByteTable` and demanded by
 `Config.ofCertified`. `Config`'s constructor is private and
-`Config.unsafeWithTables` is the only other way in, confined by G12. So the
-obligation is *carried and visible*, not *discharged by the compiler*.
+`Config.unsafeWithTables` is the only other way in, confined by G12.
 
-Closing this needs the `Table` to survive into `Lookup`, which is a change to
-Clean's core.
+**But `Config.ofCertified` erases what it demands.** It is
+`Config.unsafeWithTables spec (tables.map (·.exported))` — it drops the `Table`
+and the certificate and returns a plain `Config`, so by the time `compile` runs
+there is no certificate to see. The obligation is demanded at one wrapper and
+discarded there; what reaches the compiler is a convention plus a grep. An
+earlier version of this entry said the obligation was "carried and visible",
+which is exactly the kind of claim R5 exists to catch, and it survived four
+commits here after being written.
+
+So this entry is **two** gaps, and only one of them is upstream:
+
+1. **The erasure** — backend-only, and specified in
+   `sessions/S23-x1-closure.md`: a `CertifiedConfig F` that carries the proofs to
+   the public entry points, which stop accepting a plain `Config`. No change to
+   Clean's core. Recording this as blocked on upstream is how a closable gap goes
+   unpicked-up.
+2. **The tie to the circuit's own table** — even with the certificate carried,
+   the caller picks *both* sides of `Certifies`, so it can certify a table the
+   circuit does not look into. Closing that needs the `Table` to survive into
+   `Lookup` instead of being erased to a `RawTable`, which *is* a change to
+   Clean's core.
+
+S23 closes (1) and leaves (2) exactly where it is.
 
 ## 2. Nothing says the renderer is faithful
 

@@ -131,7 +131,7 @@ purpose. Making the unchecked path *impossible* would delete those fixtures;
 making it *quiet* is what allowed R5's X1, where
 `{ field := .babybear, tables := #[fatBytes] }` compiled `Addition8FullCarry`
 into a module admitting `w0 = 300` with every gate green. So it is loud instead,
-and `scripts/llzk/check-unsafe-config.sh` fails if any non-test backend module
+and `scripts/llzk/check-confinement.sh` fails if any non-test backend module
 names it. -/
 def Config.unsafeWithTables (field : FieldSpec) (tables : Array ExportTable) : Config :=
   ⟨field, tables⟩

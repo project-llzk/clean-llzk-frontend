@@ -800,7 +800,7 @@ and the actual size.
 `Config`'s constructor is now private. The only public way to supply lookup
 tables is `Config.unsafeWithTables`, and `Config.ofCertified` is the wrapper
 that supplies an `ExportTable.Certifies` proof. G12
-(`scripts/llzk/check-unsafe-config.sh`) fails if any non-test module names the
+(`scripts/llzk/check-confinement.sh`) fails if any non-test module names the
 unsafe one.
 
 R5's X1 was not that an unchecked path existed — D012 says the compiler cannot

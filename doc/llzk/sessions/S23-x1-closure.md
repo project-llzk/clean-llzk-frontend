@@ -53,8 +53,14 @@ the only public entries that take a `Config`:
 | `emit` | `CertifiedConfig F` |
 | `emitSource` | `CertifiedConfig F` |
 | `compileSourceVerified` | `CertifiedConfig F` |
+| `verify` | `CertifiedConfig F` |
 | `witnessAgree_of_compileSourceVerified` | `{cfg : CertifiedConfig F}` |
 | `constraintsAgree_of_compileSourceVerified` | `{cfg : CertifiedConfig F}` |
+
+`verify` was added to this table after the packet was written: R5's X3 gave it a
+`Config` parameter so it could check the constraint half as well as the witness
+half, which turned it from a module-and-source comparison into a seventh entry
+point taking a configuration.
 
 Each body starts by projecting `cfg.toConfig`, so nothing below changes and the
 two theorems keep their current proofs modulo that unfolding.
