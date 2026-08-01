@@ -695,4 +695,19 @@ partial artefacts from the attempt are *not* kept, deliberately: a `readStmt`/
 theorem above it is the speculative generality R2-08 removed elsewhere, and it
 would have to be rewritten under whichever shape above is chosen.
 
-Recorded because "S20 is large" was an estimate, and this is the actual reason.
+**The blast radius, measured rather than guessed**, so the next session starts
+from a number: 43 call sites of the typed emitters, across four modules
+(`Expression`, `Circuit`, `RendererFixture`, `Test/Constraints`), and exactly two
+references to `BuilderM`/`BuilderState` outside `IR.lean` — one of which is a
+docstring. The monad is already almost entirely contained; what leaks is the
+*emitter API*, and (3) changes its shape rather than its users' logic. That is a
+contained refactor, and it is contained *because* of the encapsulation that
+blocks the proof today.
+
+Why it is not done here: it rewrites the core of a system that currently passes
+eleven gates and has just been through two independent reviews, at a point where
+no further review is available. The order that respects that is: make the shape
+decision, refactor under G0–G10, get it reviewed, then prove. Not the reverse.
+
+Recorded because "S20 is large" was an estimate, and this is the actual reason
+and the actual size.
