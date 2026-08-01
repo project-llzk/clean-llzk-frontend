@@ -711,6 +711,34 @@ the first. D009 calls `FieldExpr` "a closed language containing only what the
 backend can emit", which is a description of part of the emitter, so this is
 arguably where it belonged.
 
+**One more fact, from carrying the move out and then setting it aside.** The move
+itself is mechanical and keeps every gate green — that was verified end to end.
+What stops the proof being *developed* against it from outside is stronger than
+expected: `BuilderState`'s constructor is private too, so the theorem's
+*statement* cannot be written outside `IR.lean` at all. `Builder.run start (lower
+…)` is expressible, but the frame lemma every sequencing case needs must mention
+`{ nextIndex := …, stmts := … }`, and cannot.
+
+So the session that does this works inside `IR.lean` throughout, with transient
+`sorry`s in the working tree that never reach a commit. That is a normal way to
+develop a proof and a bad way to end a session, which is why the move is not
+merged here: without the theorem it is cost — `IR.lean` grows, cohesion drops —
+with no benefit yet. It is kept on the stash
+(`S20 attempt: FieldExpr move + reader infrastructure`) so the next session can
+`git stash pop` rather than redo it.
+
+Two things the attempt established, recorded so they are not rediscovered:
+
+- **The monadic machinery reduces definitionally.** `rfl` discharges
+  `Builder.run start (FieldExpr.lower ctx ty env (.const c))`. No `simp`
+  incantation for `ExceptT`/`StateT` is needed, which was the risk D018's
+  "simulation argument over the `BuilderM` state monad" implied.
+- **The reader's two stability lemmas are short and compiled first try**: that
+  reading one statement changes only the index it defines, and that statements
+  defining only high indices leave low ones alone. The second is what makes an
+  earlier subexpression's value survive a later one's emission, and it is the
+  lemma the sequencing cases turn on.
+
 This is a session of its own with its own review. Two
 partial artefacts from the attempt are *not* kept, deliberately: a `readStmt`/
 `readStmts` pair and their two lemmas compiled cleanly, but a lemma with no
