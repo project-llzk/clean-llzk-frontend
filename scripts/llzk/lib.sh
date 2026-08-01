@@ -36,7 +36,13 @@ $(sed 's/^/    /' <<<"${version}")"
 # Not laziness: at LLZK 3.0.0, `llzk-witgen --version` prints only LLVM's version
 # banner and never mentions LLZK, so there is nothing to match on. Requiring it
 # to sit in the same directory as a version-checked llzk-opt ties it to the same
-# installation, which is the property that actually matters.
+# installation.
+#
+# Provenance is necessary and not sufficient: a two-line `exit 0` script named
+# llzk-witgen next to a symlink to the real llzk-opt used to satisfy this and
+# make the whole harness report PASS while checking nothing (R2-06). What the
+# gates need is that the binary *discriminates*, which is
+# require_llzk_witgen_discriminates below.
 require_llzk_sibling() {
   local var="$1" path="$2" ref_var="$3" ref_path="$4"
   [[ "$(dirname -- "${path}")" == "$(dirname -- "${ref_path}")" ]] \
@@ -44,6 +50,75 @@ require_llzk_sibling() {
 both must come from the same LLZK installation"
   echo "${var}: ${path}"
   echo "  version: not self-reported; provenance from ${ref_var} (same installation)"
+}
+
+# require_llzk_witgen_discriminates ARTIFACT INPUTS EXPECTED WORKDIR
+#
+# Proves, on a real emitted artifact, that llzk-witgen --check-output can go both
+# green and red. Runs it twice: once against the expected witness, which must
+# succeed, and once against the same witness with one signal perturbed, which
+# must fail.
+#
+# Without this, every green below is unfalsifiable: the harness cannot tell a
+# passing check from a binary that exits 0 unconditionally. It costs one extra
+# invocation and it is the reason the 27 subsequent greens mean anything. It is
+# R2's Control 1, promoted from something a reviewer did by hand to something the
+# harness does every run.
+require_llzk_witgen_discriminates() {
+  local artifact="$1" inputs="$2" expected="$3" workdir="$4"
+  local corrupted="${workdir}/witgen-selftest-corrupted.json"
+
+  "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" \
+    --output-scope=full-witness --check-output "${expected}" >/dev/null \
+    || llzk_fail "llzk-witgen self-test: ${artifact} does not match its own expected witness; \
+every later green would be meaningless"
+
+  python3 - "${expected}" "${corrupted}" <<'PY' || llzk_fail "llzk-witgen self-test: \
+could not build the corrupted witness"
+import json, sys
+witness = json.load(open(sys.argv[1]))
+signals = witness["signals"]
+if not signals:
+    raise SystemExit("expected witness has no signals to perturb")
+key = next(iter(signals))
+signals[key] = str(int(signals[key]) + 1)
+json.dump(witness, open(sys.argv[2], "w"))
+PY
+
+  if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" \
+       --output-scope=full-witness --check-output "${corrupted}" >/dev/null 2>&1; then
+    llzk_fail "llzk-witgen self-test: ${LLZK_WITGEN} accepted a witness with one signal \
+perturbed, so --check-output is not checking anything. Every G5/G6/G7 green below would be \
+vacuous."
+  fi
+  rm -f "${corrupted}"
+  echo "llzk-witgen self-test: green on the expected witness, red on a perturbed one"
+}
+
+# llzk_smt_declared_reason LOGFILE
+#
+# Echoes the declared reason --llzk-to-smt-no-cf could not lower a module, or
+# nothing if the diagnostic is not one of the three known limits of LLZK 3.0.0's
+# SMT lowering.
+#
+# Keyed on the tool's own diagnostic rather than on what the artifact contains.
+# A proxy — "the module has a global.read, so any failure is excusable" — would
+# have excused an unrelated failure in the same module, which is how the first
+# version of this gate would have missed a root component not named @Main in
+# Addition8FullCarry.
+# The list holds only reasons an artifact in the corpus actually produces. A
+# tolerance nothing exercises is a hole: it can only ever excuse something. LLZK
+# 3.0.0 also leaves `global.read`/`constrain.in` unhandled, but no corpus module
+# reaches that point — Addition8FullCarry fails at `felt.uintdiv` first — so that
+# reason is deliberately absent and a lookup-only circuit would turn G10b red
+# until someone adds it with evidence.
+llzk_smt_declared_reason() {
+  local log="$1"
+  if grep -qE "failed to legalize operation 'felt\.(uintdiv|umod)'" "${log}"; then
+    echo "felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf"
+  elif grep -q 'no prime field specified' "${log}"; then
+    echo "the module declares no felt type, so the pass cannot deduce a prime field"
+  fi
 }
 
 # require_llzk_tools

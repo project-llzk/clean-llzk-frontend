@@ -68,10 +68,6 @@ bare string. -/
 def registry : Array FieldSpec :=
   #[babybear, mersenne31, koalabear, goldilocks, bn254, grumpkin]
 
-/-- The registry entry for a prime, if LLZK knows one. -/
-def ofPrime? (p : Nat) : Option FieldSpec :=
-  registry.find? (·.prime = p)
-
 end FieldSpec
 
 /-- A lookup table materialized as concrete rows.
@@ -81,14 +77,20 @@ Clean's `RawTable` keeps a name, an arity and logical predicates, but
 rows therefore cannot be recovered by walking a circuit's operations, and the
 caller must supply them.
 
-**This is trusted input.** The backend checks the name, the arity, the row
-widths, and that names are unique and are legal MLIR symbols, and it refuses a
-lookup it cannot resolve. It cannot check that these rows are *the table's* rows
-— `RawTable.Contains` is a `Prop`, not something the compiler can evaluate. Where
-a `StaticTable` is still in scope, use `ExportTable.ofStatic`, which derives the
-rows instead of asserting them.
+**This is trusted input, but only where it has to be.** The backend checks the
+name, the arity, the row widths, that names are unique, that they are legal MLIR
+symbols, that none collides with the component name, and that every value is a
+canonical representative in `[0, p)` — see `ExportTable.diagnose`, which is the
+complete list. It refuses a lookup it cannot resolve.
 
-Values are canonical representatives in `[0, p)`. -/
+What it cannot check is that these rows are *the table's* rows:
+`RawTable.Contains` is a `Prop`, not something the compiler can evaluate. That,
+and nothing else, is D012's trust assumption. Where a `StaticTable` is still in
+scope, use `ExportTable.ofStatic`, which derives the rows instead of asserting
+them.
+
+Values are canonical representatives in `[0, p)`; a value at or above the prime
+is a diagnostic, not a silent reduction. -/
 structure ExportTable where
   /-- Must equal the `RawTable.name` of the lookups it resolves. -/
   name : String

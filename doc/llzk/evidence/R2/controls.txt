@@ -1,0 +1,186 @@
+# R2 — falsifiability controls and probes
+
+Date (UTC): 2026-08-01
+Commit under test: 410343b2cc7fd6d4df2757b312787501eda58c17
+Tools: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0
+       llzk-opt reports "LLZK version 3.0.0"
+
+## Reproduction of the accumulated gates (packet gate: G0-G8 re-run)
+
+  $ export LLZK_OPT=.../bin/llzk-opt LLZK_WITGEN=.../bin/llzk-witgen
+  $ bash scripts/llzk/e2e.sh
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7
+    3 circuit(s), 16 input vector(s), both witgen backends.
+  exit status: 0
+
+Full transcript: evidence/R2/e2e-reproduced.txt.
+G8 is not part of e2e.sh; it is carried by `lake build CleanTests` inside G1.
+
+## Control 1 — corrupt an expected value (S02 control 1, reproduced)
+
+  $ python3 -c "... d['signals']['w0']='41' ..."   # Multiply.0.expected.json
+  $ llzk-witgen Multiply.llzk --inputs Multiply.0.inputs.json \
+      --output-scope=full-witness --check-output Multiply.0.expected.json
+  llzk-witgen output mismatch:
+  $.signals.w0: value mismatch: expected "41", got "42"
+  exit status: 1                                            REPRODUCED (red)
+
+## Control 2 — inject a one-off into Clean's witness computation
+
+Not re-run; it requires editing Differential.witness, which is outside R2's
+read-only scope. Control 1 and Control 3 exercise the same comparison path.
+
+## Control 3 (NEW) — corrupt @constrain only, leave @compute intact
+
+Multiply's constraint is `w0 - x*y = 0`, emitted with the coefficient
+`felt.const 2013265920` (= -1). Replacing it with `felt.const 7` inside
+@constrain only turns the constraint into `w0 + 7*x*y = 0`, a different and
+wrong constraint system.
+
+  G3 llzk-opt parse+verify       exit 0     STILL GREEN
+  G5 llzk-witgen interpreter     exit 0     STILL GREEN
+  G6 llzk-witgen exec-engine     exit 0     STILL GREEN
+
+## Control 4 (NEW) — delete the whole body of @constrain
+
+Addition8FullCarry with @constrain reduced to `function.return` — no lookup,
+no boolean constraint, no linear relation; a constraint system that proves
+nothing at all.
+
+  G3 llzk-opt parse+verify              exit 0     STILL GREEN
+  G4 llzk-opt --verify-roundtrip        exit 0     STILL GREEN
+  G5/G6 both backends, all 6 vectors    exit 0     STILL GREEN
+
+This is the §A gap made concrete rather than asserted. Only G2 (the goldens)
+would notice, and the goldens were generated from the emitter, so they detect
+drift, not error.
+
+## Control 5 (NEW) — make e2e.sh pass vacuously
+
+  $ mkdir fakebin && ln -s <real>/bin/llzk-opt fakebin/llzk-opt
+  $ printf '#!/bin/sh\nexit 0\n' > fakebin/llzk-witgen && chmod +x fakebin/llzk-witgen
+  $ LLZK_OPT=fakebin/llzk-opt LLZK_WITGEN=fakebin/llzk-witgen bash scripts/llzk/e2e.sh
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7
+    3 circuit(s), 16 input vector(s), both witgen backends.
+  exit status: 0                                            HARNESS FOOLED
+
+require_llzk_sibling establishes llzk-witgen's provenance by co-location with a
+version-checked llzk-opt. A symlink defeats it. G5, G6 and G7 pass vacuously
+and the summary line still claims 16 vectors on both backends.
+
+## Probe A — the field registry (D010)
+
+Transcription checked against the pinned LLZK source itself:
+
+  $ git -C ~/LLZK/llzk-lib show 5db6f8f9:lib/Util/Field.cpp
+  bn128/bn254  21888242871839275222246405745257275088548364400416034343698204186575808495617
+  grumpkin     21888242871839275222246405745257275088696311157297823662689037894645226208583
+  babybear     2013265921
+  goldilocks   18446744069414584321
+  mersenne31   2147483647
+  koalabear    2130706433
+
+All six entries in FieldSpec.registry match.
+
+Checked again behaviourally, by computing (p-1)^2 in each field through
+llzk-witgen and requiring 1:
+
+  babybear    {"out0":"1"}      mersenne31  {"out0":"1"}
+  koalabear   {"out0":"1"}      goldilocks  {"out0":"1"}
+  bn254       {"out0":"1"}      grumpkin    {"out0":"1"}
+
+An unknown field name is rejected: `!felt.type<"notafield">` gives
+`error: field 'notafield' is not defined`, exit 1, from both llzk-opt and
+llzk-witgen.
+
+## Probe B — llzk-witgen's --inputs number format
+
+  goldilocks, arg0 = p-1 as a JSON number
+    llzk-witgen error: expected felt value as JSON integer or decimal string
+  goldilocks, arg0 = p-1 as a JSON decimal string
+    {"out0":"1"}
+
+Same for bn254 and grumpkin. Differential.inputsJson emits `Json.num`.
+
+## Probe C — LLZK pipelines on the emitted artifacts
+
+  $ llzk-opt --llzk-product-program .lake/llzk/Multiply.llzk
+  error: could not find root struct "Main"
+  exit status: 1
+
+  $ sed 's/@Multiply/@Main/g' Multiply.llzk | llzk-opt --llzk-product-program
+  exit status: 0   (emits a @product function)
+
+  $ llzk-opt --llzk-full-inlining --llzk-product-program --llzk-to-smt-no-cf Main.llzk
+  exit status: 0   (emits smt.declare_fun w0_c/w0_w, out0_c/out0_w and asserts)
+
+  On Addition8FullCarry (renamed to @Main) the same pipeline exits 1, after
+  warning twice:
+    warning: unhandled operation, analysis may be incomplete
+      %v6 = global.read @Bytes : !array.type<256 x !felt.type<"babybear">>
+      constrain.in %v6, %v4 : ...
+
+  $ llzk-opt --llzk-print-interval-analysis .lake/llzk/Addition8FullCarry.llzk
+  @Addition8FullCarry StructIntervals {
+      %self.w0 in Entire   %self.w1 in Entire
+      %self.out0 in Entire %self.out1 in Entire
+      arg0..arg2 in Entire }
+  (uninformative; the same two unhandled-operation warnings precede it)
+
+## Probe D — unchecked names (D3)
+
+  $ #eval IO.print (emit babybear "not a symbol" multiply)
+  module attributes {llzk.lang, llzk.main = !struct.type<@not a symbol>} {
+    struct.def @not a symbol {
+  ...
+  No diagnostic. The text is not valid MLIR.
+
+## Probe E — unchecked table values (D4)
+
+  def badBytes : ExportTable :=
+    { name := "Bytes", arity := 1,
+      rows := (Array.range 256).map (fun i => #[i + 2013265921]) }
+  $ #eval IO.println (repr (ExportTable.diagnose badBytes))
+  #[]
+  $ #eval IO.print (emit { field := .babybear, tables := #[badBytes] } "A8" ...)
+  global.def const @Bytes : !array.type<256 x !felt.type<"babybear">>
+    = [2013265921, 2013265922, ...]
+
+  llzk-opt accepts such a global unchanged (exit 0) and prints the
+  out-of-range literals back verbatim.
+
+## Probe F — the Test/Print.lean golden is not valid LLZK
+
+Extracting the #guard_msgs expectation verbatim and feeding it to llzk-opt:
+
+  error: expected "@constrain" function argument types (sans the first one)
+         to match "@compute" function argument types
+  exit status: 1   (both plain verify and --verify-roundtrip)
+
+@Demo's @compute takes two felt parameters; its @constrain takes %self and one.
+Adding the missing parameter makes the same text verify and round-trip, exit 0,
+so the parameter-list mismatch is the only defect.
+
+## Probe G — control-set follow-ups (run after CONTROL-SET.md was opened)
+
+S2, struct name colliding with a global:
+  $ sed 's/@Addition8FullCarry/@Bytes/g' Addition8FullCarry.llzk | llzk-opt
+  error: symbol "@Bytes" references a 'global.def' but expected a 'struct.def'
+
+S5, outputs that are not witness cells (compiled through the emitter, then
+llzk-opt):
+  def passthrough : FormalCircuit (F pBabybear) field field where
+    main x := pure x                       -- output is the input
+  def constOut : FormalCircuit (F pBabybear) field field where
+    main _ := pure (Expression.const 7)    -- output is a constant
+
+  @Passthrough  verify=0  roundtrip=0   (no {signal} members at all;
+                                         constrain.eq %out0, %arg0)
+  @ConstOut     verify=0  roundtrip=0   (constrain.eq %out0, %(felt.const 7))
+
+S4, zero-of-everything: llzk-opt accepts a struct.def with no members, a
+parameterless @compute, and a @constrain with no constraints — established by
+demo-fixed.llzk (Probe F), which contains @Empty and verifies, exit 0.
+A circuit with zero inputs remains untested.
+
+S6: Clean/Backend/LLZK/IR.lean:38 — `deriving DecidableEq, Repr, Inhabited` on Ty.

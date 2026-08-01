@@ -8,15 +8,20 @@ import Clean.Backend.LLZK.Table
 Turns a Clean circuit into `Recognized`, the shape the lowering consumes, or into
 every reason it cannot.
 
-The analysis is the *only* capability gate: the lowering in `Circuit.lean` is
-total on a `Recognized`, so a construct that reaches LLZK text has necessarily
-passed through here. Clean's own `#assert_exportable` is a weaker check — it
-rejects only `.native` witness closures — so passing it says nothing about
-lowerability.
+The analysis is where every *source*-side capability question is settled: the
+lowering in `Circuit.lean` is total on a `Recognized` apart from one genuine
+failure it cannot rule out (`FieldExpr.lower` on an expression naming a circuit
+variable nothing defines — see `Circuit.lean`'s docstring). Clean's own
+`#assert_exportable` is a weaker check — it rejects only `.native` witness
+closures — so passing it says nothing about lowerability.
 
 Diagnostics are collected across all operations rather than stopping at the
 first. Each operation is recognized independently of the others, so a rejection
-early in the circuit cannot cascade into spurious rejections later.
+early in the circuit cannot cascade into spurious rejections later. The running
+witness offset is the one piece of cross-operation state, and it advances by the
+`m` a `.witness m` operation *declares* rather than by the number of cells
+recognition managed to produce — so a rejected block still leaves later blocks
+with the right base.
 -/
 
 namespace LLZK
@@ -94,7 +99,7 @@ private def collect {α : Type} (results : Array (Except Diagnostic α)) :
   else
     .error errors
 
-variable {F : Type} [FiniteField F]
+variable {F : Type} [FiniteField F] [CanonicalRepr F]
 
 /-- What one flat operation contributes: witness cells, assertions, lookups. -/
 private structure Contribution where
@@ -124,15 +129,23 @@ private def recognizeLookup (tables : Array ExportTable) (context : String) (l :
     | #[entry] =>
       .ok { tableName := table.name, tableRows := table.rows.size
             entry := FieldExpr.ofExpression entry }
+    -- Unreachable, and kept because the match must be total. `Lookup.entry` is a
+    -- `Vector (Expression F) l.table.arity`, `diagnoseRegistry` has already
+    -- rejected every registered arity other than 1, and the comparison above has
+    -- already forced `l.table.arity = 1` — so `entry` has exactly one element.
+    -- R2-07 listed this as a rejection path with no fixture; it has none because
+    -- nothing can reach it, which is a better answer than a fixture.
     | queried =>
       .error { context
                message := s!"lookup queries {queried.size} value(s); only single-column tables \
                              are supported" }
 
-private def recognizeOperation (tables : Array ExportTable) (prime : Nat) (index : Nat) :
-    FlatOperation F → Except Diagnostic Contribution
+/-- Recognize one flat operation. `base` is the circuit variable a witness block
+starting here would define first. -/
+private def recognizeOperation (tables : Array ExportTable) (prime : Nat) (base : Nat)
+    (index : Nat) : FlatOperation F → Except Diagnostic Contribution
   | .witness _ program => do
-    return { witnesses := ← Witness.recognize prime s!"operation {index} (witness)" program }
+    return { witnesses := ← Witness.recognize prime s!"operation {index} (witness)" base program }
   | .assert e => .ok { asserts := #[FieldExpr.ofExpression e] }
   | .lookup l => do
     return { lookups := #[← recognizeLookup tables s!"operation {index} (lookup)" l] }
@@ -159,13 +172,16 @@ The registry is diagnosed first and separately: a malformed entry is reported
 even when no lookup happens to reach it, and once it is known well-formed the
 per-lookup resolution has less to re-check. -/
 def recognize (cfg : Config) (src : Source F) : Except (Array Diagnostic) Recognized := do
-  match diagnoseRegistry cfg.tables with
+  match diagnoseRegistry cfg.field.prime cfg.tables with
   | #[] => pure ()
   | registryProblems => throw registryProblems
-  let contributions ← collect
-    (#[checkField (F := F) cfg |>.map fun _ => ({} : Contribution)]
-      ++ (src.operations.toArray.zipIdx.map fun (op, i) =>
-            recognizeOperation cfg.tables cfg.field.prime i op))
+  let mut results : Array (Except Diagnostic Contribution) :=
+    #[checkField (F := F) cfg |>.map fun _ => ({} : Contribution)]
+  let mut base := src.inputSize
+  for (op, i) in src.operations.toArray.zipIdx do
+    results := results.push (recognizeOperation cfg.tables cfg.field.prime base i op)
+    if let .witness m _ := op then base := base + m
+  let contributions ← collect results
   let lookups := contributions.flatMap (·.lookups)
   return {
     inputSize := src.inputSize
@@ -174,14 +190,5 @@ def recognize (cfg : Config) (src : Source F) : Except (Array Diagnostic) Recogn
     lookups
     tables := cfg.tables.filter fun table => lookups.any (·.tableName = table.name)
     outputs := src.outputs.map FieldExpr.ofExpression }
-
-/-- Every reason the circuit cannot be compiled; empty exactly when it can.
-
-The public form of `recognize`, for callers that want to inspect the capability
-boundary without building a module. -/
-def analyze (cfg : Config) (src : Source F) : Array Diagnostic :=
-  match recognize cfg src with
-  | .error diagnostics => diagnostics
-  | .ok _ => #[]
 
 end LLZK

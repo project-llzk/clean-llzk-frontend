@@ -1,0 +1,53 @@
+# S16-S18 - the proof track
+
+Date (UTC): 2026-08-01
+
+## Axiom hygiene: every theorem in the backend
+
+  $ lake env lean <file with #print axioms for each>
+
+  'LLZK.Monomial.eval_mul' depends on axioms: [propext, Quot.sound]
+  'LLZK.Poly.eval_addTerm' depends on axioms: [propext, Quot.sound]
+  'LLZK.Poly.eval_add' depends on axioms: [propext, Quot.sound]
+  'LLZK.Poly.eval_mul' depends on axioms: [propext, Quot.sound]
+  'LLZK.Expression.eval_toPoly' depends on axioms: [propext, Quot.sound]
+  'LLZK.ConstraintSet.ofSource_eqs_iff' depends on axioms: [propext, Quot.sound]
+  'LLZK.fromNat_val' depends on axioms: [propext, Quot.sound]
+  'LLZK.ConstraintSet.agree_of_compileSource'' depends on axioms: [propext, Classical.choice, Quot.sound]
+  'LLZK.ConstraintSet.eqs_iff_of_compileSource'' depends on axioms: [propext, Classical.choice, Quot.sound]
+  'LLZK.ConstraintSet.lookups_perm_of_compileSource'' depends on axioms: [propext, Classical.choice, Quot.sound]
+  'LLZK.mem_ofStatic_values' depends on axioms: [propext, Classical.choice, Quot.sound]
+  'LLZK.ofStatic_certifies' depends on axioms: [propext, Classical.choice, Quot.sound]
+  'LLZK.byteTable_certifies' depends on axioms: [propext, Classical.choice, Quot.sound]
+  'LLZK.certified_membership' depends on axioms: [propext, Classical.choice, Quot.sound]
+  'LLZK.Examples.byteTable_certified' depends on axioms: [propext,
+   Classical.choice,
+   Quot.sound,
+   instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+   primeBabybear._native.native_decide.ax_1]
+  'LLZK.CanonicalRepr.val_natCast' depends on axioms: [propext, Quot.sound]
+
+No 'sorry' anywhere under Clean/Backend/ (0 files match).
+
+Note the one outlier above. The *generic* theorem `byteTable_certifies` holds for
+any prime p and needs only the three standard axioms. Its instantiation at
+`pBabybear` -- `Examples.byteTable_certified` -- additionally picks up
+`primeBabybear` and `Fact (pBabybear > 512)`, which Clean proves by
+`native_decide`. That is a pre-existing property of Clean/Utils/Primes.lean,
+untouched by this work, and it is inherited by every proof about a concrete
+Clean prime field. Recorded because an axiom list is only worth reading if the
+surprises in it are explained.
+
+## Canonicity of the polynomial normal form (R3)
+
+  Eight terms, two of them equal monomials, summed in all eight rotations
+  and in reverse:
+  rotations all equal          : true
+  reverse equal                : true
+  term count after normalising : 7
+  monomials strictly sorted    : true
+  no zero coefficients         : true
+  no duplicate monomials       : true
+  x^3 monomial                 : [([LLZK.PVar.circuit 0, LLZK.PVar.circuit 0, LLZK.PVar.circuit 0], 1)]
+  (x+1)^2 = x^2+2x+1           : true
+  big product sorted           : true

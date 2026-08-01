@@ -1,6 +1,5 @@
 import Clean.Circuit.Formal
 import Clean.Backend.LLZK.Analyze
-import Clean.Backend.LLZK.Print
 
 /-!
 # Compiling a Clean circuit to an LLZK module
@@ -19,6 +18,7 @@ meaningful.
 
 | Clean | LLZK |
 |---|---|
+| the circuit | `struct.def @Main` — see `IR.rootComponent` and D015 |
 | input field element `i` | `@compute`/`@constrain` parameter `arg{i}` |
 | witness cell `k` | member `@w{k}`, `{signal}` |
 | output field element `j` | member `@out{j}`, `{llzk.pub}` |
@@ -72,25 +72,29 @@ private def members (r : Recognized) (fieldTy : Ty) : Array Member :=
 private def inputSpecs (r : Recognized) (fieldTy : Ty) : Array ParamSpec :=
   (Array.range r.inputSize).map fun i => { ty := fieldTy, argName := some (inputArgName i) }
 
-/-- `@compute`: evaluate each witness cell in allocation order, then each output.
+/-- `@compute`'s body: evaluate each witness cell in allocation order, then each
+output.
 
 A cell is written to its member as soon as it is computed and bound in the
-environment, so a later cell may read an earlier one — and only an earlier one,
-which is what makes a forward reference a diagnostic rather than silently reading
-an unwritten member. -/
-private def lowerCompute (structTy fieldTy : Ty) (r : Recognized) : Except Diagnostic Func :=
-  Builder.computeFunction structTy (inputSpecs r fieldTy) fun self inputs => do
-    let mut env : FieldExpr.Env := inputs
-    for (expr, k) in r.witnesses.zipIdx do
-      let value ← FieldExpr.lower s!"witness cell {k}" fieldTy env expr
-      Builder.writeMember self structTy (witnessMember k) value fieldTy
-      env := env.push value
-    for (expr, j) in r.outputs.zipIdx do
-      let value ← FieldExpr.lower s!"output {j}" fieldTy env expr
-      Builder.writeMember self structTy (outputMember j) value fieldTy
+environment, so a later cell may read an earlier one. That is sound only because
+`Analyze` has already refused any cell that reads another cell of its *own*
+`.witness m` block — Clean evaluates such a block against the environment before
+it, and would read `0` where this reads the computed value (R2-03). Across
+blocks, and from inputs, the two agree. A reference to a cell not yet in scope at
+all remains a diagnostic from `FieldExpr.lower`. -/
+private def computeBody (fieldTy : Ty) (r : Recognized) (self : Value) (inputs : Array Value) :
+    FieldExpr.LowerM Unit := do
+  let mut env : FieldExpr.Env := inputs
+  for (expr, k) in r.witnesses.zipIdx do
+    let value ← FieldExpr.lower s!"witness cell {k}" fieldTy env expr
+    Builder.writeMember self (witnessMember k) value fieldTy
+    env := env.push value
+  for (expr, j) in r.outputs.zipIdx do
+    let value ← FieldExpr.lower s!"output {j}" fieldTy env expr
+    Builder.writeMember self (outputMember j) value fieldTy
 
-/-- `@constrain`: read the state back, then emit the lookups, the assertions, and
-the output equalities, in that order.
+/-- `@constrain`'s body: read the state back, then emit the lookups, the
+assertions, and the output equalities, in that order.
 
 The grouping does not follow the circuit's operation order. Constraints are a
 conjunction, so it carries no meaning — see `Recognized`.
@@ -103,51 +107,53 @@ Each lookup reads its table's global rather than sharing one read across lookups
 of the same table. Sharing would need an index from a lookup back into the
 emitted globals, and a lookup into that index is a failure case the types cannot
 rule out; a repeated `global.read` is pure and MLIR's CSE folds it. -/
-private def lowerConstrain (structTy fieldTy : Ty) (r : Recognized) : Except Diagnostic Func :=
-  Builder.constrainFunction structTy (inputSpecs r fieldTy) fun self inputs => do
-    let mut env : FieldExpr.Env := inputs
-    for k in Array.range r.witnesses.size do
-      env := env.push (← Builder.readMember self structTy (witnessMember k) fieldTy)
-    for lookup in r.lookups do
-      let table ← Builder.globalRead lookup.tableName (Ty.array lookup.tableRows fieldTy)
-      let value ← FieldExpr.lower s!"lookup into '{lookup.tableName}'" fieldTy env lookup.entry
-      Builder.constrainIn table (Ty.array lookup.tableRows fieldTy) value fieldTy
-    unless r.asserts.isEmpty do
-      let zero ← Builder.feltConst 0 fieldTy
-      for (expr, i) in r.asserts.zipIdx do
-        let value ← FieldExpr.lower s!"assertion {i}" fieldTy env expr
-        Builder.constrainEq value zero fieldTy
-    for (expr, j) in r.outputs.zipIdx do
-      let declared ← Builder.readMember self structTy (outputMember j) fieldTy
-      let value ← FieldExpr.lower s!"output {j}" fieldTy env expr
-      Builder.constrainEq declared value fieldTy
+private def constrainBody (fieldTy : Ty) (r : Recognized) (self : Value) (inputs : Array Value) :
+    FieldExpr.LowerM Unit := do
+  let mut env : FieldExpr.Env := inputs
+  for k in Array.range r.witnesses.size do
+    env := env.push (← Builder.readMember self (witnessMember k) fieldTy)
+  for lookup in r.lookups do
+    let table ← Builder.globalRead lookup.tableName (Ty.array lookup.tableRows fieldTy)
+    let value ← FieldExpr.lower s!"lookup into '{lookup.tableName}'" fieldTy env lookup.entry
+    Builder.constrainIn table (Ty.array lookup.tableRows fieldTy) value fieldTy
+  unless r.asserts.isEmpty do
+    let zero ← Builder.feltConst 0 fieldTy
+    for (expr, i) in r.asserts.zipIdx do
+      let value ← FieldExpr.lower s!"assertion {i}" fieldTy env expr
+      Builder.constrainEq value zero fieldTy
+  for (expr, j) in r.outputs.zipIdx do
+    let declared ← Builder.readMember self (outputMember j) fieldTy
+    let value ← FieldExpr.lower s!"output {j}" fieldTy env expr
+    Builder.constrainEq declared value fieldTy
 
-/-- Lower a recognized circuit to a one-component module.
+/-- Lower a recognized circuit to a module.
+
+The component is `@Main` — `IR.rootComponent`, fixed rather than derived from the
+circuit, so that the emitted module can enter LLZK's analysis pipeline (D015).
+The circuit's own name survives as the artifact's file name, which is where
+`Corpus`/`EmitMain` put it.
+
+`Builder.component` takes `inputSpecs` once and hands it to both functions, so
+the two parameter lists cannot disagree (R2-04).
 
 Each used table becomes one `global.def const`. Only single-column tables reach
 here — `ExportTable.diagnose` rejects wider ones — so flattening the rows is the
 identity on their shape and the emitted array length is the row count. -/
-def lower (cfg : Config) (name : String) (r : Recognized) : Except Diagnostic Module := do
+def lower (cfg : Config) (r : Recognized) : Except Diagnostic Module := do
   let fieldTy := Ty.felt cfg.field.name
-  let structTy := Ty.struct name
   return {
-    main := name
     globals := r.tables.map fun table => {
       name := table.name
       elemTy := fieldTy
-      values := table.rows.flatMap id }
-    structs := #[{
-      name
-      members := members r fieldTy
-      compute := ← lowerCompute structTy fieldTy r
-      constrain := ← lowerConstrain structTy fieldTy r }] }
+      values := table.rows.flatten }
+    root := ← Builder.component (members r fieldTy) (inputSpecs r fieldTy)
+      (computeBody fieldTy r) (constrainBody fieldTy r) }
 
-variable {F : Type} [FiniteField F]
+variable {F : Type} [FiniteField F] [CanonicalRepr F]
 
 /-- Compile a circuit that has already been reduced to a `Source`. -/
-def compileSource (cfg : Config) (name : String) (src : Source F) :
-    Except (Array Diagnostic) Module := do
-  lower cfg name (← recognize cfg src) |>.mapError (#[·])
+def compileSource (cfg : Config) (src : Source F) : Except (Array Diagnostic) Module := do
+  lower cfg (← recognize cfg src) |>.mapError (#[·])
 
 /-- Circuits this backend can read.
 
@@ -174,21 +180,10 @@ instance {Input Output : TypeMap} [ProvableType Input] [ProvableType Output] :
     Compilable (FormalCircuit F Input Output) F :=
   ⟨Source.ofFormalCircuit⟩
 
-/-- Compile a circuit to an LLZK module, or report every reason it cannot be.
-
-`name` becomes both the component name and `llzk.main`. -/
-def compile {C : Type} [Compilable C F] (cfg : Config) (name : String) (c : C) :
-    Except (Array Diagnostic) Module :=
-  compileSource cfg name (Compilable.source (F := F) c)
-
-/-- Every reason a circuit cannot be compiled; empty exactly when it can. -/
-def diagnostics {C : Type} [Compilable C F] (cfg : Config) (c : C) : Array Diagnostic :=
-  analyze cfg (Compilable.source (F := F) c)
-
-/-- Emit a circuit as textual LLZK, or as the diagnostics explaining why not.
-
-The entry point behind the user-facing command. -/
-def emit {C : Type} [Compilable C F] (cfg : Config) (name : String) (c : C) : String :=
-  renderResult (compile cfg name c)
+/-! `compile` and `emit`, the public entry points, are deliberately **not** here.
+They live in `Clean/Backend/LLZK/Constraints.lean`, because they run gate G9 on
+the module before returning it — so no caller can obtain a module from this
+backend that has not been compared against its Clean source. `compileSource`
+above is the raw lowering, used by that check and by nothing else. -/
 
 end LLZK

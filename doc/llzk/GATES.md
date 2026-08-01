@@ -14,7 +14,8 @@ accumulated gates from a clean checkout.
 | G6 — Execution engine | Pinned execution engine produces the same witness |
 | G7 — Differential | Clean and LLZK witnesses agree on the fixture corpus |
 | G8 — Fail closed | Unsupported constructors and invalid layouts diagnose |
-| G9 — Proof | Named theorem target builds without new `sorry` |
+| G9 — Semantics | The emitted `@constrain` and `@compute` are the circuit's |
+| G10 — Pipeline | Every artifact is admissible to LLZK's analysis pipeline |
 
 ## G0 — State
 
@@ -54,6 +55,12 @@ lake env lean --run Clean/Backend/LLZK/EmitMain.lean <output-directory>
 LLZK_OPT=... LLZK_WITGEN=... bash scripts/llzk/e2e.sh
 ```
 
+The emitter also writes `<output-directory>/syntax/`: the renderer fixtures from
+`Clean/Backend/LLZK/RendererFixture.lean`, which have no Clean circuit behind
+them and no input vectors. G3/G4 run over them. That is the repair for R2-04 —
+the renderer golden had never been shown to a tool and was in fact invalid LLZK,
+while its own docstring claimed `e2e.sh` fed it to `llzk-opt`.
+
 There is deliberately no `#emit_llzk` macro. `#eval IO.print (LLZK.emit cfg
 "Name" circuit)` already does that job — the golden tests use exactly that form —
 and the artifact-producing command is the executable above, which is what a
@@ -84,13 +91,103 @@ so the expected JSON cannot drift from the emitted members.
 
 **What G5–G7 do not establish.** `llzk-witgen` executes `compute()` and ignores
 `constrain()`. Agreement means the two witness generators agree; it says nothing
-about whether the emitted constraints capture Clean's. That is the G9 proof
-track.
+about whether the emitted constraints capture Clean's. That is G9.
 
 Keep these gates falsifiable. A green that cannot go red is decoration — S02
 verified both by corrupting an expected value and by injecting a one-off into
 Clean's witness computation. Note that editing a generated file in place is *not*
 a valid check: `e2e.sh` removes and regenerates its output directory every run.
+
+Since S09 the harness does not take that on trust. Before the loop,
+`require_llzk_witgen_discriminates` runs `llzk-witgen` twice on a real corpus
+artifact — once against its own expected witness, which must pass, and once
+against the same witness with one signal perturbed, which must fail. R2-06 showed
+why: with `llzk-witgen` replaced by a two-line `exit 0` script sitting next to a
+symlinked `llzk-opt`, the harness reported `PASS … 16 input vectors, both witgen
+backends` and exited 0. Provenance by co-location was necessary and not
+sufficient; what the gates need is that the binary discriminates.
+
+## G9 — the emitted constraints
+
+```bash
+lake build CleanTests        # Test/Constraints.lean and Test/WitnessCheck.lean
+```
+
+Runs at Lean compile time and is also enforced by the emitter: `EmitMain` refuses
+to write a corpus entry whose constraints disagree, so `e2e.sh` carries it too.
+
+`Clean/Backend/LLZK/Constraints.lean` reads the Clean circuit and the emitted
+module into the same canonical polynomial form, through two readers that cannot
+see each other's input, and compares them as multisets. See D017 for what that
+proves and what it assumes.
+
+This is the gate R2's Control 4 was missing. An `Addition8FullCarry` module with
+a completely empty `@constrain` passes G3, G4, G5, G6, G7 and G10 on all six
+input vectors; it does not pass G9.
+
+Falsifiability is part of the gate rather than a note about it:
+`Test/Constraints.lean` perturbs the Clean side — dropping a constraint, bumping
+a coefficient, duplicating a constraint, dropping the lookup, substituting
+another circuit — and pins that the comparison goes red for each.
+
+**G9 is not a property of the corpus.** Since S17 the comparison is a
+*precondition of emission*: `ConstraintSet.compileSource'` runs it and refuses to
+return a module that fails, and `compile`/`emit` — the only public entry points —
+go through it. `agree_of_compileSource'` is the theorem, and
+`eqs_iff_of_compileSource'` gives its meaning. So this holds for every circuit,
+not for the five in the corpus.
+
+That is translation validation rather than a verified translator: a lowering bug
+would surface as a refusal to compile rather than as a compile-time
+impossibility. The stronger statement — a preservation theorem about `lower`
+itself — needs a simulation argument over the `BuilderM` state monad and is not
+done.
+
+**G9 has two halves, and both are preconditions of emission.**
+`Constraints.lean` compares `@constrain` against the circuit's constraints;
+`WitnessCheck.lean` (S19) compares `@compute` against its witness programs, with
+`WExpr.eval_ofWitgen` proving that the Clean-side reading is `Witgen.FExpr.eval`.
+`compile` and `emit` live in `WitnessCheck.lean` and go through both.
+
+**What G9 does not establish.** D017's reading of the emitted IR: that `felt.add`
+is `+`, `constrain.eq` is equality, `constrain.in` is membership, and
+`felt.umod`/`felt.uintdiv` read their operands as canonical representatives.
+Nothing in Lean settles that without a formal model of LLZK; G5–G7 are the
+empirical evidence for the `@compute` half of it, on 30 vectors and two
+independent LLZK backends. The lookup *rows* used to be listed here; since S16
+they are proved — see D012 and `Clean/Backend/LLZK/TableCert.lean`.
+
+## G10 — the LLZK analysis pipeline
+
+```bash
+llzk-opt --llzk-full-inlining --llzk-product-program <artifact>          # G10a
+llzk-opt --llzk-full-inlining --llzk-product-program \
+         --llzk-to-smt-no-cf <artifact>                                 # G10b
+```
+
+**G10a — admissibility — must succeed on every artifact, with no exceptions.**
+`--llzk-product-program` is the entry point to the SMT lowering and to everything
+downstream of it, and it looks up a root struct named literally `Main`, ignoring
+`llzk.main`. Before S12 the emitter named the component after the circuit, so no
+emitted module could enter any LLZK analysis and no gate noticed (R2-12, D015).
+
+**G10b — SMT lowering — is tolerated to fail only for a reason declared in
+`lib.sh`**, matched against the tool's own diagnostic rather than against what the
+artifact contains. The tolerance list holds only reasons a corpus artifact
+actually produces, because a tolerance nothing exercises can only ever excuse
+something. At the LLZK 3.0.0 pin those are `felt.uintdiv`/`felt.umod`, which the
+lowering marks illegal, and a module with no felt type, whose prime field cannot
+be deduced. Nine of the eleven corpus modules lower; `Decompose` and
+`Addition8FullCarry` do not.
+
+**The solver step is not reachable from the pinned tools.** `llzk-smt-check`
+ships in the same `bin/` and takes SMT-LIB, and `llzk-translate --smt-to-smtlib`
+requires a top-level `smt.solver` op that none of `--llzk-to-smt-no-cf`,
+`--llzk-to-smt-no-cf-naive` or `--llzk-to-smt-cf-only` produces. So G10 stops at
+"the module is admissible and lowers"; it runs no solver and checks no
+constraint. Recorded here because R2-12's finding was that the project described
+the toolchain as offering nothing at all against `constrain()` without anyone
+having looked. It offers this much, and no more.
 
 ## Evidence
 

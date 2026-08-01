@@ -2,7 +2,11 @@
 
 Status: proposed  
 Depends on: S02 (all of S00–S07 accepted)  
-Base integration commit: `a0c862786691a3bbdbbb2543c98ceb0951a9f24d` — verify with `git rev-parse HEAD`  
+Base integration commit: `0f4f5705a22980524afba1ec4ae724e2f4646a4e` — the commit
+this packet reviews, i.e. `git rev-parse HEAD^` from the commit that added the
+packet. (Corrected by S14 per R2-15: the packet originally named a third value,
+`a0c86278`, and said to verify it with `git rev-parse HEAD`, which cannot hold at
+the commit that introduces the packet.)  
 Worktree: `/home/alh/LLZK/clean-llzk-frontend`  
 Branch: `clean-to-llzk/integration`
 
@@ -106,11 +110,44 @@ records which.
 
 ## Handoff
 
-- Changes made:
-- Verdicts: (counts of REFUTED / CONFIRMED / UNSUPPORTED / NOT-CHECKED)
-- Findings and their severity:
-- Control-set coverage:
-- Decision: accepted / returned for repair
-- Follow-up packets written:
+- Changes made: `doc/llzk/review/R2-findings.md` (new) and
+  `doc/llzk/evidence/R2/` (new: `e2e-reproduced.txt`, `controls.txt`). No source
+  file touched; the review stayed read-only as the packet requires.
+- Verdicts: 12 CONFIRMED, 8 REFUTED, 6 CONFIRMED-with-caveat, 4 UNSUPPORTED,
+  0 NOT-CHECKED. Refuted: A5, C6, D2, D3, D4, E1 (D005), E2, E3, E4, F1, F4.
+- Findings and their severity: 15 numbered findings, R2-01 … R2-15.
+  High: R2-01 (component name never validated → invalid MLIR, no diagnostic),
+  R2-02 (table row values never range-checked → silently reduced mod p),
+  R2-06 (`e2e.sh` reports PASS with `llzk-witgen` replaced by `exit 0`).
+  Medium-high: R2-03 (the lowering's witness environment is more permissive than
+  Clean's `dynamicWitnesses`; the only §A refutation), R2-04 (D005 overclaimed,
+  and `Test/Print.lean`'s golden is invalid LLZK), R2-12 (emitted modules cannot
+  enter any LLZK pipeline because the root is not named `@Main`; an SMT-based
+  partial constraint check was available and unevaluated).
+  The most important single result is a control, not a code defect: an
+  `Addition8FullCarry` with a **completely empty `@constrain`** passes G3–G7 on
+  all six vectors.
+- Control-set coverage: 2 of 6 found independently (S1, S3); missed S2, S5, and
+  the framing of S4 and S6. All four re-checked afterwards — S2 is a real defect
+  and folds into R2-01's fix; S5 and S4 are corpus gaps, not defects; S6 is a
+  non-issue with a documentation point. Two of the misses share one method gap,
+  recorded at the end of `R2-findings.md`: acceptance paths were never enumerated
+  for coverage the way rejection paths were.
+- Decision: **returned for repair.** No emitted artifact in the corpus is
+  unsound — `Addition8FullCarry`'s constraints were hand-evaluated and are exactly
+  the gadget's three — but the fail-closed property is refuted by two working
+  counterexamples, and the harness can be made to pass vacuously.
+- Follow-up packets written: none yet; six are specified with their groupings and
+  ordering in `R2-findings.md` § "Recommended follow-up sessions" (S08 fail-open
+  checks → S09 harness → S10 witness environment → S11 IR invariants →
+  S12 SMT track → S13 documentation), with G9 after S10 and S12.
 - Resulting commit:
-- Exact next action:
+- Exact next action: write and run **S08** — add `isSymbolName` (plus a
+  table-name collision check) to the component name, and a value-range check to
+  `ExportTable.diagnose`, each with a negative fixture. Both are one-loop changes
+  and both break the fail-closed property that everything else rests on.
+
+Out of scope for this packet and therefore not done: `CURRENT.md`, `ROADMAP.md`
+and `DECISIONS.md` still describe Stage 1 as complete and still carry the
+miscounts in R2-11. Correcting them belongs to the session that acts on the
+verdict.

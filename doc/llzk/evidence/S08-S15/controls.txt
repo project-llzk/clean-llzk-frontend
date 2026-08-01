@@ -1,0 +1,82 @@
+# S08-S15 - falsifiability controls
+
+Date (UTC): 2026-08-01
+Tools:      /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0
+            z3 4.15.3 at /nix/store/x6z3sjmccszacl1xvdlpi7bd4ps7mhci-z3-4.15.3
+
+Every gate added or repaired by S08-S15 is shown going red. A green that
+cannot go red is decoration; R2 established that the hard way.
+
+## Control 5 (R2-06) - the vacuous harness, which used to report PASS
+
+  $ mkdir fakebin && ln -s <real>/llzk-opt fakebin/ && printf '#!/bin/sh\nexit 0\n' > fakebin/llzk-witgen
+  $ LLZK_OPT=fakebin/llzk-opt LLZK_WITGEN=fakebin/llzk-witgen bash scripts/llzk/e2e.sh
+
+  == harness self-test ==
+  error: llzk-witgen self-test: /tmp/claude-1000/-home-alh-LLZK/3528e903-3069-4039-a6b3-965cb6ab84b9/scratchpad/fakebin/llzk-witgen accepted a witness with one signal perturbed, so --check-output is not checking anything. Every G5/G6/G7 green below would be vacuous.
+  exit status: 1                                        RED (was PASS, exit 0)
+
+## Control A (R2-12) - a root component not named @Main fails G10a
+
+  $ sed 's/@Main/@Renamed/g' Multiply.llzk | llzk-opt                 exit 0   (G3 still green)
+  $ llzk-opt --llzk-full-inlining --llzk-product-program ...    exit 1   G10a RED
+    error: could not find root struct "Main"
+    declared reason: ''  (empty, so it is not excused)
+
+  $ sed 's/@Main/@Renamed/g' Addition8FullCarry.llzk | llzk-opt                 exit 0   (G3 still green)
+  $ llzk-opt --llzk-full-inlining --llzk-product-program ...    exit 1   G10a RED
+    error: could not find root struct "Main"
+    declared reason: ''  (empty, so it is not excused)
+
+## Control 4 (R2) - an empty @constrain, the control the whole repair is about
+
+Addition8FullCarry with @constrain reduced to 'function.return'.
+
+  G3  llzk-opt parse and verify                  exit 0   STILL GREEN
+  G4  llzk-opt --verify-roundtrip                exit 0   STILL GREEN
+  G10a --llzk-product-program                    exit 0   STILL GREEN
+  G5/G6 both backends, all 6 vectors             exit 0   STILL GREEN
+  G9  the constraint comparison                        RED
+
+No tool in the pinned toolchain looks at constrain(). G9 is the gate that
+does, and Test/Constraints.lean pins it going red for this and four other
+perturbations on every build:
+
+  $ lake build Clean.Backend.LLZK.Test.Constraints
+  exit status: 0 (all 26 #guards pass, including the eleven red controls and the canonicity checks)
+
+  cross(module, perturbed Clean source)         verdict
+  --------------------------------------------  -------
+  baseline, multiply                            true
+  baseline, Addition8FullCarry                  true
+  multiply's module vs decompose's constraints  false
+  every assertion dropped (Control 4's shape)   false
+  one coefficient bumped (Control 3's shape)    false
+  every assertion duplicated                    false
+  the lookup dropped                            false
+  a lookup pointed at a different table         false
+
+## Canonicity, pinned alongside the controls
+
+The comparison must not report a mismatch for two constraints that are equal as
+polynomials but written differently, or every green above would be luck.
+
+  x*y          vs y*x                          equal
+  x+y          vs y+x                          equal
+  x*(y*z)      vs (x*y)*z                      equal
+  (x+y)*z      vs x*z + y*z                    equal
+  x + (-1)*x   vs 0                            equal
+  x*y          vs x*z                          NOT equal
+  const 7      vs const 8                      NOT equal
+
+The last two matter: without them the first five would be satisfied by a normal
+form that collapses everything to the same value.
+
+## Axiom hygiene
+
+  $ #print axioms LLZK.ConstraintSet.ofSource_eqs_iff
+  depends on axioms: [propext, Quot.sound]
+
+Same for LLZK.Expression.eval_toPoly, LLZK.fromNat_val, LLZK.Poly.eval_add,
+LLZK.Poly.eval_mul, LLZK.Poly.eval_addTerm and LLZK.Monomial.eval_mul. No
+`sorry`, and not even `Classical.choice`.

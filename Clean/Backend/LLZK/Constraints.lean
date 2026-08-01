@@ -1,0 +1,385 @@
+import Clean.Backend.LLZK.Poly
+import Clean.Backend.LLZK.Circuit
+import Clean.Backend.LLZK.Print
+
+/-!
+# Gate G9: does the emitted `@constrain` say what Clean's circuit says?
+
+This is the gap R2 demonstrated rather than argued: an `Addition8FullCarry`
+module with a **completely empty `@constrain`** passes G3, G4, G5, G6, G7 and
+G10 on every input vector. `llzk-witgen` executes `compute()` and ignores
+`constrain()`, `llzk-opt` only type-checks it, and the goldens were generated
+from the emitter, so they detect drift rather than error. Nothing looked at the
+constraints.
+
+This module looks at them, by reading both sides into the same normal form:
+
+* `ConstraintSet.ofSource` reads the **Clean** circuit — the `.assert` and
+  `.lookup` operations of `Source.operations`, plus the output expressions.
+* `ConstraintSet.ofModule` reads the **emitted module** — the statements of
+  `@constrain`, as data, knowing nothing about the circuit they came from.
+
+The two meet only at `Poly`. Neither reader can see the other's input, so an
+emitted constraint that is missing, duplicated, or carries a wrong coefficient
+makes the comparison fail.
+
+**The comparison is a precondition of emission** (D018). `compileSource'` runs it
+and refuses to return a module that fails, and `compile`/`emit` — the public
+entry points, which is why they are at the bottom of this file rather than in
+`Circuit.lean` — go through it. So this is not a property of the corpus: no
+module leaves this backend without it. `Test/Constraints.lean` additionally pins
+that the comparison can go *red*, which is what makes the green worth anything.
+
+## What this establishes, and what it assumes
+
+`ofSource_holds_iff` proves that the Clean-side polynomials hold at an assignment
+exactly when `ConstraintsHoldFlat` does. So when the two polynomial sets agree,
+the emitted constraint system is satisfied by exactly the assignments that
+satisfy Clean's — *given* that `ofModule` reads the emitted IR the way LLZK does.
+
+That last clause is an assumption, and it is deliberately a small and inspectable
+one: `felt.add` is `+`, `felt.mul` is `*`, `felt.const n` is `fromNat n`,
+`struct.readm` reads the cell of that name, `constrain.eq a, b` is `a = b`, and
+`constrain.in t, v` is membership. It is the same *kind* of assumption as D011,
+and it is recorded as D017. Two things narrow it further: `ofModule` is
+fail-closed on every statement form it does not model, and it re-derives the
+component's shape (input count, witness count, output count) from the module
+alone, so a layout disagreement is a mismatch rather than a shared blind spot.
+
+**Lookups.** The comparison checks that each `constrain.in` names the table
+Clean's `.lookup` named and queries the same polynomial. That the *rows* are the
+table's rows is a separate obligation, `ExportTable.Certifies`, and
+`Clean/Backend/LLZK/TableCert.lean` discharges it for every table this backend
+can be given — generically for anything derived from a `StaticTable`, and
+specifically for `Gadgets.ByteTable`, which cannot be. What the compiler does not
+do is *demand* the certificate: `Config.tables` takes bare `ExportTable`s, and
+tying a certificate to a lookup would need the `Table` that `RawTable` erased.
+For the corpus the obligation is discharged and the build enforces it, because
+`Examples.byteTable_certified` holds by `rfl` and breaks if the rows change.
+-/
+
+namespace LLZK
+
+variable {F : Type} [Field F] [DecidableEq F]
+
+/-! ## Clean's constraints as polynomials -/
+
+/-- Read a Clean circuit expression as a polynomial. Total: `Expression` has
+exactly these four constructors. -/
+def Expression.toPoly : Expression F → Poly F
+  | .var v => Poly.var (.circuit v.index)
+  | .const c => Poly.const c
+  | .add a b => Poly.add (toPoly a) (toPoly b)
+  | .mul a b => Poly.mul (toPoly a) (toPoly b)
+
+/-- The assignment a comparison is stated over: circuit variables take their
+values from Clean's environment, and the emitter's `@out{j}` members from a
+separate function, because they are cells Clean does not have (D008). -/
+def assign (env : Environment F) (outs : Nat → F) : PVar → F
+  | .circuit i => env.get i
+  | .output j => outs j
+
+/-- Reading a Clean expression as a polynomial preserves its meaning. -/
+theorem Expression.eval_toPoly (env : Environment F) (outs : Nat → F) (e : Expression F) :
+    Poly.eval (assign env outs) (toPoly e) = e.eval env := by
+  induction e with
+  | var v => simp [toPoly, assign, Expression.eval]
+  | const c => simp [toPoly, Expression.eval]
+  | add a b iha ihb => simp [toPoly, Expression.eval, Poly.eval_add, iha, ihb]
+  | mul a b iha ihb => simp [toPoly, Expression.eval, Poly.eval_mul, iha, ihb]
+
+/-- A constraint system in normal form. -/
+structure ConstraintSet (F : Type) where
+  /-- Each polynomial must evaluate to zero. -/
+  eqs : List (Poly F)
+  /-- Each queried polynomial must be a row of the table of that name. -/
+  lookups : List (String × Poly F)
+deriving Repr
+
+namespace ConstraintSet
+
+/-- The polynomials for the output members: `@out{j} - ⟦output j⟧`. These are the
+emitter's own constraints (D008), not Clean's, so they are kept separate in the
+correctness statement below. -/
+def outputEqs (outputs : List (Expression F)) : List (Poly F) :=
+  outputs.zipIdx.map fun (e, j) => Poly.sub (Poly.var (.output j)) (Expression.toPoly e)
+
+/-- Read the Clean circuit.
+
+`FlatOperation.constraints` and `FlatOperation.lookups` are Clean's own
+extractors, and they are the ones `constraintsHoldFlat_iff_forall_mem` is stated
+over — so this reader is not a re-reading of the operation list that could
+disagree with Clean about which operations are constraints. -/
+def ofSource (src : Source F) : ConstraintSet F where
+  eqs :=
+    (FlatOperation.constraints src.operations).map Expression.toPoly
+    ++ outputEqs src.outputs.toList
+  lookups :=
+    (FlatOperation.lookups src.operations).flatMap
+      fun l => (l.entry.toArray.map fun e => (l.table.name, Expression.toPoly e)).toList
+
+/-- **The Clean side is exactly `ConstraintsHoldFlat`, plus the output
+definitions.**
+
+The left-hand side is what the polynomial comparison checks; the right-hand side
+is Clean's own semantics of the circuit. So once `ofModule` agrees with
+`ofSource`, the emitted `constrain.eq`s are satisfied by exactly the assignments
+that satisfy Clean's assertions — with the output members pinned to the output
+expressions, which is what D008 says they are for and what A4 argued informally. -/
+theorem ofSource_eqs_iff (src : Source F) (env : Environment F) (outs : Nat → F) :
+    (∀ p ∈ (ofSource src).eqs, Poly.eval (assign env outs) p = 0)
+      ↔ (∀ e ∈ FlatOperation.constraints src.operations, e.eval env = 0)
+        ∧ (∀ e j, (e, j) ∈ src.outputs.toList.zipIdx → outs j = e.eval env) := by
+  simp only [ofSource, List.forall_mem_append, List.forall_mem_map, outputEqs, Prod.forall]
+  constructor
+  · rintro ⟨hasserts, houts⟩
+    refine ⟨fun e he => ?_, fun e j hj => ?_⟩
+    · have := hasserts e he
+      rwa [Expression.eval_toPoly] at this
+    · have := houts e j hj
+      rw [Poly.eval_sub, Poly.eval_var, Expression.eval_toPoly, sub_eq_zero] at this
+      simpa [assign] using this
+  · rintro ⟨hasserts, houts⟩
+    refine ⟨fun e he => ?_, fun e j hj => ?_⟩
+    · rw [Expression.eval_toPoly]; exact hasserts e he
+    · rw [Poly.eval_sub, Poly.eval_var, Expression.eval_toPoly, sub_eq_zero]
+      simpa [assign] using houts e j hj
+
+end ConstraintSet
+
+/-! ## The emitted module's constraints as polynomials
+
+The reader below knows nothing about `Recognized` or about the circuit that
+produced the module. It walks the `@constrain` function as data. Everything it
+cannot model is `none`, so a construct outside the modelled subset is a red gate,
+never a silently ignored statement. -/
+
+/-- What an SSA name in `@constrain` can hold. -/
+private inductive Slot (F : Type) where
+  | poly (p : Poly F)
+  | table (name : String)
+  /-- `%self`. Only legal as the first operand of a member read. -/
+  | self
+
+/-- `fromNat` inverts `val`, so a `felt.const` emitted from a Clean constant
+reads back as that constant. Without this the two sides would not even agree on
+constants.
+
+Not an assumption: it follows from `val_fromNat` and `val_injective`, the laws
+`FiniteField` already carries. -/
+theorem fromNat_val {G : Type} [FiniteField G] (c : G) :
+    FiniteField.fromNat (FiniteField.val c) = c :=
+  FiniteField.val_injective (FiniteField.val_fromNat _ (FiniteField.val_lt c))
+
+variable [FiniteField F]
+
+namespace ConstraintSet
+
+/-- The cell a member name denotes, given the component's shape. -/
+private def memberVar (inputSize numWitnesses numOutputs : Nat) (name : String) : Option PVar :=
+  match (List.range numWitnesses).find? (fun k => witnessMember k = name) with
+  | some k => some (.circuit (inputSize + k))
+  | none =>
+    match (List.range numOutputs).find? (fun j => outputMember j = name) with
+    | some j => some (.output j)
+    | none => none
+
+private structure Reader (F : Type) where
+  slots : Array (Slot F)
+  eqs : List (Poly F)
+  lookups : List (String × Poly F)
+
+private def Reader.get (r : Reader F) (v : Value) : Option (Slot F) := r.slots[v.index]?
+
+private def Reader.poly (r : Reader F) (v : Value) : Option (Poly F) :=
+  match r.get v with
+  | some (.poly p) => some p
+  | _ => none
+
+/-- Bind the value a statement defines. Fails unless the statement's destination
+is the next SSA index, which also checks that the emitted numbering is exactly
+sequential. -/
+private def Reader.define (r : Reader F) (v : Value) (s : Slot F) : Option (Reader F) :=
+  if v.index = r.slots.size then some { r with slots := r.slots.push s } else none
+
+/-- Interpret one statement of `@constrain`.
+
+`globals` is the set of names the module actually defines, so that a
+`global.read` of a name no `global.def` provides is a mismatch here and not only
+in `llzk-opt`. -/
+private def step (inputSize numWitnesses numOutputs : Nat) (globals : Array String)
+    (r : Reader F) : Stmt → Option (Reader F)
+  | .feltConst dst value _ => r.define dst (.poly (Poly.const (FiniteField.fromNat value)))
+  | .feltBin dst op lhs rhs _ => do
+    let a ← r.poly lhs
+    let b ← r.poly rhs
+    let combined ← match op with
+      | .add => some (Poly.add a b)
+      | .mul => some (Poly.mul a b)
+      | .uintdiv | .umod => none
+    r.define dst (.poly combined)
+  | .readMember dst self member _ => do
+    let .self ← r.get self | none
+    let cell ← memberVar inputSize numWitnesses numOutputs member
+    r.define dst (.poly (Poly.var cell))
+  | .globalRead dst name _ => do
+    guard (globals.contains name)
+    r.define dst (.table name)
+  | .constrainEq lhs rhs _ => do
+    let a ← r.poly lhs
+    let b ← r.poly rhs
+    return { r with eqs := r.eqs ++ [Poly.sub a b] }
+  | .constrainIn array _ element _ => do
+    let .table name ← r.get array | none
+    let value ← r.poly element
+    return { r with lookups := r.lookups ++ [(name, value)] }
+  -- `struct.new` and `struct.writem` belong to `@compute`. Reaching one here
+  -- means the module is not the shape this reader models.
+  | .structNew _ | .writeMember _ _ _ _ => none
+
+/-- Read the emitted module's `@constrain`.
+
+The component's shape is re-derived from the module — the parameter count, the
+`{signal}` members and the `{llzk.pub}` members — rather than taken from the
+circuit, so a layout that disagrees with Clean's is a mismatch rather than a
+blind spot shared by both sides (D014's known weakness, avoided here). -/
+def ofModule (m : Module) : Option (ConstraintSet F) := do
+  let numWitnesses := (m.root.members.filter (·.visibility = .signal)).size
+  let numOutputs := (m.root.members.filter (·.visibility = .pub)).size
+  let params := m.root.constrain.params
+  let some self := params[0]? | none
+  guard (self.ty = rootTy)
+  let inputSize := params.size - 1
+  let slots : Array (Slot F) :=
+    #[Slot.self] ++ (Array.range inputSize).map fun i => Slot.poly (Poly.var (.circuit i))
+  -- The parameters must be `%self` and then one felt each, numbered `%v0`
+  -- upwards in order, or the indices the body reads do not mean what this reader
+  -- assumes about them.
+  guard (params.zipIdx.all fun (p, i) => p.value.index = i)
+  guard ((params.extract 1 params.size).all fun p => match p.ty with
+    | .felt _ => true
+    | _ => false)
+  let globals := m.globals.map (·.name)
+  let mut reader : Reader F := { slots, eqs := [], lookups := [] }
+  for stmt in m.root.constrain.body do
+    let some next := step inputSize numWitnesses numOutputs globals reader stmt | none
+    reader := next
+  return { eqs := reader.eqs, lookups := reader.lookups }
+
+/-! ## The comparison -/
+
+/-- Whether the emitted module's constraint system is the same as the Clean
+circuit's, up to the order of the constraints.
+
+Order is deliberately not compared: constraints are a conjunction, and the
+emitter groups them lookups-first (A6). Multiplicity *is* compared — `isPerm`,
+not set equality — so a dropped or duplicated constraint is a mismatch. -/
+def agree (src : Source F) (m : Module) : Bool :=
+  match ofModule (F := F) m with
+  | none => false
+  | some emitted =>
+    let clean := ofSource src
+    emitted.eqs.isPerm clean.eqs && emitted.lookups.isPerm clean.lookups
+
+/-- The check, run through the whole compilation rather than on a module handed
+in — so what is compared is what the emitter actually produces. -/
+def agreeCompiled (cfg : Config) (src : Source F) : Bool :=
+  match compileSource cfg src with
+  | .error _ => false
+  | .ok m => agree src m
+
+/-! ## Emission is verified, not merely checked
+
+`agree` is decidable, so the emitter can run it on every circuit it compiles and
+refuse to hand back a module that fails. That is what `compileSource'` below does,
+and it is why the public entry points live in this module rather than in
+`Circuit.lean`: **there is no way to obtain a module from this backend that has
+not been compared against its Clean source.**
+
+This is translation validation rather than a verified translator. It is weaker
+than a preservation theorem about `lower` in one way — it says nothing about
+*why* the lowering is right, and a bug would surface as a refusal to compile
+rather than as a compile-time impossibility. It is stronger in the way that
+matters here: it holds for every circuit, not for the five in the corpus, and it
+needed no simulation argument over the `BuilderM` state monad.
+
+What remains outside it is D017's reading of the emitted IR, and D012's lookup
+rows — and the latter is discharged for every table in use by
+`Clean/Backend/LLZK/TableCert.lean`. -/
+
+/-- What the emitter reports when its own output fails the comparison. Reaching
+this is a bug in the lowering, not in the circuit, which is why the message says
+so. -/
+private def mismatch : Diagnostic where
+  context := "constraints"
+  message := "the emitted @constrain is not the same constraint system as the circuit's \
+              (gate G9). This is a defect in the backend, not in the circuit: please report \
+              it with the circuit that triggered it. See Clean/Backend/LLZK/Constraints.lean"
+
+/-- Compile a flattened circuit, and verify that what came out carries the
+circuit's constraint system before returning it. -/
+def compileSource' (cfg : Config) (src : Source F) : Except (Array Diagnostic) Module :=
+  match compileSource cfg src with
+  | .error diagnostics => .error diagnostics
+  | .ok m => if agree src m then .ok m else .error #[mismatch]
+
+/-- **Every module this backend emits carries its circuit's constraint system.**
+
+Not "every module in the corpus" — the comparison is a precondition of emission,
+so this is a theorem about all circuits. -/
+theorem agree_of_compileSource' {cfg : Config} {src : Source F} {m : Module}
+    (h : compileSource' cfg src = .ok m) : agree src m = true := by
+  unfold compileSource' at h
+  split at h
+  · exact absurd h (by simp)
+  · split at h
+    · rename_i ha
+      simp only [Except.ok.injEq] at h
+      exact h ▸ ha
+    · exact absurd h (by simp)
+
+/-- **The emitted equalities are Clean's constraints, semantically.**
+
+`agree_of_compileSource'` says the two polynomial sets match as data; this says
+what that means. For any module this backend emits, the polynomials read out of
+its `@constrain` vanish at an assignment exactly when Clean's
+`ConstraintsHoldFlat` holds there and each `@out{j}` carries its output
+expression — the definitional extension D008 adds, and which A4 previously argued
+informally.
+
+Order is irrelevant on both sides because the constraints are a conjunction, and
+that is why a permutation suffices. -/
+theorem eqs_iff_of_compileSource' {cfg : Config} {src : Source F} {m : Module}
+    {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
+    (hm : ofModule (F := F) m = some C) (env : Environment F) (outs : Nat → F) :
+    (∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+      ↔ (∀ e ∈ FlatOperation.constraints src.operations, e.eval env = 0)
+        ∧ (∀ e j, (e, j) ∈ src.outputs.toList.zipIdx → outs j = e.eval env) := by
+  have ha := agree_of_compileSource' h
+  simp only [agree, hm, Bool.and_eq_true] at ha
+  have hperm : C.eqs.Perm (ofSource src).eqs := List.isPerm_iff.mp ha.1
+  rw [← ofSource_eqs_iff src env outs]
+  exact ⟨fun hh p hp => hh p (hperm.mem_iff.mpr hp),
+         fun hh p hp => hh p (hperm.mem_iff.mp hp)⟩
+
+/-- **The emitted lookups are Clean's lookups.**
+
+Each `constrain.in` the module emits names the table Clean's `.lookup` named and
+queries the same polynomial, with the same multiplicity. What that *means* — that
+membership in the emitted array is Clean's `Contains` — is
+`TableCert.certified_membership`, and needs the table certified. -/
+theorem lookups_perm_of_compileSource' {cfg : Config} {src : Source F} {m : Module}
+    {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
+    (hm : ofModule (F := F) m = some C) :
+    C.lookups.Perm (ofSource src).lookups := by
+  have ha := agree_of_compileSource' h
+  simp only [agree, hm, Bool.and_eq_true] at ha
+  exact List.isPerm_iff.mp ha.2
+
+end ConstraintSet
+
+/-! `compile` and `emit`, the public entry points, are **not** here either: they
+are in `Clean/Backend/LLZK/WitnessCheck.lean`, which adds the witness half of G9
+on top of `compileSource'`. Both halves are preconditions of emission (D018). -/
+
+end LLZK

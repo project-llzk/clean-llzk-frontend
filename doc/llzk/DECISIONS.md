@@ -45,26 +45,48 @@ Lookup tables use an explicit backend registry because `RawTable` does not
 retain concrete static rows.
 
 
-## D005 — Make malformed LLZK unrepresentable in the emitter IR
+## D005 — State exactly which malformed shapes the emitter IR rules out
 
-**Status:** accepted
+**Status:** accepted, **amended by S11**
 **Date:** 2026-08-01
-**Enacted by:** S03
+**Enacted by:** S03, amended by S11
 
 The backend does not build LLZK text by concatenating strings, and it does not
 model MLIR generically. It has a small typed IR that admits only the Stage-1
-subset, and three shapes are ruled out by construction rather than by tests:
+subset. What that buys, stated as what a lowering *cannot* do:
 
-- `IR.Value` has a private constructor, so only `Builder.fresh` produces one. A
-  lowering cannot reference an undefined SSA value or reuse one.
+- `IR.Value` has a private constructor and `Builder.fresh` is private, so the
+  only values a body can name are ones a typed emitter returned to it or a
+  parameter the builder handed it.
 - `IR.Func.result : Option (Value × Ty)` is one field, so the rendered return
   type and the rendered `function.return` cannot disagree, and a body cannot be
   missing its terminator or carry two.
-- `IR.StructDef` names `compute` and `constrain` as fields rather than holding a
-  function list, so a struct that is not a valid LLZK component cannot be built.
+- `Builder.component` is the only constructor of a `StructDef`, and it takes a
+  *single* `Array ParamSpec` and hands it to both functions. LLZK requires
+  `@constrain`'s argument types, minus `%self`, to equal `@compute`'s.
+- `IR.Module` holds one `StructDef` rather than a list, and the component is
+  always named `rootComponent`, so `llzk.main` cannot dangle.
+- Neither `Value` nor `Ty` derives `Inhabited`. `Value`'s was removed in S04 so
+  no caller could conjure an SSA value; `Ty`'s was removed in S11 for symmetry —
+  a `default : Ty` renders as `!felt.type<"">`, which `llzk-opt` rejects, so it
+  could not corrupt a lowering silently, but leaving one instance and not the
+  other invited the question R2 control S6 asked.
+
+**What S11 amended, and why.** The original entry claimed "a struct that is not a
+valid LLZK component cannot be built". That was false, and R2-04 produced the
+counterexample from inside the repository: `Test/Print.lean`'s golden gave
+`@compute` two parameters and `@constrain` one, which `llzk-opt` rejects, and the
+golden passed G2 because G2 compares text to text. The third and fourth bullets
+above are the repair; the golden is now also fed to `llzk-opt` by `e2e.sh`.
+
+The general lesson is recorded rather than the specific fix: a decision entry
+should say what a construction rules out, in terms a counterexample could
+contradict, not that a whole class of error is impossible.
 
 Consequence: the analyzer's job shrinks to *source*-side questions (is this
-Clean construct in the subset?). It never has to re-check emitter well-formedness.
+Clean construct in the subset?). It never has to re-check emitter
+well-formedness. What is still checked outside the IR, because the IR has no
+notion of a prime or of a symbol table, is the table registry — see D012.
 
 ## D006 — Derive `function.allow_non_native_field_ops` from the body
 
@@ -72,9 +94,10 @@ Clean construct in the subset?). It never has to re-check emitter well-formednes
 **Date:** 2026-08-01
 **Enacted by:** S03
 
-`Builder.function` inspects the statements actually emitted and adds the
+`Builder.assemble` inspects the statements actually emitted and adds the
 attribute when any is non-native (`felt.uintdiv`, `felt.umod`). A caller cannot
-forget it, and it is never added spuriously.
+forget it, and it is never added spuriously. (S04 moved this from
+`Builder.function`, which no longer exists; the entry said otherwise until S14.)
 
 `function.allow_constraint` and `function.allow_witness` are deliberately *not*
 emitted: `llzk-opt` infers them from the function's role and prints them back, so
@@ -113,6 +136,23 @@ proves — it defines a fresh cell as equal to an expression over existing ones.
 What it buys is that `llzk-witgen --output-scope=public` reports exactly the
 circuit's outputs under stable names, which is what gate G7 diffs against Clean.
 
+That "does not change what the system proves" is now a theorem rather than an
+argument: `ConstraintSet.ofSource_eqs_iff` (S15) separates the emitted
+polynomials into Clean's assertions and the output definitions, and shows the
+second hold exactly when each `@out{j}` equals its expression.
+
+**Coverage, added by S13.** The shapes this decision exists for — an output that
+is an input, and an output that is a constant — were argued for and never
+emitted; the corpus contained only outputs that happened to be witness cells
+(R2 control S5). `passthrough` and `constOut` are now corpus entries.
+
+**Reopen when there is a downstream consumer.** The option D008 did not consider
+is emitting outputs as `@compute`'s return value rather than as members. The
+current shape doubles the public surface an analyser sees, and writes each member
+in `@compute` *and* constrains it in `@constrain`, which is not a shape the rest
+of the ecosystem produces. Nothing consumes these modules yet, so there is no
+evidence to decide on; G10 is the first thing that will produce any.
+
 ## D009 — Recognize into a closed language, then lower totally
 
 **Status:** accepted
@@ -129,15 +169,23 @@ Consequences:
 
 - There is exactly one place that decides what is in the subset. The lowering has
   no "unsupported" branch to keep in sync.
-- `analyze` and `compile` share one implementation: `analyze` is the diagnostics
-  of the same recognition pass, so they cannot disagree about what is accepted.
+- There is one entry point, `compile`, and the diagnostics a caller sees are the
+  ones the recognition pass produced. S11 removed the separate `analyze`/
+  `diagnostics` pair: it was the "inspect the capability boundary without
+  building a module" idea, it had no caller, and a second entry point is a second
+  thing that can disagree about what is accepted (R2-08).
 - Growing a capability is: one `FieldExpr` constructor, one case per recognizer,
   one case in `lower`, one positive and one negative fixture.
-- The semantics theorems planned for P5 get a small closed language to talk
-  about, instead of a predicate carved out of Clean's much larger witness IR.
+- The semantics theorems get a small closed language to talk about, instead of a
+  predicate carved out of Clean's much larger witness IR. S15's gate G9 is what
+  that bought.
 
 Diagnostics are collected across all operations rather than stopping at the
 first. Each operation is recognized independently, so a rejection cannot cascade.
+The single piece of cross-operation state, added by S10, is the running witness
+offset, and it advances by the `m` a `.witness m` operation *declares* rather than
+by however many cells recognition managed to produce — so the non-cascading
+property survives.
 
 ## D010 — The field name and its prime travel together
 
@@ -188,9 +236,28 @@ use, and the result re-enters the field through `FiniteField.fromNat`, whose
 `val_fromNat` law applies because `val x % c` and `val x / c` are both at most
 `val x`, hence below the field size.
 
-This argument is prose, not a proof. Turning it into one is a P5 obligation, and
-it is the reason `FieldExpr` is a small closed language (D009): there is
-something tractable to state it about.
+**One side condition of that argument is not checked, and cannot be** (R2-05,
+recorded by S14). `FiniteField` abstracts over prime *and* binary fields, and its
+laws — `val_lt`, `val_injective`, `val_fromNat`, `val_zero`, `val_one` — do not
+say that `val` is the *ring* representative, i.e. that
+`val (a + b) = (val a + val b) % size`. `Analyze.checkField` pins
+`FiniteField.size F` only, and size `p` forces `F ≅ 𝔽_p` without forcing this
+particular `val` to be that isomorphism. The same assumption underlies
+`FieldExpr.ofExpression`'s `.const c ↦ felt.const (val c)`. Clean's instance for
+`F p = ZMod p` uses `ZMod.val` and satisfies it, and the corpus confirms it
+behaviourally, but G7 cannot detect a violation because `Differential.witness`
+goes through the same `val`/`fromNat`.
+
+**Closed by S18.** The class is `LLZK.CanonicalRepr`, and every recognizer and
+entry point requires it, so the side condition is a hypothesis rather than a
+hope. See D019. The constraint side never needed it — its only `val`/`fromNat`
+dependence is on constants, discharged by `LLZK.fromNat_val` — which is why S15
+could prove that side first; the witness side now has a class it can be stated
+over.
+
+This argument is otherwise prose, not a proof. Turning it into one is a P5
+obligation, and it is the reason `FieldExpr` is a small closed language (D009):
+there is something tractable to state it about.
 
 Every other `NExpr` shape stays rejected. The general treatment — `NExpr.val` to
 `cast.toindex`, natural arithmetic on `index`, `FExpr.ofNat` to `cast.tofelt` —
@@ -207,11 +274,55 @@ and is deliberately not an implicit backlog item.
 cannot be recovered by walking a circuit. `Config.tables` supplies them.
 
 The backend checks what it can — the name resolves, the name is a legal MLIR
-symbol, the arity matches the circuit's lookup, rows all have that width, the
+symbol, the name does not collide with the component, the arity matches the
+circuit's lookup, rows all have that width, every value is below the prime, the
 table is non-empty, names are unique — and refuses any lookup it cannot resolve.
 It cannot check that the supplied rows are *the table's* rows, because
 `RawTable.Contains` is a `Prop`, not something the compiler can evaluate. That is
 a genuine trust assumption and is stated on `ExportTable`.
+
+**Two of those checks were missing until S08**, and the gap was wider than this
+entry admitted. `ExportTable.diagnose` did not check that row values are below
+the prime (R2-02), so a registry entry of values `≥ p` was accepted, emitted
+verbatim, and silently reduced by LLZK into a *different* set of rows. And no
+check compared a table name against the component name (R2 control S2), which
+produces a module `llzk-opt` rejects outright. Neither is D012's assumption:
+both are things the backend can check and now does. The entry previously read as
+though the row contents were uniformly untrusted, which made the missing checks
+easy to mistake for the recorded gap.
+
+**The trust assumption is discharged, by S16.** It was exactly one sentence —
+*the rows supplied in `Config.tables` are the rows of the Clean table of that
+name* — and one sentence is something you can write down as a `Prop` and prove.
+`ExportTable.Certifies` in `Clean/Backend/LLZK/TableCert.lean` is that `Prop`,
+and two theorems discharge it for every table this backend can be given:
+
+- `ofStatic_certifies` — for *any* single-column `StaticTable`. `ofStatic`
+  computes the rows from the table's own `row` function, so the only content is
+  that `FiniteField.val` loses nothing, which is `val_injective`.
+- `byteTable_certifies` — for `Gadgets.ByteTable`, the case this entry's
+  follow-up said was open because it inlines its `StaticTable` and naming that
+  breaks unrelated proofs. It does not need naming: `StaticTable.toTable` defines
+  `Contains` from the `row` function alone, and `contains_iff` already relates
+  that to `x.val < 256`. `Examples.byteTable_certified` closes the loop by `rfl`.
+
+`certified_membership` is the payoff, and it is where the range check S08 added
+does its work: for a certified table with canonical values, Clean's `Contains`
+holds of `x` exactly when `x` is one of the field elements the emitted array
+holds — which is what the emitted `constrain.in` asserts.
+
+**And the certificate is required, not merely available.** `Config.ofCertified`
+takes `CertifiedTable`s — an `ExportTable` paired with its proof — and it is what
+`Examples.withBytes` uses, so the corpus's only lookup table carries its
+certificate by construction. `Config.tables` still takes bare `ExportTable`s, and
+must: the negative fixtures that pin `diagnose`'s messages build malformed
+registries on purpose.
+
+So what is left is not "the rows are trusted". It is D017's reading of
+`constrain.in` as membership, which is a statement about LLZK, and the same
+assumption every other emitted operation carries. The follow-up about naming
+`ByteTable`'s `StaticTable` is no longer blocking anything; it would be a
+tidiness change.
 
 `ExportTable.ofStatic` is the mitigation: where a `StaticTable` is still in
 scope, the rows are computed from its own `row` function and cannot disagree
@@ -244,8 +355,19 @@ other than 1 is refused with a diagnostic that says what it would take. Clean's
 
 `Differential.witness` runs `FlatOperation.witgen`, Clean's array-backed
 reference interpreter, which `witgen_eq_dynamicWitnesses` proves computes the
-same witnesses as the semantic definition. The comparison is therefore against
-Clean's proved witness semantics, not a reimplementation written for the harness.
+same witnesses as `FlatOperation.dynamicWitnesses`. The comparison is therefore
+against a proved-equal pair of Clean definitions, not a reimplementation written
+for the harness.
+
+**The reference is `dynamicWitnesses`, not `localWitnesses`** (R2's objection to
+this entry's original wording, "Clean's proved witness semantics"). The two come
+apart on circuits whose `.witness m` block reads a cell the same block allocates:
+`dynamicWitnesses` evaluates the whole block against the environment *before* it,
+so such a read is `0`, while a straightforward `@compute` lowering reads the
+computed value. Clean names the discipline that rules this out
+`Operations.ComputableWitnesses`, and S10 made `Analyze` enforce it, so the class
+of circuit on which the two definitions disagree is now rejected rather than
+mis-emitted. See R2-03.
 
 The comparison itself is `llzk-witgen --output-scope=full-witness
 --check-output`, so a disagreement is a non-zero exit rather than two JSON dumps
@@ -259,6 +381,217 @@ scheme itself* is invisible to G7, because both sides would move together. G3/G4
 and the goldens cover naming; G7 covers values.
 
 **What G5–G7 do not establish.** `llzk-witgen` executes `compute()` and ignores
-`constrain()`. Agreement means the two witness generators agree. Nothing yet
-checks that the emitted constraints capture Clean's — that is the G9 proof track,
-and it is now the largest assurance gap in the project.
+`constrain()`. Agreement means the two witness generators agree. G9 (D017) is
+what checks the constraints; G5–G7 say nothing about them, and R2's Control 4
+made that concrete by showing an `Addition8FullCarry` with an empty `@constrain`
+passing all of G3–G7 on every vector.
+
+## D015 — The root component is `@Main`
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S12
+
+Every emitted module's component is named `Main`, fixed in `IR.rootComponent`
+rather than derived from the circuit. The circuit's own name survives as the
+artifact's file name.
+
+Two independent reasons:
+
+- `ARCHITECTURE.md` §5, the accepted design baseline, specifies
+  `struct.def @Main`. Naming the component after the circuit was a deviation from
+  it with no decision entry (R2-10).
+- `llzk-opt --llzk-product-program` looks up a root struct named literally
+  `Main` and **ignores `llzk.main`**. It is the entry point to
+  `--llzk-to-smt-no-cf` and to everything downstream of it, so before this change
+  *no* emitted artifact could enter any LLZK analysis pipeline, and no gate
+  noticed (R2-12). Gate G10 is now that gate.
+
+A consequence worth stating, because it closes a finding by construction: there
+is no longer a component name to validate. R2-01 was that `LLZK.compile` took a
+`name : String` and dropped it unvalidated into `struct.def @{name}`, so
+`emit babybear "not a symbol" multiply` emitted `struct.def @not a symbol` with
+no diagnostic. A constant is a legal MLIR symbol by inspection. What remains
+checkable is a *collision* with a table name, and `diagnoseRegistry` checks it.
+
+Cost: the emitted text no longer names the circuit. Accepted — a Stage-1 module
+holds exactly one component, the file name carries the identity, and LLZK's own
+convention is that the root is `Main` and subcomponents are named. That makes
+this forward-compatible with Stage 2, where subcircuits become named structs
+alongside `@Main`.
+
+## D016 — `llzk.fields` cannot be emitted; `llzk.lang` is a string
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S12
+
+`ARCHITECTURE.md` §5 specifies three module attributes. The emitter now produces
+`llzk.lang = "clean"` and `llzk.main = !struct.type<@Main>` as written; it does
+**not** produce `llzk.fields = [#felt.field<"babybear", 2013265921>]`, and cannot:
+declaring a field that LLZK's own registry already knows conflicts with the
+built-in definition and `llzk-opt` rejects the module.
+
+Recorded because it is a fact about LLZK 3.0.0 that was learned by trying it and
+was otherwise written down nowhere (R2-10). The registry attribute is for fields
+LLZK does *not* know; Stage 1 only emits fields it does, by D010, so the
+attribute has no role here. If Stage 2 ever needs an unregistered prime, this is
+where to start.
+
+`llzk.lang` was previously emitted as a bare unit attribute, which `llzk-opt`
+also accepts. That was a silent deviation from the same contract with no decision
+entry; it now matches.
+
+## D017 — Check the emitted constraints by comparing polynomials
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S15
+
+Gate G9 reads both sides of the translation into the same normal form and
+compares them:
+
+- `ConstraintSet.ofSource` reads the **Clean** circuit, through Clean's own
+  `FlatOperation.constraints` and `FlatOperation.lookups` extractors;
+- `ConstraintSet.ofModule` reads the **emitted module**'s `@constrain` as data,
+  knowing nothing about the circuit behind it, and re-deriving the component's
+  shape (input, witness and output counts) from the module alone.
+
+The two meet only at `Poly`, a canonical multivariate polynomial over the
+component's cells. The comparison is by multiset, because constraints are a
+conjunction and the emitter groups them lookups-first (A6), but multiplicity is
+compared, so a dropped or duplicated constraint is a mismatch.
+
+Why polynomials are exact here rather than an approximation: `@constrain`
+contains only `felt.const`, `felt.add`, `felt.mul` and cell reads. The non-native
+`felt.uintdiv`/`felt.umod` are witness-only and cannot appear, and `ofModule` is
+fail-closed on every statement form it does not model. So a syntactic comparison
+of normal forms *is* an exact comparison of the two constraint systems.
+
+**What is proved and what is assumed.** `ConstraintSet.ofSource_eqs_iff` proves
+that the Clean-side polynomials hold at an assignment exactly when
+`ConstraintsHoldFlat` does, and that the remaining polynomials are precisely the
+output definitions D008 adds. Every `Poly` operation carries the theorem that it
+commutes with evaluation, so two polynomials equal as data denote the same
+function. What is *assumed* is that `ofModule` reads the emitted IR the way LLZK
+does: `felt.add` is `+`, `felt.mul` is `*`, `felt.const n` is `fromNat n`,
+`struct.readm` reads the cell of that name, `constrain.eq a, b` is `a = b`,
+`constrain.in t, v` is membership. That is the same kind of assumption as D011,
+and deliberately a small and inspectable one.
+
+Alternatives considered:
+
+- *A universal preservation theorem about the lowering.* Better, and still the
+  eventual target. It needs a simulation argument over the `BuilderM` state
+  monad, and R2-05 shows it cannot even be *stated* over `FiniteField` for the
+  witness side. G9 as built covers the constraint side for every corpus circuit
+  today, with no `sorry`.
+- *An SMT determinism check.* Evaluated in S12 and reported as G10. It checks
+  determinism of the emitted system, not equivalence with Clean's, and the
+  solver step is unreachable from the pinned tools (see `GATES.md`, G10).
+
+**The gate is checked to be falsifiable.** `Test/Constraints.lean` perturbs the
+Clean side in each of the ways the emitter could get the emitted side wrong —
+dropped constraint, wrong coefficient, duplicated constraint, dropped lookup,
+wrong table, wrong circuit entirely — and pins that the comparison goes red for
+every one. Without that, a green here would be worth exactly as much as G5–G7's
+greens were against Control 4.
+
+## D018 — Validate every translation, rather than verify the translator
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S17
+
+`ConstraintSet.agree` is decidable, so the emitter runs it on its own output and
+refuses to return a module that fails. `ConstraintSet.compileSource'` is that
+step, and `compile`/`emit` — the only public entry points, which is why they live
+in `Constraints.lean` and not in `Circuit.lean` — go through it. There is no way
+to obtain a module from this backend that has not been compared against its Clean
+source.
+
+`agree_of_compileSource'` is the theorem; `eqs_iff_of_compileSource'` and
+`lookups_perm_of_compileSource'` give it meaning by composing it with
+`ofSource_eqs_iff`.
+
+Alternative considered and not done: a preservation theorem about `lower` itself.
+It is the better artifact — it would say *why* the lowering is right, and make a
+bug impossible rather than merely non-emitting — and it is still the eventual
+target. It needs a simulation argument over the `BuilderM` state monad, relating
+the reader's slot map to the builder's SSA counter through every loop of
+`constrainBody`, and the state is behind private fields. That is a session of its
+own, and it would have delivered less than this one: before S17, G9 covered five
+circuits; after it, every circuit.
+
+What this trades away, stated plainly: a lowering bug shows up as a compile
+failure with a "this is a backend defect" diagnostic, not as an unrepresentable
+state. That is a worse experience than a verified translator and a much better
+one than a wrong module.
+
+## D019 — The backend requires fields whose `val` is the ring representative
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S18
+
+Every recognizer and entry point requires `LLZK.CanonicalRepr F`, a class with
+two laws — `val (x + y) = (val x + val y) % size` and the same for `*`.
+
+This is R2-05, closed rather than recorded. D011's argument rests on
+`FiniteField.val x` being "the canonical representative in `[0, p)`, which is
+exactly the operand interpretation LLZK's `umod`/`uintdiv` use". `FiniteField`
+does not say that: it abstracts over binary fields too, and its laws are
+satisfied by any injection into `[0, size)` fixing `0` and `1`. `checkField` pins
+`size` only, and size `p` forces `F ≅ 𝔽_p` without forcing *this* `val` to be
+that isomorphism.
+
+`CanonicalRepr.val_natCast` derives that `val (n : F) = n % size`, which is what
+pins `val` down; without `val_add` the statement is false. The instance for
+`F p = ZMod p` is `ZMod.val_add`/`ZMod.val_mul`.
+
+Requiring it at the entry points, rather than recording it in prose, makes a
+field that lacks it a *type error* — the same fail-closed treatment D010 gives a
+wrong prime, and for the same reason: the failure mode is silently wrong
+arithmetic, which no gate can see.
+
+What remains on the LLZK side is that `!felt.type<"babybear">` is
+`ZMod 2013265921` and that `felt.umod` reads its operands through `ZMod.val`.
+That is part of D017. The point of D019 is that these are now two separate,
+stated things rather than one unstated thing spanning both.
+
+## D020 — Check `@compute` the same way, against a tree rather than a polynomial
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S19
+
+G9's other half. `Clean/Backend/LLZK/WitnessCheck.lean` reads the Clean circuit's
+witness programs and the emitted `@compute` into a common language, `WExpr`, and
+compares them; the comparison is a precondition of emission alongside the
+constraint one, so `compile` and `emit` moved again, to that module.
+
+Why a tree and not `Poly`: `@compute` contains `felt.umod` and `felt.uintdiv`,
+which no polynomial normal form represents. The comparison is therefore syntactic
+on trees — sound, and stricter than the constraint side, since two computations
+that are equal but differently shaped would be reported as a mismatch. That is
+fail-closed, and in practice the shapes match because both readers are structural
+over the same source.
+
+`WExpr.eval_ofWitgen` is the theorem, and it is the one D011 wanted and could not
+state before D019: Clean's `ofNat (mod (val x) (const c))` denotes exactly what
+`WExpr.eval` says `felt.umod` denotes. `WExpr.eval`'s `umod`/`uintdiv` cases *are*
+the D017 reading of those operations, so the two sides of D011's argument are now
+connected by a theorem rather than by prose.
+
+Two things this does not do:
+
+- It compares expressions cell by cell. Lifting that to "the emitted `@compute`
+  produces the vector `FlatOperation.dynamicWitnesses` produces" additionally
+  needs the block-prefix argument R2-03 is about, which `Analyze` enforces rather
+  than proves. G5–G7 remain the evidence for the whole-vector statement, now on
+  30 vectors including three outside `Addition8FullCarry`'s `Assumptions` — the
+  gap R2's C5 recorded.
+- The Clean-side reader is deliberately *not* `Witness.ofFExpr`, which is the
+  emitter's own recognizer; using it would make the comparison a self-check. It
+  is a separate traversal whose correctness is proved, which is the property
+  `ofFExpr` has only by inspection.

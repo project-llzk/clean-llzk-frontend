@@ -2,6 +2,7 @@ import Clean.Circuit.Expression
 import Clean.Utils.FiniteField
 import Clean.Backend.LLZK.Basic
 import Clean.Backend.LLZK.IR
+import Clean.Backend.LLZK.Field
 
 /-!
 # The accepted field-expression language, and its lowering
@@ -49,7 +50,7 @@ deriving DecidableEq, Repr
 
 namespace FieldExpr
 
-variable {F : Type} [FiniteField F]
+variable {F : Type} [FiniteField F] [CanonicalRepr F]
 
 /-- Recognize a Clean circuit expression.
 
@@ -62,6 +63,21 @@ def ofExpression : Expression F → FieldExpr
   | .const c => .const (FiniteField.val c)
   | .add a b => .add (ofExpression a) (ofExpression b)
   | .mul a b => .mul (ofExpression a) (ofExpression b)
+
+/-- The first circuit variable this expression reads at or above `bound`, if there
+is one.
+
+Used by `Analyze` to enforce the discipline Clean calls
+`Operations.ComputableWitnesses`: a `.witness m` block is evaluated by
+`FlatOperation.dynamicWitnesses` against the environment *before* the block, so
+none of its `m` cells may read another. Checking it needs the block boundary,
+which `Recognized.witnesses` has already flattened away, so it happens at
+recognition time rather than in the lowering. See R2-03. -/
+def firstVarAtLeast (bound : Nat) : FieldExpr → Option Nat
+  | .var index => if index ≥ bound then some index else none
+  | .const _ => none
+  | .add a b | .mul a b => (firstVarAtLeast bound a).orElse fun _ => firstVarAtLeast bound b
+  | .uintdiv a _ | .umod a _ => firstVarAtLeast bound a
 
 /-- SSA values bound for circuit variables, indexed by circuit variable index.
 
@@ -88,7 +104,8 @@ def lower (context : String) (fieldTy : Ty) (env : Env) : FieldExpr → LowerM V
     | none =>
       throw { context
               message := s!"expression reads circuit variable {index}, which no input or \
-                            earlier witness defines (only {env.size} are in scope here)" }
+                            earlier witness defines; variables 0 to {env.size - 1} are in scope \
+                            here" }
   | .const value => Builder.feltConst value fieldTy
   | .add a b => do
     Builder.feltBin .add (← lower context fieldTy env a) (← lower context fieldTy env b) fieldTy

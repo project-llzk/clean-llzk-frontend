@@ -10,10 +10,13 @@ harness then makes both LLZK backends check themselves against it, so a
 disagreement between Clean and LLZK is a non-zero exit rather than something a
 reader has to spot in two JSON dumps.
 
-Clean's side uses `FlatOperation.witgen`, the array-backed reference
-interpreter, which `witgen_eq_dynamicWitnesses` proves computes the same
-witnesses as the semantic definition. So the comparison is against Clean's
-*proved* witness semantics, not a reimplementation.
+Clean's side uses `FlatOperation.witgen`, the array-backed reference interpreter,
+which `witgen_eq_dynamicWitnesses` proves computes the same witnesses as
+`FlatOperation.dynamicWitnesses`. So the comparison is against a proved-equal
+pair of Clean definitions rather than a reimplementation written for the harness
+— but `dynamicWitnesses`, not `localWitnesses`, is the reference. The two come
+apart on circuits whose witness blocks read their own cells, which is exactly
+what `Analyze` now refuses (R2-03); see D014.
 
 Key names come from `Circuit.lean`'s layout functions rather than being spelled
 again here, so the expected JSON cannot drift from the emitted members.
@@ -27,7 +30,7 @@ namespace LLZK
 
 open Lean (Json)
 
-variable {F : Type} [FiniteField F]
+variable {F : Type} [FiniteField F] [CanonicalRepr F]
 
 /-- Clean's witness for one input vector: every cell the LLZK module has a member
 or parameter for. -/
@@ -67,12 +70,15 @@ private def field (value : Nat) : Json := Json.str (toString value)
 private def object (pairs : Array (String × Json)) : Json :=
   Json.mkObj pairs.toList
 
-/-- The `--inputs` object: `{"arg0": 6, "arg1": 7}`.
+/-- The `--inputs` object: `{"arg0": "6", "arg1": "7"}`.
 
-Numbers here, because this is `llzk-witgen`'s input format rather than its output
-format. -/
+Strings, for the same reason the output uses them. `llzk-witgen --inputs` accepts
+"a JSON integer or decimal string", and its integer path does not reach the
+larger registry primes: `goldilocks`, `bn254` and `grumpkin` values near `p-1` are
+rejected outright as JSON numbers and accepted as strings (R2-14). Encoding both
+directions the same way removes the question. -/
 def inputsJson (inputs : Array Nat) : Json :=
-  object (inputs.zipIdx.map fun (value, i) => (inputArgName i, Json.num value))
+  object (inputs.zipIdx.map fun (value, i) => (inputArgName i, field value))
 
 /-- The `--output-scope=full-witness --check-output` object. -/
 def fullWitnessJson (w : Witness) : Json :=
@@ -81,9 +87,5 @@ def fullWitnessJson (w : Witness) : Json :=
     ("signals", object
       (w.cells.zipIdx.map (fun (v, k) => (witnessMember k, field v))
         ++ w.outputs.zipIdx.map fun (v, j) => (outputMember j, field v)))]
-
-/-- The default `--output-scope=public` object: the circuit's outputs alone. -/
-def publicOutputsJson (w : Witness) : Json :=
-  object (w.outputs.zipIdx.map fun (v, j) => (outputMember j, field v))
 
 end LLZK

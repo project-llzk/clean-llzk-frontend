@@ -36,9 +36,7 @@ def Value.render (v : Value) : String := "%v" ++ toString v.index
 /-- The LLZK mnemonic, including the dialect prefix. -/
 def FeltBinOp.render : FeltBinOp → String
   | .add => "felt.add"
-  | .sub => "felt.sub"
   | .mul => "felt.mul"
-  | .div => "felt.div"
   | .uintdiv => "felt.uintdiv"
   | .umod => "felt.umod"
 
@@ -60,14 +58,14 @@ def Stmt.render : Stmt → String
     dst.render ++ " = felt.const " ++ toString value ++ " : " ++ ty.render
   | .feltBin dst op lhs rhs ty =>
     dst.render ++ " = " ++ op.render ++ " " ++ lhs.render ++ ", " ++ rhs.render ++ binaryTypes ty
-  | .structNew dst ty =>
-    dst.render ++ " = struct.new : " ++ ty.render
-  | .readMember dst self selfTy member memberTy =>
+  | .structNew dst =>
+    dst.render ++ " = struct.new : " ++ rootTy.render
+  | .readMember dst self member memberTy =>
     dst.render ++ " = struct.readm " ++ self.render ++ "[@" ++ member ++ "] : "
-      ++ selfTy.render ++ ", " ++ memberTy.render
-  | .writeMember self selfTy member value memberTy =>
+      ++ rootTy.render ++ ", " ++ memberTy.render
+  | .writeMember self member value memberTy =>
     "struct.writem " ++ self.render ++ "[@" ++ member ++ "] = " ++ value.render ++ " : "
-      ++ selfTy.render ++ ", " ++ memberTy.render
+      ++ rootTy.render ++ ", " ++ memberTy.render
   | .globalRead dst name ty =>
     dst.render ++ " = global.read @" ++ name ++ " : " ++ ty.render
   | .constrainEq lhs rhs ty =>
@@ -152,18 +150,27 @@ private def renderFunc (f : Func) : Array String :=
   opening ++ indentBlock (f.body.map Stmt.render ++ #[renderReturn f]) ++ #["}"]
 
 private def renderStruct (s : StructDef) : Array String :=
-  braced ("struct.def @" ++ s.name ++ " {")
+  braced ("struct.def @" ++ rootComponent ++ " {")
     (joinBlocks #[s.members.map renderMember, renderFunc s.compute, renderFunc s.constrain])
     "}"
+
+/-- The module attribute dictionary.
+
+`llzk.lang = "clean"` is the spelling `doc/llzk/ARCHITECTURE.md` §5 specifies;
+the bare unit attribute emitted before S12 was an unrecorded deviation (R2-10).
+
+`llzk.fields` from the same contract is *not* emitted, and cannot be: declaring
+`#felt.field<"babybear", 2013265921>` conflicts with LLZK's own registry entry
+and `llzk-opt` rejects the module. See D016. -/
+private def moduleAttrs : String :=
+  "{llzk.lang = \"clean\", llzk.main = " ++ rootTy.render ++ "}"
 
 /-- Render a module as textual LLZK.
 
 The result ends in a newline and contains no trailing whitespace on any line. -/
 def Module.render (m : Module) : String :=
-  let body := joinBlocks (#[m.globals.map renderGlobal] ++ m.structs.map renderStruct)
-  let lines :=
-    braced ("module attributes {llzk.lang, llzk.main = " ++ (Ty.struct m.main).render ++ "} {")
-      body "}"
+  let body := joinBlocks (#[m.globals.map renderGlobal, renderStruct m.root])
+  let lines := braced ("module attributes " ++ moduleAttrs ++ " {") body "}"
   lines.foldl (fun acc line => acc ++ line ++ "\n") ""
 
 /-- Render a compilation outcome: the module, or every reason there is none.
