@@ -1,0 +1,36 @@
+# S00 acceptance gates
+
+Worktree state under test: pinned Clean base 1e563b9c27991b3795eb440c1ee0757edb4ce8b1
+plus the uncommitted S00 control plane (this commit).
+
+## G0 — bash scripts/llzk/check-pins.sh
+
+Clean base: 1e563b9c27991b3795eb440c1ee0757edb4ce8b1
+HEAD:       1e563b9c27991b3795eb440c1ee0757edb4ce8b1
+upstream:   git@github.com:Verified-zkEVM/clean.git
+toolchain:  leanprover/lean4:v4.30.0
+pin check:  PASS
+exit status: 0
+
+## G1 — the three checks .github/workflows/ci.yml runs
+
+$ python3 scripts/check-consecutive-empty-lines.py
+✓ No consecutive empty lines found.
+exit status: 0
+
+$ lake build --wfail Clean
+Build completed successfully (1811 jobs).
+exit status: 0
+
+$ lake build CleanTests
+Build completed successfully (1704 jobs).
+exit status: 0
+Pre-existing warnings at the pinned base, not introduced by S00:
+  Clean/Utils/Test/TestCircuitProofStart.lean:{88,129,157,183}: declaration uses `sorry`
+
+## Note on a spurious first run
+
+The first `lake build Clean` was run concurrently with a 363 MiB Nix
+download and reported a failure in Clean.Gadgets.ByteDecomposition.Theorems.
+Rebuilding that target alone succeeded, and every run above was made with no
+competing load. The failure was resource contention, not a source defect.

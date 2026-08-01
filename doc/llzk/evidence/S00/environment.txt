@@ -1,0 +1,10 @@
+# S00 environment
+
+date (UTC): 2026-08-01T03:12:43Z
+host os:    Linux 6.18.7-76061807-generic
+worktree:   /home/alh/LLZK/clean-llzk-frontend
+branch:     clean-to-llzk/integration
+HEAD:       1e563b9c27991b3795eb440c1ee0757edb4ce8b1
+toolchain:  leanprover/lean4:v4.30.0
+lake:       Lake version 5.0.0-src+d024af0 (Lean version 4.30.0)
+lean:       Lean (version 4.30.0, x86_64-unknown-linux-gnu, commit d024af099ca4bf2c86f649261ebf59565dc8c622, Release)
