@@ -4,7 +4,7 @@ Updated: 2026-08-01
 Active milestone: **Stage 1 complete** — all gates G0–G8 green against the pinned tools  
 Last accepted session: S02 — validate the emitted corpus against LLZK 3.0  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: filled in by the commit that follows this one  
+Integration commit: `0f4f5705a22980524afba1ec4ae724e2f4646a4e`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
