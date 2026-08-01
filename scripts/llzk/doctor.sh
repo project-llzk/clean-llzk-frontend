@@ -11,6 +11,9 @@ elif [[ "$#" -ne 0 ]]; then
   exit 2
 fi
 
+# shellcheck source=scripts/llzk/lib.sh
+source "${script_dir}/lib.sh"
+
 "${script_dir}/check-pins.sh"
 
 if ! command -v lake >/dev/null 2>&1; then
@@ -20,28 +23,19 @@ fi
 
 echo "lake:       $(lake --version | head -n 1)"
 
-llzk_opt="${LLZK_OPT:-}"
-llzk_witgen="${LLZK_WITGEN:-}"
-
-if [[ -n "${llzk_opt}" && -x "${llzk_opt}" ]]; then
-  echo "llzk-opt:   ${llzk_opt}"
-else
-  echo "llzk-opt:   pending S01"
+# Under --require-llzk both tools must be present *and* report the pinned
+# version. Without it, a missing tool is reported but tolerated, so the doctor is
+# still useful before S01 has run.
+for var in LLZK_OPT LLZK_WITGEN; do
+  path="${!var:-}"
   if [[ "${require_llzk}" == true ]]; then
-    echo "error: set LLZK_OPT to the pinned LLZK 3.0 binary" >&2
-    exit 1
+    require_llzk_tool "${var}" "${path}"
+  elif [[ -n "${path}" && -x "${path}" ]]; then
+    require_llzk_tool "${var}" "${path}"
+  else
+    echo "${var}: not provisioned (see doc/llzk/CURRENT.md)"
   fi
-fi
-
-if [[ -n "${llzk_witgen}" && -x "${llzk_witgen}" ]]; then
-  echo "llzk-witgen:${llzk_witgen}"
-else
-  echo "llzk-witgen: pending S01"
-  if [[ "${require_llzk}" == true ]]; then
-    echo "error: set LLZK_WITGEN to the pinned LLZK 3.0 binary" >&2
-    exit 1
-  fi
-fi
+done
 
 echo "doctor:     PASS"
 

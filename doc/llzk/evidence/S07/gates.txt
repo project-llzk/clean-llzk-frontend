@@ -1,0 +1,44 @@
+# S07 acceptance gates
+
+Base integration commit: 1c1cf413 (S06 accepted)
+Date (UTC): 2026-08-01T04:11:04Z
+
+## G1
+$ python3 scripts/check-consecutive-empty-lines.py   PASS
+$ lake build --wfail Clean                           PASS (1820 jobs)
+$ lake build CleanTests                              PASS (1718 jobs)
+
+## Emitter
+
+$ lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>
+wrote <dir>/Multiply.llzk
+wrote <dir>/Decompose.llzk
+wrote <dir>/Addition8FullCarry.llzk
+exit status: 0
+
+Sizes: Multiply 1663 B, Decompose 1898 B, Addition8FullCarry 5319 B.
+
+Runs under the Lean interpreter. A `lean_exe` was tried first and
+rejected: it forces native compilation of all of mathlib, which neither
+CI nor a fresh session should have to pay for an emitter.
+
+## G8 — the harness fails closed
+
+$ bash scripts/llzk/e2e.sh
+error: LLZK_OPT is not set; see doc/llzk/CURRENT.md for provisioning        exit 1
+
+$ LLZK_OPT=<the installed LLZK 2.0 llzk-opt> LLZK_WITGEN=/bin/true bash scripts/llzk/e2e.sh
+error: LLZK_OPT=... reports a version that does not mention the pinned LLZK 3.0.0
+    LLZK version 2.0.0                                                      exit 1
+
+$ bash scripts/llzk/doctor.sh                  LLZK_*: not provisioned      exit 0
+$ bash scripts/llzk/doctor.sh --require-llzk   error: LLZK_OPT is not set   exit 1
+
+The version check is the substantive part: an LLZK 2.0 llzk-opt is
+installed on this machine and accepts different syntax, so an existence
+check alone would validate against the wrong language.
+
+## Gates NOT claimed
+
+G3, G4 — the script implements them but has never had a pinned tool to run.
+G5, G6, G7 — not implemented; e2e.sh says so rather than passing silently.

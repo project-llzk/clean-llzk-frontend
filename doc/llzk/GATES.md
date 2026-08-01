@@ -43,9 +43,35 @@ carries pre-existing `declaration uses 'sorry'` warnings at the pinned base
 (`Clean/Utils/Test/TestCircuitProofStart.lean`), and CI does not gate on them
 either. Backend test modules must not add new ones — G9 covers that.
 
-S01 records exact LLZK commands and paths here. S02 adds the golden-fixture
-commands. Later sessions extend `scripts/llzk/e2e.sh`; a missing required tool
-must fail rather than skip.
+## G2–G4 — emit and check the corpus
+
+```bash
+# Emit the corpus to a directory. Runs under the Lean interpreter, so it needs
+# only the oleans `lake build Clean` already produces -- no native compilation.
+lake env lean --run Clean/Backend/LLZK/EmitMain.lean <output-directory>
+
+# Everything above, plus llzk-opt parse and round trip on every artifact.
+LLZK_OPT=... LLZK_WITGEN=... bash scripts/llzk/e2e.sh
+```
+
+There is deliberately no `#emit_llzk` macro. `#eval IO.print (LLZK.emit cfg
+"Name" circuit)` already does that job — the golden tests use exactly that form —
+and the artifact-producing command is the executable above, which is what a
+harness needs.
+
+`e2e.sh` fails closed. A missing tool, a tool that is not executable, or a tool
+whose `--version` does not mention the pinned LLZK version is an error, never a
+skipped check. The version check is not ceremony: an LLZK 2.0 `llzk-opt` is
+installed on this machine and accepts different syntax, so a bare existence
+check would silently validate against the wrong language.
+
+Set `LLZK_EXPECTED_VERSION` when the LLZK pin moves; it is the single place the
+version appears.
+
+## Gates not yet implemented
+
+G5, G6 and G7 need a per-circuit input corpus and a Clean-side witness
+comparison. `e2e.sh` says so rather than passing silently.
 
 ## Evidence
 

@@ -1,47 +1,22 @@
-import Clean.Utils.Primes
-import Clean.Gadgets.Equality
-import Clean.Utils.Tactics.ProvableStructDeriving
-import Clean.Utils.Tactics.CircuitProofStart
-import Clean.Gadgets.Addition8.Addition8FullCarry
+import Clean.Backend.LLZK.Examples
 import Clean.Gadgets.IsZeroField
-import Clean.Backend.LLZK.Circuit
 
 /-!
-# Vertical slice: compiling an assertion-only circuit
+# Golden tests for the whole pipeline
 
-Pins the LLZK text the backend produces for a real `FormalCircuit`, and pins the
-diagnostics it produces for circuits outside the Stage-1 subset.
+Pins the exact LLZK text the backend produces for each accepted example, and the
+exact diagnostics it produces for each rejected one. The circuits themselves live
+in `Clean/Backend/LLZK/Examples.lean`, shared with the emitter executable.
 
-`Multiply` is deliberately the smallest circuit that still exercises every part
-of the layout: two inputs, one witness cell computed from them, one assertion,
-and one output. It has no lookups and no natural arithmetic, so it is inside the
-subset this increment accepts.
+Gate G2 is the accepted goldens; gate G8 is the rejected ones. Neither says
+anything about whether `llzk-opt` accepts the text — that is G3/G4.
 -/
 
 namespace LLZK.Test.Circuit
 
-/-- Two field elements. -/
-structure Inputs (F : Type) where
-  x : F
-  y : F
-deriving ProvableStruct
+open LLZK.Examples
 
-/-- Witness the product of the inputs and constrain it.
-
-Specialized to Babybear rather than left generic: it is a fixture, and pinning
-the field keeps the golden readable. -/
-def multiply : FormalCircuit (F pBabybear) Inputs field where
-  main input := do
-    let ⟨x, y⟩ := input
-    let z ← witness ((x * y : Expression (F pBabybear)) : Witgen.FExpr (F pBabybear))
-    z === x * y
-    return z
-  Assumptions _ := True
-  Spec input out := out = input.x * input.y
-  soundness := by circuit_proof_all
-  completeness := by circuit_proof_all
-
-private def babybear : Config := { field := .babybear }
+/-! ## Accepted -/
 
 /--
 info: module attributes {llzk.lang, llzk.main = !struct.type<@Multiply>} {
@@ -81,53 +56,6 @@ info: module attributes {llzk.lang, llzk.main = !struct.type<@Multiply>} {
 -/
 #guard_msgs in
 #eval IO.print (emit babybear "Multiply" multiply)
-
-/-! ## The two recognized natural division/modulo shapes
-
-`Spec` is `True` for these fixtures on purpose: they exist to exercise the
-backend, not to state anything about the circuits. The interesting arithmetic
-claim — that `felt.umod`/`felt.uintdiv` on canonical representatives agrees with
-Clean's `ofNat (mod (val x) c)` — is argued in `Witness.lean` and is a proof
-obligation for P5, not something a golden test can establish. -/
-
-/-- A field element's low byte and the rest. -/
-structure Parts (F : Type) where
-  lo : F
-  hi : F
-deriving ProvableStruct
-
-/-- Witness both recognized shapes over the same subexpression. -/
-def decompose : FormalCircuit (F pBabybear) field Parts where
-  main x := do
-    let lo ← witness ((x.val % 256).toField)
-    let hi ← witness ((x.val / 256).toField)
-    return { lo, hi }
-  Assumptions _ := True
-  Spec _ _ := True
-  soundness := by circuit_proof_all
-  completeness := by circuit_proof_all
-
-/-- Rejected: Lean's `Nat` modulo by zero is total, LLZK's is not. -/
-def moduloByZero : FormalCircuit (F pBabybear) field Parts where
-  main x := do
-    let lo ← witness ((x.val % 0).toField)
-    let hi ← witness ((x.val / 256).toField)
-    return { lo, hi }
-  Assumptions _ := True
-  Spec _ _ := True
-  soundness := by circuit_proof_all
-  completeness := by circuit_proof_all
-
-/-- Rejected: `felt.const` would reduce a divisor at or above the prime. -/
-def divideByPrime : FormalCircuit (F pBabybear) field Parts where
-  main x := do
-    let lo ← witness ((x.val % 256).toField)
-    let hi ← witness ((x.val / pBabybear).toField)
-    return { lo, hi }
-  Assumptions _ := True
-  Spec _ _ := True
-  soundness := by circuit_proof_all
-  completeness := by circuit_proof_all
 
 /--
 info: module attributes {llzk.lang, llzk.main = !struct.type<@Decompose>} {
@@ -184,23 +112,6 @@ operation 1 (witness): witness division has divisor 2013265921, which is not bel
 #guard_msgs in
 #eval IO.print (emit babybear "DivideByPrime" divideByPrime)
 
-/-! ## Fail-closed behaviour (gate G8)
-
-Every construct outside the Stage-1 subset must be refused *before* any LLZK text
-exists, and the refusal must say what was hit. These pin the exact diagnostics.
--/
-
-private def mersenne : Config := { field := .mersenne31 }
-
--- A configured field whose prime is not the circuit's is a compile error, not
--- arithmetic silently performed in the wrong field.
-/--
-info: compilation failed:
-field: configured field 'mersenne31' has prime 2147483647, but the circuit's field has 2013265921 elements
--/
-#guard_msgs in
-#eval IO.print (emit mersenne "Multiply" multiply)
-
 /-! ## Lookup tables (gate G6 target)
 
 `ExportTable.ofStatic` derives rows from a `StaticTable`, so they cannot disagree
@@ -208,38 +119,9 @@ with the table's own `row` function. Clean's `ByteTable` inlines its
 `StaticTable` into `Table.fromStatic`, which discards it, so the byte rows here
 are written out instead — see the note on `byteTable`. -/
 
-/-- A `StaticTable` whose rows `ofStatic` derives. `Spec` is stated as
-containment so that `contains_iff` is `Iff.rfl`: this fixture exists to test the
-derivation, not to say anything about the table. -/
-private def tinyStatic : StaticTable (F pBabybear) field where
-  name := "Tiny"
-  length := 4
-  row i := (i.val : F pBabybear)
-  index x := x.val
-  Spec t := ∃ i : Fin 4, t = (i.val : F pBabybear)
-  contains_iff _ := Iff.rfl
-
 #guard (ExportTable.ofStatic tinyStatic).name == "Tiny"
 #guard (ExportTable.ofStatic tinyStatic).arity == 1
 #guard (ExportTable.ofStatic tinyStatic).rows == #[#[0], #[1], #[2], #[3]]
-
-/-- The byte table, as the registry sees it.
-
-Written out rather than derived with `ExportTable.ofStatic`, because
-`Gadgets.ByteTable` inlines its `StaticTable` into `Table.fromStatic` and there
-is no named value to derive from. Naming that `StaticTable` in `ByteLookup.lean`
-would let this be derived, but it breaks every proof that unfolds `ByteTable`
-with `simp` (`Addition8FullCarry`, `U32`, `U64`), so it is a change for a Clean
-session, not this one. Recorded as D012.
-
-The rows are `0 .. 255` because `Gadgets.fromByte i = natToField i.val`, whose
-canonical representative is `i.val`. -/
-private def byteTable : ExportTable where
-  name := "Bytes"
-  arity := 1
-  rows := (Array.range 256).map (#[·])
-
-private def withBytes : Config := { field := .babybear, tables := #[byteTable] }
 
 /--
 info: module attributes {llzk.lang, llzk.main = !struct.type<@Addition8FullCarry>} {
@@ -311,6 +193,20 @@ info: module attributes {llzk.lang, llzk.main = !struct.type<@Addition8FullCarry
 -/
 #guard_msgs in
 #eval IO.print (emit withBytes "Addition8FullCarry" (Gadgets.Addition8FullCarry.circuit (p := pBabybear)))
+
+/-! ## Rejected (gate G8)
+
+Every construct outside the Stage-1 subset must be refused *before* any LLZK text
+exists, and the refusal must say what was hit. -/
+
+-- A configured field whose prime is not the circuit's is a compile error, not
+-- arithmetic silently performed in the wrong field.
+/--
+info: compilation failed:
+field: configured field 'mersenne31' has prime 2147483647, but the circuit's field has 2013265921 elements
+-/
+#guard_msgs in
+#eval IO.print (emit mersenne "Multiply" multiply)
 
 -- An unregistered table is refused, and the diagnostic says how to register it.
 /--
