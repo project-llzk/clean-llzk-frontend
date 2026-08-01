@@ -546,7 +546,7 @@ table 'Main': has the same name as the component; the module's symbol table cann
 
 /--
 info: compilation failed:
-table 'Bytes': row 1, value 0 is 2013265921, which is not below the field prime 2013265921; it is not a canonical representative and `felt.const` would reduce it, so the emitted table would be a different set of rows
+table 'Bytes': row value 2013265921 is not below the field prime 2013265921; it is not a canonical representative and `felt.const` would reduce it, so the emitted table would be a different set of rows
 -/
 #guard_msgs in
 #eval IO.print (emitSource unreducedTable oneLookup)

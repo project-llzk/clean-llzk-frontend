@@ -1,6 +1,6 @@
 == G0: state and pins ==
 Clean base: 1e563b9c27991b3795eb440c1ee0757edb4ce8b1
-HEAD:       cc7b9c5fcf22d8887c321ad45a4985f3fd867c07
+HEAD:       66d9fc864d19c2840454eeebe93d9126f74fefac
 upstream:   git@github.com:Verified-zkEVM/clean.git
 toolchain:  leanprover/lean4:v4.30.0
 pin check:  PASS
@@ -15,6 +15,10 @@ LLZK_WITGEN: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/
 Checking for consecutive empty lines in Lean files...
 
 ✓ No consecutive empty lines found.
+✔ [1825/1829] Built Clean.Backend.LLZK.TableCert (1.4s)
+✔ [1826/1829] Built Clean.Backend.LLZK.Examples (2.1s)
+✔ [1827/1829] Built Clean.Backend.LLZK.Corpus (1.5s)
+✔ [1828/1829] Built Clean (1.2s)
 Build completed successfully (1829 jobs).
 ⚠ [1691/1729] Replayed Clean.Utils.Test.TestCircuitProofStart
 warning: Clean/Utils/Test/TestCircuitProofStart.lean:17:0: declaration uses `sorry`
@@ -27,6 +31,10 @@ warning: Clean/Utils/Test/TestCircuitProofStart.lean:88:0: declaration uses `sor
 warning: Clean/Utils/Test/TestCircuitProofStart.lean:129:0: declaration uses `sorry`
 warning: Clean/Utils/Test/TestCircuitProofStart.lean:157:0: declaration uses `sorry`
 warning: Clean/Utils/Test/TestCircuitProofStart.lean:183:0: declaration uses `sorry`
+✔ [1725/1729] Built Clean.Backend.LLZK.Test.WitnessCheck (1.6s)
+✔ [1726/1729] Built Clean.Backend.LLZK.Test.Constraints (1.9s)
+✔ [1727/1729] Built Clean.Backend.LLZK.Test.Circuit (5.5s)
+✔ [1728/1729] Built Clean.Test (1.2s)
 Build completed successfully (1729 jobs).
 
 == G2: emit the corpus ==

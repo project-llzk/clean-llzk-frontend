@@ -57,6 +57,25 @@ def isSymbolName (name : String) : Bool :=
 
 namespace ExportTable
 
+/-- The values this table puts into the emitted `global.def const`, in order.
+Single-column tables are the only ones that reach the emitter, so this is the
+row list. -/
+def values (table : ExportTable) : Array Nat := table.rows.flatten
+
+/-- Every row value that is not a canonical representative.
+
+Split out from `diagnose` so that `values_lt_prime_of_diagnose` can be proved:
+a `for`-loop over a mutable accumulator makes "the result is empty" hard to
+decompose, and a `filterMap` makes it one `Array.mem_filterMap` away. -/
+private def valueProblems (prime : Nat) (context : String) (table : ExportTable) :
+    Array Diagnostic :=
+  table.values.filterMap fun value =>
+    if value < prime then none
+    else some { context
+                message := s!"row value {value} is not below the field prime {prime}; it is not \
+                              a canonical representative and `felt.const` would reduce it, so \
+                              the emitted table would be a different set of rows" }
+
 /-- Everything wrong with one registry entry, in the order it would be hit.
 
 Checked once per compilation rather than per lookup, so a malformed entry is
@@ -68,40 +87,54 @@ emitted verbatim into `global.def const` and then denote a *different* element.
 The emitted table would be a different set from the one the author wrote, with no
 diagnostic — R2-02. This is distinct from D012, which is about rows the backend
 cannot check; these it can. -/
-def diagnose (prime : Nat) (table : ExportTable) : Array Diagnostic := Id.run do
+def diagnose (prime : Nat) (table : ExportTable) : Array Diagnostic :=
   let context := s!"table '{table.name}'"
-  let mut out := #[]
-  unless isSymbolName table.name do
-    out := out.push { context
-                      message := "name is not a legal MLIR symbol; it must start with a letter \
-                                  or underscore and contain only letters, digits and underscores" }
-  if table.name = rootComponent then
-    out := out.push { context
-                      message := s!"has the same name as the component; the module's symbol \
-                                    table cannot hold a `global.def` and a `struct.def` called \
-                                    '{rootComponent}'" }
-  if table.arity ≠ 1 then
-    out := out.push { context
-                      message := s!"arity is {table.arity}; only single-column tables are \
-                                    supported, because a wider one needs an `array.new` query \
-                                    and a multi-dimensional `constrain.in`" }
-  if table.rows.isEmpty then
-    out := out.push { context, message := "has no rows; an empty table makes every lookup \
-                                            unsatisfiable, which is never intended" }
-  for (row, i) in table.rows.zipIdx do
-    if row.size ≠ table.arity then
-      out := out.push { context
-                        message := s!"row {i} has {row.size} value(s) but the arity is \
-                                      {table.arity}" }
-  for (row, i) in table.rows.zipIdx do
-    for (value, j) in row.zipIdx do
-      if value ≥ prime then
-        out := out.push { context
-                          message := s!"row {i}, value {j} is {value}, which is not below the \
-                                        field prime {prime}; it is not a canonical \
-                                        representative and `felt.const` would reduce it, so the \
-                                        emitted table would be a different set of rows" }
-  return out
+  let when (cond : Bool) (message : String) : Array Diagnostic :=
+    if cond then #[{ context, message }] else #[]
+  when (!isSymbolName table.name)
+      "name is not a legal MLIR symbol; it must start with a letter or underscore and contain \
+       only letters, digits and underscores"
+    ++ when (table.name = rootComponent)
+      s!"has the same name as the component; the module's symbol table cannot hold a \
+         `global.def` and a `struct.def` called '{rootComponent}'"
+    ++ when (table.arity ≠ 1)
+      s!"arity is {table.arity}; only single-column tables are supported, because a wider one \
+         needs an `array.new` query and a multi-dimensional `constrain.in`"
+    ++ when table.rows.isEmpty
+      "has no rows; an empty table makes every lookup unsatisfiable, which is never intended"
+    ++ table.rows.zipIdx.filterMap (fun (row, i) =>
+        if row.size = table.arity then none
+        else some { context
+                    message := s!"row {i} has {row.size} value(s) but the arity is \
+                                  {table.arity}" })
+    ++ valueProblems prime context table
+
+/-- **A table that diagnoses clean has canonical values.**
+
+The hypothesis `certified_membership` needs, discharged from the check the
+compiler already runs rather than assumed at the call site. Without it, the
+bridge from `Certifies` to "the emitted array holds exactly the table's
+elements" would rest on a side condition nobody establishes. -/
+theorem values_lt_prime_of_diagnose {prime : Nat} {table : ExportTable}
+    (h : diagnose prime table = #[]) : ∀ n ∈ table.values, n < prime := by
+  intro n hn
+  by_contra hlt
+  have hempty : valueProblems prime s!"table '{table.name}'" table = #[] := by
+    have := congrArg Array.size h
+    simp only [diagnose, Array.size_append, Array.size_empty] at this
+    have : (valueProblems prime s!"table '{table.name}'" table).size = 0 := by omega
+    exact Array.eq_empty_of_size_eq_zero this
+  have : (∃ v ∈ table.values, ¬ v < prime) := ⟨n, hn, hlt⟩
+  obtain ⟨v, hv, hvlt⟩ := this
+  have : ({ context := s!"table '{table.name}'"
+            message := s!"row value {v} is not below the field prime {prime}; it is not \
+                          a canonical representative and `felt.const` would reduce it, so \
+                          the emitted table would be a different set of rows" } : Diagnostic)
+          ∈ valueProblems prime s!"table '{table.name}'" table := by
+    simp only [valueProblems, Array.mem_filterMap]
+    exact ⟨v, hv, by simp [hvlt]⟩
+  rw [hempty] at this
+  simp at this
 
 end ExportTable
 

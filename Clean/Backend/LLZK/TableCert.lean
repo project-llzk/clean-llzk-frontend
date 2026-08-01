@@ -37,10 +37,6 @@ namespace LLZK
 
 variable {F : Type} [FiniteField F]
 
-/-- The values an `ExportTable` puts into the emitted `global.def const`, in
-order. Single-column tables only reach the emitter, so this is the row list. -/
-def ExportTable.values (e : ExportTable) : Array Nat := e.rows.flatten
-
 /-- The obligation D012 records: `e`'s values are exactly the canonical
 representatives of the elements the single-column Clean table `table` contains.
 
@@ -170,5 +166,41 @@ about the circuit's table; see the section comment above. -/
 def Config.ofCertified (spec : FieldSpec) (tables : Array (CertifiedTable F)) : Config where
   field := spec
   tables := tables.map (·.exported)
+
+/-! ## The obligation, discharged end to end for the table the corpus uses
+
+`certified_membership` was proved and then instantiated nowhere, and its
+`hcanonical` hypothesis was never derived from the check that establishes it
+(R4a-6). Both are fixed here: `ExportTable.values_lt_prime_of_diagnose` supplies
+the hypothesis from the compiler's own registry check, and the theorem below is
+the composition, stated about the concrete table `Addition8FullCarry` looks into.
+
+This is the closest the project gets to an end-to-end statement on the lookup
+side. What it still rests on is D017's reading of `constrain.in` as membership;
+everything between Clean's `ByteTable.Contains` and the field elements the
+emitted `global.def const @Bytes` holds is now a theorem.
+-/
+
+section ByteTableEndToEnd
+
+variable {p : ℕ} [Fact p.Prime] [Fact (p > 512)]
+
+/-- **`Gadgets.ByteTable` contains `x` exactly when the emitted `@Bytes` array
+holds `x`.**
+
+The left-hand side is Clean's lookup constraint. The right-hand side is what
+`constrain.in %Bytes, %x` asserts, under D017. The `diagnose` hypothesis is
+discharged by the compiler before any module is emitted — it is the check S08
+added for R2-02 — so this holds of every module the backend produces that looks
+into this table. -/
+theorem byteTable_lookup_iff
+    (hdiag : ExportTable.diagnose (FiniteField.size (_root_.F p)) ⟨"Bytes", 1, byteRows⟩ = #[])
+    (t : Array (_root_.F p)) (x : _root_.F p) :
+    (Gadgets.ByteTable (p := p)).Contains t x
+      ↔ ∃ n ∈ (⟨"Bytes", 1, byteRows⟩ : ExportTable).values, FiniteField.fromNat n = x :=
+  certified_membership byteTable_certifies
+    (ExportTable.values_lt_prime_of_diagnose hdiag) t x
+
+end ByteTableEndToEnd
 
 end LLZK

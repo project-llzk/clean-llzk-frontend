@@ -96,6 +96,12 @@ One boundary, and one improvement. Everything else R4 named is either closed or
 covered by another gate — see `review/R4-findings.md` for the risk-by-risk
 verdict, each pinned by a control rather than asserted.
 
+The lookup side, which R4a-6 found had no semantic theorem, now has one:
+`byteTable_lookup_iff` says `Gadgets.ByteTable.Contains t x` holds exactly when
+`x` is one of the field elements the emitted `@Bytes` array holds, with the
+canonicity hypothesis discharged from the compiler's own registry check rather
+than assumed.
+
 **D017 — the reading of LLZK — cannot be closed from this repository.**
 `llzk-witgen`'s help text says it outright: *"llzk-witgen v1 ignores constrain()
 and traps on bool.assert."* There is no executor for `@constrain` in the pinned

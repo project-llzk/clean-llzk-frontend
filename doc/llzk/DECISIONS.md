@@ -326,6 +326,17 @@ So the residual is precise: the obligation is stated, and proved for every table
 in use; the compiler cannot demand it. Closing that needs the `Table` to survive
 into `Lookup`, which is a change to Clean's core rather than to this backend.
 
+**And the bridge is now composed, not just available.** `certified_membership`
+was proved and instantiated nowhere, with its canonicity hypothesis left to the
+caller (R4a-6). `ExportTable.values_lt_prime_of_diagnose` discharges that
+hypothesis from the check the compiler already runs — the one S08 added for
+R2-02 — and `byteTable_lookup_iff` composes the two:
+
+> `Gadgets.ByteTable.Contains t x  ↔  ∃ n ∈ @Bytes's values, fromNat n = x`
+
+The left-hand side is Clean's lookup constraint; the right-hand side is what the
+emitted `constrain.in %Bytes, %x` asserts. Everything between them is a theorem.
+
 So what is left is not "the rows are trusted". It is D017's reading of
 `constrain.in` as membership, which is a statement about LLZK, and the same
 assumption every other emitted operation carries. The follow-up about naming
