@@ -66,14 +66,14 @@ both must come from the same LLZK installation"
 # harness does every run.
 require_llzk_witgen_discriminates() {
   local artifact="$1" inputs="$2" expected="$3" workdir="$4"
-  local corrupted="${workdir}/witgen-selftest-corrupted.json"
+  # Not a fixed name. R5d's D-5: two six-line shims that special-cased the
+  # scratch paths defeated both self-tests, because those paths were literals a
+  # shim could recognise. The basename and PID make them unguessable from
+  # inside the tool.
+  local tag; tag="$(basename -- "${artifact}" .llzk).$$"
+  local corrupted="${workdir}/witgen-selftest-${tag}.json"
 
-  "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" \
-    --output-scope=full-witness --check-output "${expected}" >/dev/null \
-    || llzk_fail "llzk-witgen self-test: ${artifact} does not match its own expected witness; \
-every later green would be meaningless"
-
-  python3 - "${expected}" "${corrupted}" <<'PY' || llzk_fail "llzk-witgen self-test: \
+  python3 - "${expected}" "${corrupted}" <<'PYEOF' || llzk_fail "llzk-witgen self-test: \
 could not build the corrupted witness"
 import json, sys
 witness = json.load(open(sys.argv[1]))
@@ -83,16 +83,29 @@ if not signals:
 key = next(iter(signals))
 signals[key] = str(int(signals[key]) + 1)
 json.dump(witness, open(sys.argv[2], "w"))
-PY
+PYEOF
 
-  if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" \
-       --output-scope=full-witness --check-output "${corrupted}" >/dev/null 2>&1; then
-    llzk_fail "llzk-witgen self-test: ${LLZK_WITGEN} accepted a witness with one signal \
-perturbed, so --check-output is not checking anything. Every G5/G6/G7 green below would be \
-vacuous."
-  fi
+  # Both backends, because both are gates. R5d's D-1: the self-test ran only the
+  # default interpreter, so `--backend=execution-engine` -- the whole of G6, and
+  # half of what makes G7 a *differential* -- was never shown to discriminate. A
+  # stub execution engine that exited 0 would have made G6 vacuous while the log
+  # differed from a real run only in tool paths.
+  local backend
+  for backend in interpreter execution-engine; do
+    "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+      --output-scope=full-witness --check-output "${expected}" >/dev/null \
+      || llzk_fail "llzk-witgen self-test (${backend}): ${artifact} does not match its own \
+expected witness; every later green would be meaningless"
+
+    if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+         --output-scope=full-witness --check-output "${corrupted}" >/dev/null 2>&1; then
+      llzk_fail "llzk-witgen self-test (${backend}): ${LLZK_WITGEN} accepted a witness with one \
+signal perturbed, so --check-output is not checking anything. Every G5/G6/G7 green below would \
+be vacuous."
+    fi
+  done
   rm -f "${corrupted}"
-  echo "llzk-witgen self-test: green on the expected witness, red on a perturbed one"
+  echo "llzk-witgen self-test: both backends green on the expected witness, red on a perturbed one"
 }
 
 # require_llzk_opt_discriminates WORKDIR ARTIFACT
@@ -104,10 +117,27 @@ vacuous."
 # satisfied require_llzk_tools and made G3, G4 and G10 all vacuous while e2e.sh
 # printed PASS (R4b-2).
 #
-# Runs llzk-opt twice: once on a real emitted artifact, which must verify, and
-# once on a file that is not LLZK at all, which must not.
+# Runs llzk-opt three times: once on a real emitted artifact, which must verify;
+# once on a file that is not MLIR at all, which must not; and once on a module
+# that is well-formed MLIR and invalid *LLZK*, which must not either.
+#
+# The third probe is R5d's D-2, and it matters more than it sounds. With only the
+# first two, any generic MLIR parser passes this self-test -- and that is not
+# hypothetical: LLZK 3.0.0 itself accepts, exit 0, a module whose entire body is
+#
+#     func.func @f(%a: i32) -> i32 { return %a : i32 }
+#
+# with no LLZK construct in it at all. So "rejects a file that is not MLIR"
+# establishes nothing about whether the LLZK verifier ran, and G3's "verifies"
+# could be false while green. The probe used instead is a `struct.def` carrying a
+# `@compute` and no `@constrain`, which parses fine and which only LLZK's own
+# verifier rejects.
 require_llzk_opt_discriminates() {
-  local workdir="$1" artifact="$2" garbage="${1}/llzk-opt-selftest-garbage.llzk"
+  local workdir="$1" artifact="$2"
+  # Derived, not fixed: see the note in require_llzk_witgen_discriminates.
+  local tag; tag="$(basename -- "${artifact}" .llzk).$$"
+  local garbage="${workdir}/llzk-opt-selftest-${tag}.notmlir"
+  local nonllzk="${workdir}/llzk-opt-selftest-${tag}.llzk"
 
   "${LLZK_OPT}" "${artifact}" -o /dev/null >/dev/null 2>&1 \
     || llzk_fail "llzk-opt self-test: ${artifact} does not verify; every later green would be \
@@ -118,8 +148,26 @@ meaningless"
     llzk_fail "llzk-opt self-test: ${LLZK_OPT} accepted a file that is not MLIR, so G3, G4 and \
 G10 are not checking anything."
   fi
-  rm -f "${garbage}"
-  echo "llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file"
+
+  cat > "${nonllzk}" <<'LLZKEOF'
+module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
+  struct.def @Main {
+    function.def @compute() -> !struct.type<@Main> {
+      %v0 = struct.new : !struct.type<@Main>
+      function.return %v0 : !struct.type<@Main>
+    }
+  }
+}
+LLZKEOF
+  if "${LLZK_OPT}" "${nonllzk}" -o /dev/null >/dev/null 2>&1; then
+    llzk_fail "llzk-opt self-test: ${LLZK_OPT} accepted a struct.def with a @compute and no \
+@constrain, which is well-formed MLIR and invalid LLZK. Something is parsing the text without \
+running LLZK's verifier, so G3, G4 and G10 are green without checking anything."
+  fi
+
+  rm -f "${garbage}" "${nonllzk}"
+  echo "llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file \
+and on well-formed MLIR that is not valid LLZK"
 }
 
 # llzk_smt_declared_reason LOGFILE

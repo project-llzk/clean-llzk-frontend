@@ -59,14 +59,21 @@ echo
 echo "== harness self-test =="
 selftest_inputs=("${out_dir}"/*.0.inputs.json)
 (( ${#selftest_inputs[@]} > 0 )) || fail "no input vector to run the llzk-witgen self-test on"
-selftest_input="${selftest_inputs[0]}"
-selftest_name="$(basename -- "${selftest_input}" .0.inputs.json)"
-require_llzk_witgen_discriminates \
-  "${out_dir}/${selftest_name}.llzk" \
-  "${selftest_input}" \
-  "${out_dir}/${selftest_name}.0.expected.json" \
-  "${out_dir}"
-require_llzk_opt_discriminates "${out_dir}" "${out_dir}/${selftest_name}.llzk"
+# Both ends of the corpus, not just the alphabetically first. R5d's D-4: with a
+# single fixed probe, a wrapper honest on that one artifact and lying about the
+# other twelve passed every gate. Two probes do not make that impossible -- only
+# harder to write by accident -- and the real defence is that the probe paths are
+# derived rather than fixed. See require_llzk_witgen_discriminates.
+for selftest_input in "${selftest_inputs[0]}" "${selftest_inputs[${#selftest_inputs[@]}-1]}"; do
+  selftest_name="$(basename -- "${selftest_input}" .0.inputs.json)"
+  echo "-- on ${selftest_name}"
+  require_llzk_witgen_discriminates \
+    "${out_dir}/${selftest_name}.llzk" \
+    "${selftest_input}" \
+    "${out_dir}/${selftest_name}.0.expected.json" \
+    "${out_dir}"
+  require_llzk_opt_discriminates "${out_dir}" "${out_dir}/${selftest_name}.llzk"
+done
 echo
 
 # G10 is in two halves.
@@ -87,6 +94,10 @@ echo
 # smt_ok=0, smt_skipped=13 and still print PASS — the count is the only signal
 # G10b produces, and nothing compared it to anything (R4b-5).
 LLZK_EXPECTED_SMT_OK="${LLZK_EXPECTED_SMT_OK:-9}"
+LLZK_EXPECTED_SMT_SKIPPED="${LLZK_EXPECTED_SMT_SKIPPED:-1}"
+LLZK_EXPECTED_ARTIFACTS="${LLZK_EXPECTED_ARTIFACTS:-11}"
+LLZK_EXPECTED_VECTORS="${LLZK_EXPECTED_VECTORS:-30}"
+LLZK_EXPECTED_FIXTURES="${LLZK_EXPECTED_FIXTURES:-2}"
 smt_ok=0
 smt_skipped=0
 smt_log="${out_dir}/.smt.log"
@@ -101,7 +112,11 @@ $(sed 's/^/    /' "${smt_log}")"
     smt_ok=$(( smt_ok + 1 ))
     return
   fi
-  reason="$(llzk_smt_declared_reason "${smt_log}")"
+  # `|| true` is load-bearing. Under `set -e` a command substitution that exits
+  # non-zero in a bare assignment kills the shell *here*, so the message below --
+  # the one that says a module failed for an undeclared reason, which is the
+  # whole point of this branch -- could never print. R5d's D-8.
+  reason="$(llzk_smt_declared_reason "${smt_log}" || true)"
   [[ -n "${reason}" ]] || fail "$(basename -- "${artifact}") fails --llzk-to-smt-no-cf, and not \
 for any declared reason:
 $(sed 's/^/    /' "${smt_log}")"
@@ -162,6 +177,31 @@ echo
 expected at least ${LLZK_EXPECTED_SMT_OK}. Something that used to be admissible no longer is. \
 Set LLZK_EXPECTED_SMT_OK if the corpus legitimately shrank."
 
+# G10b's own discriminate check, and the reason it is a floor on *skips* rather
+# than a probe. `--llzk-to-smt-no-cf` is the one pass with no self-test: a shim
+# honest on --llzk-product-program and exiting 0 on the SMT flag would report
+# every module lowered, and the smt_ok floor above would *reward* it (R5d's
+# D-3). The corpus contains modules the pass genuinely cannot lower -- anything
+# with a felt.umod -- so a run in which it refused nothing means it is not
+# running. Both directions observed, on real artifacts, every run.
+(( smt_skipped >= LLZK_EXPECTED_SMT_SKIPPED )) || fail "G10b: --llzk-to-smt-no-cf refused \
+nothing in this run (${smt_skipped} skipped, expected at least \
+${LLZK_EXPECTED_SMT_SKIPPED}). The corpus has modules it cannot lower, so a pass that accepts \
+all of them is not running -- and ${smt_ok} acceptances mean nothing. Set \
+LLZK_EXPECTED_SMT_SKIPPED=0 only if LLZK gained support for every construct in the corpus."
+
+# No silent shrinking. Every count below is reported in the PASS banner, and a
+# banner that says "3 circuit(s)" after a change that dropped ten of them reads
+# exactly like a pass (R5d's D-10).
+(( ${#artifacts[@]} >= LLZK_EXPECTED_ARTIFACTS )) || fail "the corpus emitted \
+${#artifacts[@]} artifact(s), expected at least ${LLZK_EXPECTED_ARTIFACTS}. Coverage shrank; \
+set LLZK_EXPECTED_ARTIFACTS if that was intended."
+(( vectors >= LLZK_EXPECTED_VECTORS )) || fail "the corpus ran ${vectors} input vector(s), \
+expected at least ${LLZK_EXPECTED_VECTORS}. G5, G6 and G7 are only as good as the vectors \
+that exist; set LLZK_EXPECTED_VECTORS if the reduction was intended."
+(( ${#fixtures[@]} >= LLZK_EXPECTED_FIXTURES )) || fail "the corpus emitted \
+${#fixtures[@]} renderer fixture(s), expected at least ${LLZK_EXPECTED_FIXTURES}."
+
 echo "PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12"
 echo "  ${#artifacts[@]} circuit(s), ${vectors} input vector(s), both witgen backends."
 echo "  ${#fixtures[@]} renderer fixture(s), syntax only."
@@ -174,8 +214,21 @@ ${smt_skipped} out of scope for a declared reason."
 echo
 echo "G9 is not a property of this corpus: both halves of it -- @constrain against"
 echo "the circuit's constraints, and @compute against its witness programs -- are"
-echo "preconditions of emission, so no module leaves this backend without them."
-echo "What remains is the reading of LLZK's own semantics, recorded as D017: that"
-echo "felt.add is +, constrain.in is membership, felt.umod reads its operands as"
-echo "canonical representatives. G10 shows the modules are admissible to LLZK's"
+echo "preconditions of emission, so no module obtained through LLZK.compile or"
+echo "LLZK.emit leaves this backend without them."
+echo
+echo "That is narrower than 'no module', and the difference is on screen above."
+echo "The six Square_* entries are built from a hand-written Recognized with no"
+echo "Clean circuit behind them, so there is nothing for G9 to compare against and"
+echo "EmitMain reports them as none rather than as passing. G12 keeps the entry"
+echo "points that skip G9 out of ordinary code. This banner used to say 'no module"
+echo "leaves this backend without them', which was false for six of the eleven"
+echo "modules the same run certifies (R5d)."
+echo
+echo "What remains beyond that is doc/llzk/GAPS.md -- above all D017, the reading"
+echo "of LLZK's own semantics: that felt.add is +, constrain.in is membership, and"
+echo "felt.umod reads its operands as canonical representatives. The @compute half"
+echo "of that reading is what the ${vectors} vectors above test, on two independent"
+echo "backends. The @constrain half has no executor in this toolchain and so no"
+echo "empirical check at all. G10 shows the modules are admissible to LLZK's"
 echo "analysis pipeline; it runs no solver."

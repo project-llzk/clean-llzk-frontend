@@ -223,6 +223,51 @@ expect "llzk-witgen self-test catches a permissive shim" 1 "is not checking anyt
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
        "${workdir}/expected.json" "${workdir}"
 
+> "${workdir}/shim/llzk-opt-mlironly" cat <<'SHIM'
+#!/usr/bin/env bash
+# A generic MLIR parser: rejects text that is not MLIR, accepts anything that is,
+# and never runs an LLZK verifier. R5d's D-2 -- with only the non-MLIR probe, the
+# self-test could not tell this from the real tool, so G3's "verifies" could be
+# false while green. And this is not a strawman: LLZK 3.0.0 really does accept a
+# module whose whole body is a `func.func` with no LLZK in it.
+case "${1:-}" in --version) echo "LLZK version 3.0.0"; exit 0;; esac
+for a in "$@"; do
+  [[ -f "${a}" ]] || continue
+  grep -q '^module' "${a}" && exit 0
+  exit 1
+done
+exit 0
+SHIM
+chmod +x "${workdir}/shim/llzk-opt-mlironly"
+expect "llzk-opt self-test catches a parser with no LLZK verifier" 1 "@compute and no" \
+  -- env LLZK_OPT="${workdir}/shim/llzk-opt-mlironly" \
+       bash -c 'source "$1/lib.sh"; require_llzk_opt_discriminates "$2" "$3"' \
+       _ "${script_dir}" "${workdir}" "${workdir}/dummy.llzk"
+
+> "${workdir}/shim/llzk-witgen-interp-only" cat <<'SHIM'
+#!/usr/bin/env bash
+# Honest on the interpreter, a no-op on the execution engine. R5d's D-1: the
+# self-test ran only the default backend, so a stub execution engine made G6
+# vacuous while the log differed from a real run only in tool paths.
+backend=interpreter
+check=""
+for a in "$@"; do
+  case "${a}" in
+    --backend=*) backend="${a#--backend=}" ;;
+    --check-output) check="next" ;;
+    *) [[ "${check}" == "next" ]] && { check="${a}"; } ;;
+  esac
+done
+[[ "${backend}" == "interpreter" ]] || exit 0
+case "${check}" in *expected*) exit 0 ;; *) exit 1 ;; esac
+SHIM
+chmod +x "${workdir}/shim/llzk-witgen-interp-only"
+expect "llzk-witgen self-test catches a stub execution engine" 1 "execution-engine" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-interp-only" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/expected.json" "${workdir}"
+
 echo
 if (( failed > 0 )); then
   echo "FAIL: ${passed} passed, ${failed} failed"
