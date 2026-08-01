@@ -4,7 +4,7 @@ Updated: 2026-08-01
 Active milestone: P2 complete on the Lean side; **no LLZK tool has run**  
 Last accepted session: S07 — emitter command and conformance harness  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: filled in by the commit that follows this one  
+Integration commit: `1f560aa19181e276acc67290b03bffa387cf5972`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
