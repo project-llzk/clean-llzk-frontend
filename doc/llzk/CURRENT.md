@@ -86,9 +86,18 @@ turn the harness red. See `doc/llzk/evidence/S02/gates.txt`.
 
 ## Next session
 
-- Packet: R2 (Stage-1 acceptance from a clean checkout), then S08 (proof
-  baseline).
-- Objective for S08: executable semantics for the emitted subset, and the first
-  preservation theorems — field-expression evaluation, assertion lowering, and
-  the two natural shapes of D011. That closes gap 1 and gap 2 together.
-- First command: `bash scripts/llzk/e2e.sh` from a fresh clone of the branch.
+- Packet: `doc/llzk/sessions/R2-stage1-acceptance.md` — the Stage-1 adversarial
+  acceptance review. Bootstrapped and ready; nothing else should start first.
+- Objective: falsify, not confirm. The work list is
+  `doc/llzk/review/CLAIMS.md`; the highest-value section is §A, because **no
+  automated gate covers the emitted constraints at all** — `llzk-witgen` ignores
+  `constrain()`, so 16 green input vectors say nothing about whether the
+  constraints are right.
+- Do **not** read `doc/llzk/review/CONTROL-SET.md` until the review is written
+  down; it exists to measure the review's own coverage.
+- First command: `bash scripts/llzk/e2e.sh` (with `LLZK_OPT`/`LLZK_WITGEN` set as
+  above).
+
+After R2: S08, the proof baseline — executable semantics for the emitted subset
+and the first preservation theorems, which is what would close gaps 1 and 2
+above.
