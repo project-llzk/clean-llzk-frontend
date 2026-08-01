@@ -20,6 +20,66 @@ jobs:
       - name: Build tests
         run: lake build CleanTests
 
+  # The LLZK gates that need no LLZK toolchain: G0 (pins and provenance), G11
+  # (the harness's own error paths) and G12 (confinement). Kept separate from
+  # llzk-e2e so that a Nix or LLZK-build problem cannot take them down with it --
+  # these three are pure git, grep and bash, and should never be flaky.
+  #
+  # Until R5, none of the LLZK gates ran in CI at all: `lake build CleanTests`
+  # carries G1, G2, G8 and G9, and everything else was local-only (R5e-7).
+  llzk-harness:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # check-pins.sh verifies HEAD descends from the pinned Clean base.
+          fetch-depth: 0
+      - name: Declare the upstream remote
+        # A fresh checkout has `origin` only; G0 checks provenance against
+        # `upstream`, which is exactly the state its first error path describes.
+        run: git remote add upstream git@github.com:Verified-zkEVM/clean.git
+      - name: G0 — state and pins
+        run: bash scripts/llzk/check-pins.sh
+      - name: G11 — harness error paths
+        run: bash scripts/llzk/test-scripts.sh
+      - name: G12 — confinement
+        run: bash scripts/llzk/check-confinement.sh
+
+  # The gates that need the pinned LLZK 3.0.0: G3, G4, G5, G6, G7 and G10. The
+  # toolchain comes from the same flake reference doc/llzk/PINS.md records, so CI
+  # and a local run are the same binaries by construction rather than by
+  # convention.
+  llzk-e2e:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Declare the upstream remote
+        run: git remote add upstream git@github.com:Verified-zkEVM/clean.git
+      - uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+      - name: Build the pinned LLZK
+        id: llzk
+        run: |
+          out="$(nix build --no-link --print-out-paths \
+            'github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk')"
+          echo "path=${out}" >> "$GITHUB_OUTPUT"
+          "${out}/bin/llzk-opt" --version
+      - uses: leanprover/lean-action@v1
+        with:
+          build-args: "--wfail"
+      - name: G0–G12 — the whole pipeline
+        env:
+          LLZK_OPT: ${{ steps.llzk.outputs.path }}/bin/llzk-opt
+          LLZK_WITGEN: ${{ steps.llzk.outputs.path }}/bin/llzk-witgen
+        run: bash scripts/llzk/e2e.sh
+
   plonky3-backend:
     runs-on: ubuntu-latest
     needs: build

@@ -29,7 +29,10 @@ forms. That is what keeps non-field operations out of `@constrain`.
 namespace LLZK
 namespace FieldExpr
 
-variable {F : Type} [FiniteField F] [CanonicalRepr F]
+-- `[CanonicalRepr F]` is written into the signature below, not left here: a
+-- `variable [C F]` binder is dropped unless the instance is *used* in the
+-- declaration, and this line was one of the six that silently vanished in R4a-1.
+variable {F : Type} [FiniteField F]
 
 /-- Recognize a Clean circuit expression.
 
@@ -37,7 +40,7 @@ Total: `Expression` has exactly these four constructors, so every constraint
 expression Clean can build is in the accepted subset. Nothing here can produce a
 witness-only constructor, which is what keeps `@constrain` free of non-field
 operations. -/
-def ofExpression : Expression F → FieldExpr
+def ofExpression [CanonicalRepr F] : Expression F → FieldExpr
   | .var v => .var v.index
   | .const c => .const (FiniteField.val c)
   | .add a b => .add (ofExpression a) (ofExpression b)

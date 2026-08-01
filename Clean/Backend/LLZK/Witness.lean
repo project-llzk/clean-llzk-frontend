@@ -197,7 +197,8 @@ def checkLowerable (prime : Nat) (context : String) :
 expression is always accepted; the arithmetic constructors recurse; the two
 natural division/modulo shapes are matched whole; everything else is refused by
 name. -/
-def ofFExpr (prime : Nat) (context : String) : Witgen.FExpr F → Except Diagnostic FieldExpr
+def ofFExpr [CanonicalRepr F] (prime : Nat) (context : String) :
+    Witgen.FExpr F → Except Diagnostic FieldExpr
   | .expr e => .ok (ofExpression e)
   | .const c => .ok (.const (FiniteField.val c))
   | .add a b => return .add (← ofFExpr prime context a) (← ofFExpr prime context b)
@@ -220,8 +221,16 @@ namespace Witness
 
 variable {F : Type} [FiniteField F] {m : Nat}
 
-/-- Recognize the output of a witness program: one expression per witness cell. -/
-private def ofVExpr (prime : Nat) (context : String) : {n : Nat} → Witgen.VExpr F n →
+/-- Recognize the output of a witness program: one expression per witness cell.
+
+`[CanonicalRepr F]` is written into every signature in this namespace rather than
+left to a `variable`. D019 claimed the class was required at every recognizer;
+R4a-1 found it in *zero* elaborated signatures, because a `variable [C F]` binder
+is dropped unless the instance is used in the declaration, and R5b-4 found the
+same pattern still here after that repair. An explicit binder cannot be dropped,
+and `#check` on these names is how the claim stays true. -/
+private def ofVExpr [CanonicalRepr F] (prime : Nat) (context : String) :
+    {n : Nat} → Witgen.VExpr F n →
     Except Diagnostic (Array FieldExpr)
   | _, .lit es => es.toArray.mapM (FieldExpr.ofFExpr prime context)
   | _, .mapRange _ _ =>
@@ -257,7 +266,7 @@ private def checkBlockLocal (context : String) (base : Nat) (cells : Array Field
 
 `base` is the circuit variable the block's first cell defines. The returned array
 has one entry per witness cell, in allocation order. -/
-def recognize (prime : Nat) (context : String) (base : Nat) :
+def recognize [CanonicalRepr F] (prime : Nat) (context : String) (base : Nat) :
     Witgen.WitgenIR F m → Except Diagnostic (Array FieldExpr)
   | .native _ =>
     .error { context

@@ -626,14 +626,26 @@ Why a tree and not `Poly`: `@compute` contains `felt.umod` and `felt.uintdiv`,
 which no polynomial normal form represents. The comparison is therefore syntactic
 on trees — sound, and stricter than the constraint side, since two computations
 that are equal but differently shaped would be reported as a mismatch. That is
-fail-closed, and in practice the shapes match because both readers are structural
-over the same source.
+fail-closed, and the shapes match because both readers are structural over the
+same source — except for bare copies, which the module genuinely does not
+distinguish and which both sides therefore canonicalise away. See "Canonicalising
+copies" in `WitnessCheck.lean`; R5c found that case by having a correct module
+for a proved `FormalCircuit` refused. "In practice the shapes match" was too
+strong: it is what stopped anyone testing the refusal branch against real emitter
+output.
 
-`WExpr.eval_ofWitgen` is the theorem, and it is the one D011 wanted and could not
-state before D019: Clean's `ofNat (mod (val x) (const c))` denotes exactly what
-`WExpr.eval` says `felt.umod` denotes. `WExpr.eval`'s `umod`/`uintdiv` cases *are*
-the D017 reading of those operations, so the two sides of D011's argument are now
-connected by a theorem rather than by prose.
+`WExpr.eval_ofWitgen` is the theorem: Clean's `ofNat (mod (val x) (const c))`
+denotes exactly what `WExpr.eval` says `felt.umod` denotes, and `WExpr.eval`'s
+`umod`/`uintdiv` cases *are* the D017 reading of those operations. So the two
+sides of D011's argument are connected by a theorem rather than by prose.
+
+This paragraph used to add "and it is the one D011 wanted and could not state
+before D019". That misattributes it. `eval_ofWitgen` carries **no canonicity
+content**: it is stated over `FiniteField`, holds for a permuted `val`, and would
+have elaborated fine before D019 existed (R5b-5). What D019 buys is separate and
+lives in `CanonicalRepr`'s own two laws — that `val` really is the ring
+representative, which is what makes `felt.const (val c)` mean `c`. Both are
+needed; they are not the same theorem.
 
 Two things this does not do:
 

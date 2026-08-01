@@ -1,11 +1,11 @@
 # Clean → LLZK current state
 
 Updated: 2026-08-01  
-Active milestone: **Stage 1 repaired and re-reviewed** — all gates G0–G10 green
+Active milestone: **Stage 1 repaired and re-reviewed** — all gates G0–G12 green
 against the pinned tools  
-Last accepted session: R4 — two independent reviews, and their repairs  
+Last accepted session: R5 — five independent reviews, and their repairs  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: recorded in `sessions/R4-independent-review.md` § Handoff  
+Integration commit: recorded in `review/R5-findings.md`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
@@ -26,8 +26,13 @@ export LLZK_WITGEN=/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.
 bash scripts/llzk/e2e.sh
 ```
 
-Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10` — 11 circuits, 30 input
-vectors, both witgen backends, 2 renderer fixtures.
+Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 11 circuits, 30
+input vectors, both witgen backends, 2 renderer fixtures, 9 modules lowered to
+SMT and 4 out of scope for a declared reason.
+
+CI runs G0, G11 and G12 on every pull request, and G1–G10 in the `llzk-e2e` job,
+which builds the pinned LLZK from the same flake reference `PINS.md` records.
+Until R5 none of the LLZK gates ran in CI at all.
 
 ## State
 
@@ -50,6 +55,16 @@ vectors, both witgen backends, 2 renderer fixtures.
     by anything other than the session that wrote it. Nine findings, five
     breaking a written claim, two of them severe. All fixed and every
     counterexample re-run. `review/R4-findings.md`.
+  - **R5**, five independent adversarial reviews run against a frozen tree —
+    theorem statements, documentation versus elaborated reality, a red team,
+    gate falsification, and the trusted base. One soundness break (a `Config`
+    could weaken the emitted constraint system with every gate green), one
+    completeness break (a proved `FormalCircuit` refused and told to file a
+    backend bug), and nine claims stated more strongly than the code supported.
+    `review/R5-findings.md`; the boundaries it established are `GAPS.md`.
+  - **S21–S22**, the repair: the doors confined (G12), the harness's own error
+    paths gated (G11), D011's side conditions moved below every door, and the
+    LLZK gates put into CI for the first time.
   - `Gadgets.Addition8FullCarry` compiles to LLZK, `llzk-opt` accepts,
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
@@ -71,9 +86,11 @@ Evidence under `doc/llzk/evidence/`.
 | G5 `llzk-witgen` interpreter | PASS — 30 vectors |
 | G6 `llzk-witgen` execution engine | PASS — 30 vectors |
 | G7 both backends vs Clean's own interpreter | PASS — carried by `--check-output` |
-| G8 fail closed | PASS — 19 negative fixtures, one per rejection path, plus tool-version rejection |
+| G8 fail closed | PASS — 24 negative fixtures, plus tool-version rejection. Not "one per rejection path": R5 found three reachable paths with none, including the field-registry branch that was R4b-1's own repair. Those three now have fixtures; the claim is not reinstated as a general one |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 13 |
+| G11 the harness's own error paths | PASS — 20 exercised |
+| G12 every gate-skipping entry point is confined | PASS |
 | G10b SMT lowering | PASS — 9 lowered, 4 out of scope for a declared reason |
 
 Every gate is checked to be falsifiable, and the checks are part of the gate
@@ -83,24 +100,46 @@ rather than notes about it:
   `llzk-witgen` against a perturbed witness before the loop and aborts if it
   passes (R2-06);
 - G3, G4 and G10, by `require_llzk_opt_discriminates`, which requires `llzk-opt`
-  to reject a non-MLIR file — a shim answering only `--version` used to make all
-  three vacuous while the harness printed PASS (R4b-2);
+  to reject a non-MLIR file *and* a well-formed MLIR module that is invalid LLZK
+  — a shim answering only `--version` used to make all three vacuous while the
+  harness printed PASS (R4b-2), and the non-MLIR probe alone was satisfied by any
+  generic MLIR parser, which LLZK 3.0.0 itself demonstrates by accepting a module
+  containing no LLZK at all (R5d);
 - G9, by `Test/Constraints.lean`, which perturbs the Clean side six ways and
   pins that the comparison goes red for each;
 - G10a, by the control in `evidence/S08-S15/controls.txt`: a module whose root is
-  not `@Main` fails it.
+  not `@Main` fails it;
+- G10b, by a floor on *refusals*: the corpus contains modules the SMT pass cannot
+  lower, so a run in which it refused nothing means it is not running;
+- and the checks themselves, by G11 — `scripts/llzk/test-scripts.sh`, which
+  drives each one against a shim built to defeat it. Until R5 nothing exercised
+  any harness failure branch, which is how a repair to `check-pins.sh` shipped
+  dying with `llzk_fail: command not found` instead of the message it was written
+  to print, and survived two reviews.
 
 ## What is still not established
 
-One boundary, and one improvement. Everything else R4 named is either closed or
-covered by another gate — see `review/R4-findings.md` for the risk-by-risk
-verdict, each pinned by a control rather than asserted.
+**`doc/llzk/GAPS.md` is the register.** It exists because this section used to be
+the register and was not one: it listed "one boundary and one improvement", and
+R5's five reviewers found nine claims across the codebase that were stated more
+strongly than the code supported. Two of them were consequences of paragraphs
+that stood right here. The list below is the summary; `GAPS.md` is the thing to
+read, and the docstrings it points at now agree with it.
 
-The lookup side, which R4a-6 found had no semantic theorem, now has one:
-`byteTable_lookup_iff` says `Gadgets.ByteTable.Contains t x` holds exactly when
-`x` is one of the field elements the emitted `@Bytes` array holds, with the
-canonicity hypothesis discharged from the compiler's own registry check rather
-than assumed.
+The largest, in order: lookup table rows are asserted by the caller and not
+checked (D012 — and the `ConstraintSet.globals` conjunct that claimed to close
+this is a tautology); `Module.render` is outside every theorem, uncovered for
+`@constrain`; there is no proof from the emitted constraints to a gadget's
+`Spec`; `byteTable_lookup_iff` is instantiated nowhere and its `hdiag` therefore
+discharged nowhere; `FieldExpr.lower_spec` is satisfied by five grossly wrong
+lowerings and does not compose; and G9 compares no types.
+
+The lookup side, which R4a-6 found had no semantic theorem, has one in
+`byteTable_lookup_iff` — `Gadgets.ByteTable.Contains t x` holds exactly when `x`
+is one of the field elements the emitted `@Bytes` array holds. This paragraph
+used to add that its canonicity hypothesis was "discharged from the compiler's
+own registry check". It is not: nothing instantiates the theorem, so nothing
+discharges its hypothesis.
 
 **D017 — the reading of LLZK — cannot be closed from this repository.**
 `llzk-witgen`'s help text says it outright: *"llzk-witgen v1 ignores constrain()
@@ -111,11 +150,19 @@ check and cannot acquire one here. Closing it means formalising LLZK, which is
 VeIR's project (D003). The `@compute` half of the same reading *does* have
 evidence: 30 vectors across two independent LLZK backends.
 
-**S20 — the preservation theorem — is an improvement, not a gap in the
-artifacts.** Every module `compile` returns has been compared against its circuit
-on both sides, so a lowering bug yields a *refusal*, never a wrong module. S20
-would make that refusal impossible rather than merely never-observed: better
-robustness and diagnosis, not better soundness of what is emitted.
+**S20 — the preservation theorem — exists, and is much smaller than this section
+used to claim.** Every module `compile` returns has been compared against its
+circuit on both sides, so a lowering bug yields a *refusal*, never a wrong
+module; that part holds.
+
+Two corrections R5 forced. The refusal is no longer "merely never-observed" — R5c
+observed one, on a proved `FormalCircuit` whose emitted module was correct, and
+the reader was at fault. And `FieldExpr.lower_spec`, the theorem S20 produced,
+turns out to be satisfied by a lowering that throws on every expression, one that
+emits everything in the wrong field, and one that appends a bogus
+`constrain.eq %v, 0` to every subexpression. Lifting it through the assembly
+loops — the plan for S21 — would have been lifting almost nothing; R5a-4 gives
+three obstructions. `GAPS.md` item 5.
 
 It was attempted, and the attempt found that the obstacle is not the one D018
 implied. It is not the state monad: it is that `Value.mk`, `Builder.fresh`,

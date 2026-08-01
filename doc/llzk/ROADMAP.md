@@ -135,7 +135,7 @@ Status against that definition:
 | unsupported cases fail with structured diagnostics | done — 19 negative fixtures pin exact messages, one per rejection path |
 | `llzk-opt` accepts and round-trips | done — 11 modules and 2 renderer fixtures, G3 and G4 |
 | every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 13 |
-| both witgen backends agree | done — 27 input vectors, G5 and G6 |
+| both witgen backends agree | done — 30 input vectors, G5 and G6 |
 | witnesses match Clean on a corpus | done — G7, via `--check-output` against `FlatOperation.witgen` |
 | the emitted constraints are Clean's | done — G9, and since S17 a precondition of emission, so for every circuit |
 
@@ -144,7 +144,7 @@ One command, `bash scripts/llzk/e2e.sh`, reproduces all of it.
 ### What is still not established
 
 - **The witness side has no G9.** `@compute` is covered by G5–G7 differentially,
-  on 27 vectors, and by nothing else. The class its preservation theorem needs
+  on 30 vectors, and by nothing else. The class its preservation theorem needs
   now exists (`CanonicalRepr`, D019), so it is statable; it is not stated.
 - **G9 validates each translation; it does not verify the translator** (D018,
   D020). A lowering bug surfaces as a refusal to compile rather than as a

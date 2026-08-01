@@ -130,7 +130,8 @@ Fails closed on an unregistered name and on an arity that disagrees with the
 circuit's. The arity check matters: a name can match while the shape does not,
 and emitting a one-column `constrain.in` against a two-column table would be a
 silently weaker constraint. -/
-private def recognizeLookup (tables : Array ExportTable) (context : String) (l : Lookup F) :
+private def recognizeLookup [CanonicalRepr F] (tables : Array ExportTable)
+    (context : String) (l : Lookup F) :
     Except Diagnostic RecognizedLookup := do
   let some table := tables.find? (·.name = l.table.name)
     | .error { context
@@ -159,8 +160,8 @@ private def recognizeLookup (tables : Array ExportTable) (context : String) (l :
 
 /-- Recognize one flat operation. `base` is the circuit variable a witness block
 starting here would define first. -/
-private def recognizeOperation (tables : Array ExportTable) (prime : Nat) (base : Nat)
-    (index : Nat) : FlatOperation F → Except Diagnostic Contribution
+private def recognizeOperation [CanonicalRepr F] (tables : Array ExportTable) (prime : Nat)
+    (base : Nat) (index : Nat) : FlatOperation F → Except Diagnostic Contribution
   | .witness _ program => do
     return { witnesses := ← Witness.recognize prime s!"operation {index} (witness)" base program }
   | .assert e => .ok { asserts := #[FieldExpr.ofExpression e] }

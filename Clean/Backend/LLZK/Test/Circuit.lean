@@ -12,6 +12,22 @@ Gate G2 is the accepted goldens; gate G8 is the rejected ones. Neither says
 anything about whether `llzk-opt` accepts the text — that is G3/G4, and
 `scripts/llzk/e2e.sh` runs it over every artifact in the corpus.
 
+## What a golden establishes, and how to refresh one
+
+**A golden detects drift, not error.** The expected text is the emitter's own
+output, so it cannot tell that the text was right to begin with — only that a
+change to it was reviewed. What makes it more than a snapshot is that the same
+text goes through G3, G4 and G5–G7, which are independent of this file. R5e
+raised this; `doc/llzk/GAPS.md` records it alongside the other boundaries.
+
+To refresh one after an intended emitter change: run
+`lake env lean --run Clean/Backend/LLZK/EmitMain.lean .lake/llzk` and splice the
+artifact's text into the `#guard_msgs` docstring, or paste what the build reports
+as the mismatch. Deliberately a manual splice and not a script: this file also
+holds hand-written rejection fixtures and prose, and a regenerate-the-whole-file
+tool — which is how these goldens were first produced — would silently discard
+them. A diff that has to be reviewed is the point of the gate.
+
 The accepted circuits live in `Clean/Backend/LLZK/Examples.lean`, shared with the
 corpus. The rejected ones live *here*: they are not examples of anything the
 library should ship, and having them in a module `Clean.lean` imports meant

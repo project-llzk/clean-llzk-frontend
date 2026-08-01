@@ -189,10 +189,16 @@ variable {p : ℕ} [Fact p.Prime] [Fact (p > 512)]
 holds `x`.**
 
 The left-hand side is Clean's lookup constraint. The right-hand side is what
-`constrain.in %Bytes, %x` asserts, under D017. The `diagnose` hypothesis is
-discharged by the compiler before any module is emitted — it is the check S08
-added for R2-02 — so this holds of every module the backend produces that looks
-into this table. -/
+`constrain.in %Bytes, %x` asserts, under D017.
+
+**`hdiag` is a hypothesis, and nothing discharges it.** An earlier version of
+this docstring said it was "discharged by the compiler before any module is
+emitted", on the grounds that `ExportTable.diagnose` is the check S08 added for
+R2-02. The compiler does run that check — but this theorem is instantiated at no
+call site, so its hypothesis is discharged at none either, and a hypothesis of an
+uninstantiated theorem is discharged by nothing. R5a-7. `GAPS.md` item 4 records
+that the lookup half of `ConstraintsHoldFlat` has no *composed* semantic
+theorem; this is the piece that would go in it. -/
 theorem byteTable_lookup_iff
     (hdiag : ExportTable.diagnose (FiniteField.size (_root_.F p)) ⟨"Bytes", 1, byteRows⟩ = #[])
     (t : Array (_root_.F p)) (x : _root_.F p) :
