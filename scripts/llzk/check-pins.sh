@@ -3,6 +3,9 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
+
+# shellcheck source=scripts/llzk/lib.sh
+source "${script_dir}/lib.sh"
 clean_base="1e563b9c27991b3795eb440c1ee0757edb4ce8b1"
 expected_upstream="git@github.com:Verified-zkEVM/clean.git"
 expected_toolchain="leanprover/lean4:v4.30.0"

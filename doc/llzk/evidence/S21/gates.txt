@@ -1,0 +1,66 @@
+# S21 — harness error paths
+
+Date (UTC): 2026-08-01T21:27:18Z
+Base: faaf5309 (R5 bootstrap)
+
+## The defect
+
+`scripts/llzk/check-pins.sh` called `llzk_fail` and never sourced
+`lib.sh`. Reproduced in a clone with no `upstream` remote:
+
+  scripts/llzk/check-pins.sh: line 13: llzk_fail: command not found
+  exit=127
+
+Introduced by cc7b9c5f, the commit that acted on R4's findings. R4 had
+found that check-pins.sh died on git's own message in that exact
+situation; the repair added the intended diagnostic and did not work.
+Exit was non-zero, so it failed closed and no gate noticed. It survived
+R4's verification and R5's bootstrap.
+
+After the fix:
+
+  error: no git remote named 'upstream'; this worktree is not the project home (D002)
+  exit=1
+
+## The gap behind it
+
+No test exercised any script failure branch. Only happy paths ran, on
+every gate run. A check nothing can observe failing is not a check.
+
+## G11
+
+$ bash scripts/llzk/test-scripts.sh
+PASS: 13 error paths exercised
+exit status: 0
+
+  check-pins.sh   no upstream remote; wrong upstream URL; pinned base
+                  absent; HEAD not descended from base; toolchain
+                  mismatch; happy path
+  lib.sh          LLZK_OPT unset; not executable; wrong LLZK version;
+                  right version; witgen from another installation
+  self-tests      llzk-opt discriminate catches a permissive shim;
+                  llzk-witgen discriminate catches a permissive shim
+
+Each case asserts an exit status AND a message substring. Status alone
+would have passed the very defect that motivated this: exit 127 is
+non-zero.
+
+The last two are the negative direction of the controls that keep every
+other green honest (R2-06, R4b-2). Their positive direction ran on the
+real tools every time; nothing exercised the direction that matters.
+
+## Falsifiability
+
+Removing the `source` line again:  FAIL: 12 passed, 1 failed   exit 1
+Restoring it:                       PASS: 13 error paths        exit 0
+
+The first draft of test-scripts.sh tested the *committed* scripts, so it
+reported a failure for a defect already fixed in the tree. make_clone now
+copies the working tree's scripts over the clone's.
+
+## Full harness
+
+$ LLZK_OPT=... LLZK_WITGEN=... bash scripts/llzk/e2e.sh
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11
+  11 circuit(s), 30 input vector(s), both witgen backends.
+exit status: 0

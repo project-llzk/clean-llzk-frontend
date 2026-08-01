@@ -85,8 +85,14 @@ C7. `readStmt` models only `feltConst` and `feltBin`; `lower_spec`'s statement
 
 ## Frozen at
 
-Commit: `e56d9e12` (`S20: prove the expression lowering emits what the reader
-reads back`), plus this packet.
+Commit: **updated by S21** — see `doc/llzk/CURRENT.md` for the exact SHA.
+
+Originally `e56d9e12` plus this packet. S21 then fixed a broken error path in
+`check-pins.sh`, which R5's own bootstrap runs first, and added G11 to keep the
+harness's failure branches observable. S21 believed R5 had not begun; it had, concurrently, and
+wrote its findings between two of S21's edits. The freeze was therefore broken
+under a running review — see `doc/llzk/sessions/S21-harness-error-paths.md`.
+S21 changed no Lean source, so R5's Lean findings are unaffected. See `doc/llzk/sessions/S21-harness-error-paths.md`.
 
 Reproduce: `LLZK_OPT=… LLZK_WITGEN=… bash scripts/llzk/e2e.sh` →
 `PASS: G0 … G10`, exit 0, 11 circuits, 30 vectors.

@@ -16,6 +16,7 @@ accumulated gates from a clean checkout.
 | G8 — Fail closed | Unsupported constructors and invalid layouts diagnose |
 | G9 — Semantics | The emitted `@constrain` and `@compute` are the circuit's |
 | G10 — Pipeline | Every artifact is admissible to LLZK's analysis pipeline |
+| G11 — Harness | The scripts' own failure branches behave as written |
 
 ## G0 — State
 
@@ -201,3 +202,33 @@ Store concise evidence under `doc/llzk/evidence/SNN/`. Record:
 
 Evidence that exists only in `/tmp` is not accepted.
 
+
+## G11 — the harness's own error paths
+
+```bash
+bash scripts/llzk/test-scripts.sh
+```
+
+Every gate above is enforced by `scripts/llzk/*.sh`, and until S21 nothing
+exercised any of their *failure* branches — only the happy path, on every run.
+That gap shipped a broken fix: R4 found `check-pins.sh` died on git's own
+message in a clone with no `upstream` remote, the repair added the intended
+diagnostic, and the repair itself was wrong. `check-pins.sh` never sourced
+`lib.sh`, so the branch died with `llzk_fail: command not found` and exit 127.
+It failed closed, so no gate noticed, and it survived R4's verification and R5's
+bootstrap.
+
+G11 runs *first* in `e2e.sh`, though it is numbered last: a broken check would
+silently weaken everything below it.
+
+Each case asserts an exit status **and** a message substring. Status alone would
+have passed the defect that motivated the gate — exit 127 is non-zero. Two of
+the thirteen cases are the negative direction of
+`require_llzk_opt_discriminates` and `require_llzk_witgen_discriminates`, whose
+positive direction ran on the real tools every time while the direction that
+matters ran never.
+
+It needs no LLZK tools and no Lean build: `lib.sh`'s helpers are called
+directly and `check-pins.sh` is driven against throwaway `--shared` clones, so
+it costs about a second. The clones get the *working tree's* scripts copied in,
+so an uncommitted regression is caught.
