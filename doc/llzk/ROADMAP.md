@@ -26,7 +26,9 @@ Clean/Backend/LLZK/
   Table.lean       the lookup-table export registry
   Analyze.lean     Source, Recognized, recognize, analyze
   Circuit.lean     layout, compute/constrain lowering, compile, emit
-  Examples.lean    worked examples and the conformance corpus
+  Examples.lean    worked example circuits
+  Differential.lean  Clean's own witness, in llzk-witgen's --check-output shape
+  Corpus.lean      the conformance corpus: circuits plus input vectors
   EmitMain.lean    `lean --run` entry point that materializes the corpus
   Test/            goldens for both accepted and rejected circuits
 ```
@@ -37,8 +39,10 @@ so a macro would only have been sugar over one of them.
 
 ## Stage-1 capability
 
-Implemented and golden-tested on the Lean side; **not yet validated by any LLZK
-tool** — see `CURRENT.md`.
+Implemented, golden-tested, and validated against the pinned LLZK 3.0 tools:
+`llzk-opt` parses, verifies and round-trips every emitted module, and both
+`llzk-witgen` backends agree with Clean's own witness interpreter across the
+recorded input corpus.
 
 Accept:
 
@@ -71,18 +75,21 @@ S00 → S01 → S02 → R0 → S03 → S04 → R1 → S05 → S06 → S07 → R2
 ```
 
 What actually happened: S01 stalled on a machine trust change outside a
-session's authority, so S03–S07 were brought forward rather than idling. The
-order run was
+session's authority, so S03–S07 were brought forward rather than idling, and
+S01/S02 ran last:
 
 ```text
-S00 → S03 → S04 → S05 → S06 → S07 → [S01, S02, R0, R1, R2 outstanding]
+S00 → S03 → S04 → S05 → S06 → S07 → S01 → S02 → [R0, R1, R2 outstanding]
 ```
 
-The consequence is concentrated and known: the entire emitter's concrete syntax
-was read from test fixtures in the pinned LLZK revision rather than confirmed by
-the pinned binaries. S02 should therefore validate the *emitted* corpus first —
-it is now a more useful subject than a handwritten fixture — and R0/R1/R2 should
-review the emitter against the tools, not only against the fixtures.
+The risk that created — five increments of syntax read from the pinned
+revision's test fixtures rather than confirmed by its binaries — was retired by
+S02 at zero cost: every gate passed on the first run and `Print.lean` needed no
+change. S02 also dropped its planned handwritten fixture, which by then would
+have been a second source of truth with no added assurance.
+
+The review sessions R0/R1/R2 remain outstanding. R2 in particular should
+reproduce everything from a clean checkout, since no session so far has.
 
 After S02, a separate VeIR audit may consume the frozen fixture corpus. It may
 not redefine the textual contract or add a direct dependency to Clean.
@@ -100,7 +107,14 @@ Status against that definition:
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
 | unsupported cases fail with structured diagnostics | done — eight negative fixtures pin exact messages |
-| `llzk-opt` accepts and round-trips | **not run** — harness implemented, no pinned tool |
-| both witgen backends agree | **not run**, and not implemented |
-| witnesses match Clean on a corpus | **not run**, and not implemented |
+| `llzk-opt` accepts and round-trips | done — 3 modules, G3 and G4 |
+| both witgen backends agree | done — 16 input vectors, G5 and G6 |
+| witnesses match Clean on a corpus | done — G7, via `--check-output` against `FlatOperation.witgen` |
+
+**Stage 1 is complete.** One command, `bash scripts/llzk/e2e.sh`, reproduces all
+of it.
+
+The largest remaining assurance gap is that nothing checks the emitted
+*constraints*: `llzk-witgen` executes `compute()` and ignores `constrain()`. That
+is what S08 and the G9 proof track are for.
 

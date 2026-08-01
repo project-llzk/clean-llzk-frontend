@@ -11,8 +11,8 @@ import Clean.Backend.LLZK.Circuit
 The circuits this backend is tested and demonstrated against. They live in the
 library rather than the test library for two reasons: they document what Stage 1
 accepts and rejects, and both the golden tests
-(`Clean/Backend/LLZK/Test/Circuit.lean`) and the emitter executable
-(`Clean/Backend/LLZK/EmitMain.lean`) consume them, so there is one definition of
+(`Clean/Backend/LLZK/Test/Circuit.lean`) and the conformance corpus
+(`Clean/Backend/LLZK/Corpus.lean`) consume them, so there is one definition of
 each rather than two that can drift.
 
 `Spec` is `True` for several of these on purpose: they exist to exercise the
@@ -124,25 +124,5 @@ def byteTable : ExportTable where
   rows := (Array.range 256).map (#[·])
 
 def withBytes : Config := { field := .babybear, tables := #[byteTable] }
-
-/-! ## The conformance corpus
-
-Every artifact `lake exe llzk-emit` materializes and `scripts/llzk/e2e.sh`
-checks. Only circuits that are expected to *compile* belong here; the rejected
-ones are pinned by the golden tests instead.
-
-A `Config` travels with each entry because the field and the table registry are
-part of what is being tested, not incidental. -/
-
-/-- Name, and the module the backend produces for it.
-
-Entries are `Except` rather than pre-rendered text so the emitter can fail closed
-on a corpus entry that stopped compiling, instead of writing a diagnostic dump
-into a `.llzk` file for `llzk-opt` to choke on. -/
-def corpus : Array (String × Except (Array Diagnostic) Module) := #[
-  ("Multiply", compile babybear "Multiply" multiply),
-  ("Decompose", compile babybear "Decompose" decompose),
-  ("Addition8FullCarry",
-    compile withBytes "Addition8FullCarry" (Gadgets.Addition8FullCarry.circuit (p := pBabybear)))]
 
 end LLZK.Examples

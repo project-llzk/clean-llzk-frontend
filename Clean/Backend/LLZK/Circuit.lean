@@ -47,14 +47,18 @@ circuit's outputs, under stable names, which is what gate G7 diffs against Clean
 namespace LLZK
 
 /-- Parameter name for input field element `i`; also its `function.arg_name`, so
-`llzk-witgen --inputs` accepts `{"arg0": …}`. -/
-private def inputArgName (i : Nat) : String := s!"arg{i}"
+`llzk-witgen --inputs` accepts `{"arg0": …}`.
+
+Public, with the two below, because the differential harness must key its JSON on
+exactly the names the emitter uses. Sharing the function is the only way that
+cannot drift. -/
+def inputArgName (i : Nat) : String := s!"arg{i}"
 
 /-- Member holding witness cell `k`. -/
-private def witnessMember (k : Nat) : String := s!"w{k}"
+def witnessMember (k : Nat) : String := s!"w{k}"
 
 /-- Member holding output field element `j`. -/
-private def outputMember (j : Nat) : String := s!"out{j}"
+def outputMember (j : Nat) : String := s!"out{j}"
 
 /-- The component's state: one `{signal}` member per witness cell, then one
 `{llzk.pub}` member per output. -/

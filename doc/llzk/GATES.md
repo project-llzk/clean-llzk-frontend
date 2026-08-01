@@ -68,10 +68,29 @@ check would silently validate against the wrong language.
 Set `LLZK_EXPECTED_VERSION` when the LLZK pin moves; it is the single place the
 version appears.
 
-## Gates not yet implemented
+## G5–G7 — witness generation, differentially
 
-G5, G6 and G7 need a per-circuit input corpus and a Clean-side witness
-comparison. `e2e.sh` says so rather than passing silently.
+`LLZK.Corpus.corpus` carries input vectors alongside each circuit. The emitter
+writes, per vector, the `--inputs` object and Clean's own witness for it, in the
+shape `--output-scope=full-witness --check-output` compares against. Clean's side
+uses `FlatOperation.witgen`, the array-backed reference interpreter that
+`witgen_eq_dynamicWitnesses` proves agrees with the semantic definition.
+
+So G7 is not a separate run: `--check-output` carries it inside G5 and G6, and a
+disagreement is a non-zero exit rather than two JSON dumps to compare by eye.
+
+Key names come from `Circuit.lean`'s layout functions, shared with the emitter,
+so the expected JSON cannot drift from the emitted members.
+
+**What G5–G7 do not establish.** `llzk-witgen` executes `compute()` and ignores
+`constrain()`. Agreement means the two witness generators agree; it says nothing
+about whether the emitted constraints capture Clean's. That is the G9 proof
+track.
+
+Keep these gates falsifiable. A green that cannot go red is decoration — S02
+verified both by corrupting an expected value and by injecting a one-off into
+Clean's witness computation. Note that editing a generated file in place is *not*
+a valid check: `e2e.sh` removes and regenerates its output directory every run.
 
 ## Evidence
 

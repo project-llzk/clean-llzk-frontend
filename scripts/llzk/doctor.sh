@@ -26,16 +26,11 @@ echo "lake:       $(lake --version | head -n 1)"
 # Under --require-llzk both tools must be present *and* report the pinned
 # version. Without it, a missing tool is reported but tolerated, so the doctor is
 # still useful before S01 has run.
-for var in LLZK_OPT LLZK_WITGEN; do
-  path="${!var:-}"
-  if [[ "${require_llzk}" == true ]]; then
-    require_llzk_tool "${var}" "${path}"
-  elif [[ -n "${path}" && -x "${path}" ]]; then
-    require_llzk_tool "${var}" "${path}"
-  else
-    echo "${var}: not provisioned (see doc/llzk/CURRENT.md)"
-  fi
-done
+if [[ "${require_llzk}" == true || ( -n "${LLZK_OPT:-}" && -n "${LLZK_WITGEN:-}" ) ]]; then
+  require_llzk_tools
+else
+  echo "LLZK_OPT/LLZK_WITGEN: not provisioned (see doc/llzk/CURRENT.md)"
+fi
 
 echo "doctor:     PASS"
 

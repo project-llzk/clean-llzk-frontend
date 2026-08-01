@@ -1,0 +1,45 @@
+# S01 — provisioned LLZK 3.0 tools
+
+Date (UTC): 2026-08-01T09:19:08Z
+
+## Acquisition
+
+```
+sudo systemctl restart nix-daemon   # so the corrected cache key takes effect
+nix build --no-link --max-jobs 0 --print-out-paths \
+  github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk
+```
+
+Result: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0
+
+Entirely substituted from https://veridise-public.cachix.org; nothing built
+from source. `--max-jobs 0` is what guarantees that: it turns a substitution
+failure into an error instead of a silent multi-hour LLVM build.
+
+## Versions
+
+$ llzk-opt --version
+  LLVM (http://llvm.org/):
+    LLVM version 20.1.8
+    Optimized build.
+  
+  LLZK (https://github.com/project-llzk/llzk-lib):
+    LLZK version 3.0.0
+
+$ llzk-witgen --version
+  LLVM (http://llvm.org/):
+    LLVM version 20.1.8
+    Optimized build.
+
+Note: llzk-witgen does not report an LLZK version, only LLVM's. Its
+provenance is established by co-location with the version-checked
+llzk-opt (scripts/llzk/lib.sh, require_llzk_sibling).
+
+## Binaries in the package
+
+  llzk-lsp-server
+  llzk-opt
+  llzk-smt-check
+  llzk-translate
+  llzk-witgen
+  r1cs-opt

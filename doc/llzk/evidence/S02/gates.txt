@@ -1,0 +1,52 @@
+# S02 — the emitted corpus, validated by the pinned tools
+
+Date (UTC): 2026-08-01T09:19:08Z
+Tools: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0
+
+## Result
+
+$ LLZK_OPT=... LLZK_WITGEN=... bash scripts/llzk/e2e.sh
+PASS: G0 G1 G2 G3 G4 G5 G6 G7
+  3 circuit(s), 16 input vector(s), both witgen backends.
+exit status: 0
+
+Every gate passed on the first run of the tools against the emitter.
+No change to Print.lean was needed: the syntax read from the pinned
+revision's own test fixtures during S03-S06 was correct.
+
+## What each gate covered
+
+  G3  llzk-opt parse + verify           3 modules
+  G4  llzk-opt --verify-roundtrip       3 modules
+  G5  llzk-witgen interpreter           16 vectors
+  G6  llzk-witgen execution-engine      16 vectors
+  G7  both, --check-output against Clean's own reference interpreter
+
+G7 is not a separate run: --check-output compares llzk-witgen's full
+witness against the JSON Clean produced via FlatOperation.witgen, so
+G5 and G6 each carry G7 for their backend.
+
+## Negative controls
+
+A gate that cannot go red is decoration. Two checks:
+
+1. Corrupting one value in an expected file:
+     $.signals.w0: value mismatch: expected "254", got "255"    exit 1
+
+2. Injecting a one-off into Clean's witness computation
+   (Differential.witness, cells +1) and running the whole harness:
+     $.signals.w0: value mismatch: expected "1", got "0"
+     $.signals.w1: value mismatch: expected "1", got "0"        exit 1
+   Reverting restored exit 0.
+
+Note that an in-place edit of a generated file is NOT a valid control:
+e2e.sh removes and regenerates its output directory every run.
+
+## What this does not establish
+
+llzk-witgen executes compute() and ignores constrain(). Agreement means
+the two witness generators agree; it says nothing about whether the
+emitted constraints capture Clean's. That is the P5/S08 proof track.
+
+The input vectors are chosen, not exhaustive: representative boundaries
+(0, p-1, 255/256/257, and Addition8's carry cases). See LLZK.Corpus.corpus.

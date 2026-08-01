@@ -23,13 +23,41 @@ checker rejects a history that no longer contains it.
 
 ## LLZK tools
 
-S01 must fill in:
+Provisioned by S01. Evidence: `doc/llzk/evidence/S01/tools.txt`.
 
-- reproducible acquisition/build command;
-- absolute or repository-relative tool location;
-- `llzk-opt --version` output;
-- `llzk-witgen --version` output;
-- evidence that both tools correspond to the pinned LLZK revision.
+```bash
+nix build --no-link --max-jobs 0 --print-out-paths \
+  github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk
+```
 
-An installed LLZK 2.0 `llzk-opt` is not an acceptable substitute.
+- Store path: `/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0`
+- `LLZK_OPT` = `<that>/bin/llzk-opt`, reports `LLZK version 3.0.0`
+- `LLZK_WITGEN` = `<that>/bin/llzk-witgen`
+
+Entirely substituted from `https://veridise-public.cachix.org`; nothing built
+from source. Keep `--max-jobs 0`: it turns a substitution failure into an error
+rather than a silent multi-hour LLVM build, which is exactly the failure mode
+that cost this project a session.
+
+`llzk-witgen --version` reports only LLVM's version and never mentions LLZK, so
+`scripts/llzk/lib.sh` establishes its provenance by requiring it to sit in the
+same directory as a version-checked `llzk-opt`.
+
+An installed LLZK 2.0 `llzk-opt` is not an acceptable substitute, and the
+scripts reject it by version — verified.
+
+### Cache key
+
+`/etc/nix/nix.conf` must carry the *correct* public key for the substituter:
+
+```
+extra-substituters = https://veridise-public.cachix.org
+extra-trusted-public-keys = veridise-public.cachix.org-1:FvpZ8GzAj1mmJA5PnO9UgKxC6CQdmPutuIKtEpGmeig=
+```
+
+A wrong key is worse than a missing one: Nix selects it by name, fails
+verification, discards the substitute, and falls back to building from source
+without saying why. `nix-daemon` reads this file only at startup, so a change
+needs `sudo systemctl restart nix-daemon`. See
+`doc/llzk/evidence/S01/substituter-diagnosis.md`.
 

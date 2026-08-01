@@ -21,8 +21,7 @@ bash "${script_dir}/check-pins.sh"
 echo
 
 echo "== tools =="
-require_llzk_tool LLZK_OPT "${LLZK_OPT:-}"
-require_llzk_tool LLZK_WITGEN "${LLZK_WITGEN:-}"
+require_llzk_tools
 echo
 
 echo "== G1: Lean =="
@@ -39,16 +38,42 @@ artifacts=("${out_dir}"/*.llzk)
 (( ${#artifacts[@]} > 0 )) || fail "the emitter produced no artifacts"
 echo
 
+vectors=0
 for artifact in "${artifacts[@]}"; do
-  echo "== ${artifact##*/} =="
+  name="$(basename -- "${artifact}" .llzk)"
+  echo "== ${name} =="
+
   echo "-- G3: parse and verify"
   "${LLZK_OPT}" "${artifact}" -o /dev/null
   echo "-- G4: round trip"
   "${LLZK_OPT}" --verify-roundtrip "${artifact}" -o /dev/null
+
+  # G5/G6/G7 in one step per backend: --check-output compares llzk-witgen's
+  # full witness against the one Clean's own reference interpreter produced, so
+  # a disagreement is a non-zero exit rather than two dumps to eyeball.
+  inputs=("${out_dir}/${name}".*.inputs.json)
+  (( ${#inputs[@]} > 0 )) \
+    || fail "${name} has no input vectors; add some to LLZK.Corpus.corpus or the \
+witness gates silently cover nothing"
+  for input in "${inputs[@]}"; do
+    index="${input##*/${name}.}"; index="${index%%.inputs.json}"
+    expected="${out_dir}/${name}.${index}.expected.json"
+    [[ -f "${expected}" ]] || fail "missing ${expected}"
+    echo "-- G5/G7: interpreter vs Clean, vector ${index}"
+    "${LLZK_WITGEN}" "${artifact}" --inputs "${input}" \
+      --output-scope=full-witness --check-output "${expected}" >/dev/null
+    echo "-- G6/G7: execution engine vs Clean, vector ${index}"
+    "${LLZK_WITGEN}" "${artifact}" --inputs "${input}" --backend=execution-engine \
+      --output-scope=full-witness --check-output "${expected}" >/dev/null
+    vectors=$(( vectors + 1 ))
+  done
   echo "   ok"
 done
 echo
 
-echo "All gates that do not need per-circuit input vectors passed."
-echo "G5, G6 and G7 need an input corpus and a Clean-side witness comparison;"
-echo "they are not implemented yet, and this script does not claim them."
+echo "PASS: G0 G1 G2 G3 G4 G5 G6 G7"
+echo "  ${#artifacts[@]} circuit(s), ${vectors} input vector(s), both witgen backends."
+echo
+echo "Not covered: llzk-witgen executes compute() and ignores constrain(), so"
+echo "agreement means the two witness generators agree. It says nothing about"
+echo "whether the emitted constraints capture Clean's."

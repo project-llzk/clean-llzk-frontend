@@ -235,3 +235,30 @@ A wider table needs an `array.new` query and a multi-dimensional `constrain.in`,
 neither of which the emitter IR has. Rather than guess at that encoding, arity
 other than 1 is refused with a diagnostic that says what it would take. Clean's
 `ByteTable` — the Stage-1 target — is single-column.
+
+## D014 — Differential testing compares against Clean's proved witness semantics
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S02
+
+`Differential.witness` runs `FlatOperation.witgen`, Clean's array-backed
+reference interpreter, which `witgen_eq_dynamicWitnesses` proves computes the
+same witnesses as the semantic definition. The comparison is therefore against
+Clean's proved witness semantics, not a reimplementation written for the harness.
+
+The comparison itself is `llzk-witgen --output-scope=full-witness
+--check-output`, so a disagreement is a non-zero exit rather than two JSON dumps
+for a reader to diff. G7 is carried inside G5 and G6 rather than being a separate
+run.
+
+The JSON keys come from `Circuit.lean`'s layout functions, shared with the
+emitter. That is deliberate — it makes drift between the expected keys and the
+emitted members impossible — and it has a known consequence: a bug *in the naming
+scheme itself* is invisible to G7, because both sides would move together. G3/G4
+and the goldens cover naming; G7 covers values.
+
+**What G5–G7 do not establish.** `llzk-witgen` executes `compute()` and ignores
+`constrain()`. Agreement means the two witness generators agree. Nothing yet
+checks that the emitted constraints capture Clean's — that is the G9 proof track,
+and it is now the largest assurance gap in the project.
