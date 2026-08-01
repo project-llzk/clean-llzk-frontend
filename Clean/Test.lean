@@ -8,3 +8,4 @@ import Clean.Utils.Test.TestElaborateCircuit
 import Clean.Utils.Test.TestCircuitStructDeriving
 import Clean.Utils.Test.TestMixedCircuitType
 import Clean.Backend.LLZK.Test.Print
+import Clean.Backend.LLZK.Test.Circuit

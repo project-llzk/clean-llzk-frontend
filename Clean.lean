@@ -3,7 +3,7 @@ import Clean.Examples.WitnessExport
 import Clean.Utils.FiniteField
 import Clean.Utils.SourceSinkPath
 import Clean.Utils.OfflineMemory
-import Clean.Backend.LLZK.Print
+import Clean.Backend.LLZK.Circuit
 import Clean.Circomlib.AliasCheck
 import Clean.Circomlib.BinSum
 import Clean.Circomlib.BinSub

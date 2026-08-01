@@ -1,0 +1,38 @@
+# S04 acceptance gates
+
+Base integration commit: b75a5125 (S03 accepted)
+Date (UTC): 2026-08-01T03:50:47Z
+
+## G1 — the three checks .github/workflows/ci.yml runs
+
+$ python3 scripts/check-consecutive-empty-lines.py
+✓ No consecutive empty lines found.       exit 0
+$ lake build --wfail Clean
+Build completed successfully (1818 jobs). exit 0
+$ lake build CleanTests
+Build completed successfully (1716 jobs). exit 0
+Only the pre-existing TestCircuitProofStart `sorry` warnings; none added.
+
+## G2 — goldens
+
+$ lake build Clean.Backend.LLZK.Test.Print     PASS  (renderer, every IR constructor)
+$ lake build Clean.Backend.LLZK.Test.Circuit   PASS  (whole pipeline on a FormalCircuit)
+
+Test/Circuit.lean pins the exact LLZK module for `multiply`, a two-input
+FormalCircuit with one witness cell, one assertion and one output, proved
+sound and complete by `circuit_proof_all`.
+
+## G8 — fail closed
+
+Three negative fixtures in Test/Circuit.lean pin exact diagnostics:
+
+  wrong configured field  -> 1 diagnostic (prime mismatch, before any lowering)
+  Addition8FullCarry      -> 3 diagnostics (2x ofNat witness, 1x lookup)
+  IsZeroField             -> 1 diagnostic (ite witness)
+
+The Addition8FullCarry fixture demonstrates multi-error reporting: three
+independent operations are each reported, rather than stopping at the first.
+
+## Gates NOT claimed
+
+G3, G4, G5, G6, G7. No LLZK tool has seen this output; S01 is unprovisioned.

@@ -91,3 +91,65 @@ one-line diff in a golden fixture; gate G2 is only useful if a golden diff is
 readable. Constant-array initializers stay on one line however long, because a
 lookup table is a single logical value and wrapping would make the layout depend
 on the row count.
+
+## D008 — Outputs get their own public members
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S04
+
+A Clean circuit output is an arbitrary `Expression`, not necessarily a witness
+cell: it may be an input, a constant, or a sum. The backend therefore gives each
+output field element its own `{llzk.pub}` member `@out{j}`, writes it in
+`@compute`, and constrains it equal to the lowered expression in `@constrain`.
+
+Alternative considered: mark "the witness cell an output points at" as
+`{llzk.pub}`. Rejected because it needs a fallback for every output that is not
+exactly a witness variable, and because it makes the public JSON key names depend
+on the witness layout.
+
+The extra `constrain.eq` per output does not change what the constraint system
+proves — it defines a fresh cell as equal to an expression over existing ones.
+What it buys is that `llzk-witgen --output-scope=public` reports exactly the
+circuit's outputs under stable names, which is what gate G7 diffs against Clean.
+
+## D009 — Recognize into a closed language, then lower totally
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S04
+
+`Analyze` does not *validate* a Clean circuit and hand the original on. It
+*translates* it into `Recognized`, built from `FieldExpr` — a closed language
+containing only what the backend can emit. The lowering consumes `Recognized` and
+is total apart from one genuine failure (an expression naming a circuit variable
+nothing defines).
+
+Consequences:
+
+- There is exactly one place that decides what is in the subset. The lowering has
+  no "unsupported" branch to keep in sync.
+- `analyze` and `compile` share one implementation: `analyze` is the diagnostics
+  of the same recognition pass, so they cannot disagree about what is accepted.
+- Growing a capability is: one `FieldExpr` constructor, one case per recognizer,
+  one case in `lower`, one positive and one negative fixture.
+- The semantics theorems planned for P5 get a small closed language to talk
+  about, instead of a predicate carved out of Clean's much larger witness IR.
+
+Diagnostics are collected across all operations rather than stopping at the
+first. Each operation is recognized independently, so a rejection cannot cascade.
+
+## D010 — The field name and its prime travel together
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S04
+
+`Config.field` is a `FieldSpec` (name plus prime) drawn from `FieldSpec.registry`,
+not a bare string, and `Analyze` rejects a circuit whose `FiniteField.size` is not
+that prime. A wrong field choice is therefore a diagnostic rather than arithmetic
+silently performed in the wrong field.
+
+The registry is transcribed from `lib/Util/Field.cpp`, `Field::initKnownFields`,
+at the pinned LLZK revision. Adding a field means adding it there, with its
+prime — not passing a new string.

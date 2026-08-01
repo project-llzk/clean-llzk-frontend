@@ -20,17 +20,24 @@ private def bytes : Ty := .array 4 felt
 private def demo : Ty := .struct "Demo"
 private def empty : Ty := .struct "Empty"
 
-/-- `@compute` for `@Demo`: exercises every binary operation, `felt.const`,
-`struct.new` and `struct.writem`, a named and an unnamed parameter, and a
-function that returns a value. Using `felt.uintdiv`/`felt.umod` must make the
-rendered signature carry `function.allow_non_native_field_ops`. -/
-private def demoCompute : Func :=
-  Builder.function "compute"
+/-- Read one of the input values a component builder hands the body. The builders
+pass inputs as an array, so a test that asks for a position the specification did
+not declare is a test bug; it surfaces as a diagnostic rather than a panic. -/
+private def input (args : Array Value) (i : Nat) : Except Diagnostic Value :=
+  match args[i]? with
+  | some v => .ok v
+  | none => .error { context := "test", message := s!"no input {i}" }
+
+/-- `@Demo`'s `@compute`: exercises every binary operation, `felt.const`,
+`struct.writem`, a named and an unnamed parameter. Using `felt.uintdiv`/
+`felt.umod` must make the rendered signature carry
+`function.allow_non_native_field_ops`. -/
+private def demoCompute : Except Diagnostic Func :=
+  Builder.computeFunction demo
     #[{ ty := felt, argName := "lhs" }, { ty := felt }]
-    fun args => do
-      let lhs := args[0]!
-      let rhs := args[1]!
-      let self ← Builder.structNew demo
+    fun self args => do
+      let lhs ← input args 0
+      let rhs ← input args 1
       let sum ← Builder.feltBin .add lhs rhs felt
       let diff ← Builder.feltBin .sub sum lhs felt
       let prod ← Builder.feltBin .mul diff rhs felt
@@ -40,45 +47,42 @@ private def demoCompute : Func :=
       let r ← Builder.feltBin .umod quot c256 felt
       Builder.writeMember self demo "w0" q felt
       Builder.writeMember self demo "out0" r felt
-      return some (self, demo)
 
-/-- `@constrain` for `@Demo`: exercises `struct.readm`, `global.read`,
-`constrain.eq`, `constrain.in`, and a function with no result. -/
-private def demoConstrain : Func :=
-  Builder.function "constrain"
-    #[{ ty := demo }, { ty := felt, argName := "lhs" }]
-    fun args => do
-      let self := args[0]!
-      let lhs := args[1]!
+/-- `@Demo`'s `@constrain`: exercises `struct.readm`, `global.read`,
+`constrain.eq` and `constrain.in`. -/
+private def demoConstrain : Except Diagnostic Func :=
+  Builder.constrainFunction demo #[{ ty := felt, argName := "lhs" }]
+    fun self args => do
+      let lhs ← input args 0
       let w0 ← Builder.readMember self demo "w0" felt
       let out0 ← Builder.readMember self demo "out0" felt
       let table ← Builder.globalRead "Bytes" bytes
       Builder.constrainIn table bytes w0 felt
       Builder.constrainEq out0 lhs felt
-      return none
 
 /-- A component with no members and a parameterless `@compute`, so the renderer's
 empty-parameter and empty-member paths are covered. -/
-private def emptyStruct : StructDef where
-  name := "Empty"
-  members := #[]
-  compute := Builder.function "compute" #[] fun _ => do
-    let self ← Builder.structNew empty
-    return some (self, empty)
-  constrain := Builder.function "constrain" #[{ ty := empty }] fun _ => return none
+private def emptyStruct : Except Diagnostic StructDef := do
+  return {
+    name := "Empty"
+    members := #[]
+    compute := ← Builder.computeFunction empty #[] fun _ _ => pure ()
+    constrain := ← Builder.constrainFunction empty #[] fun _ _ => pure () }
 
-private def demoStruct : StructDef where
-  name := "Demo"
-  members := #[
-    { name := "w0", ty := felt, visibility := .signal },
-    { name := "out0", ty := felt, visibility := .pub }]
-  compute := demoCompute
-  constrain := demoConstrain
+private def demoStruct : Except Diagnostic StructDef := do
+  return {
+    name := "Demo"
+    members := #[
+      { name := "w0", ty := felt, visibility := .signal },
+      { name := "out0", ty := felt, visibility := .pub }]
+    compute := ← demoCompute
+    constrain := ← demoConstrain }
 
-private def demoModule : Module where
-  main := "Demo"
-  globals := #[{ name := "Bytes", elemTy := felt, values := #[0, 1, 2, 3] }]
-  structs := #[demoStruct, emptyStruct]
+private def demoModule : Except Diagnostic Module := do
+  return {
+    main := "Demo"
+    globals := #[{ name := "Bytes", elemTy := felt, values := #[0, 1, 2, 3] }]
+    structs := #[← demoStruct, ← emptyStruct] }
 
 /--
 info: module attributes {llzk.lang, llzk.main = !struct.type<@Demo>} {
@@ -133,6 +137,6 @@ info: module attributes {llzk.lang, llzk.main = !struct.type<@Demo>} {
 }
 -/
 #guard_msgs in
-#eval IO.print demoModule.render
+#eval IO.print (renderResult (demoModule.mapError (#[·])))
 
 end LLZK.Test.Print

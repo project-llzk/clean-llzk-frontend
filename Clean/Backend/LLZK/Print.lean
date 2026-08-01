@@ -1,3 +1,4 @@
+import Clean.Backend.LLZK.Basic
 import Clean.Backend.LLZK.IR
 
 /-!
@@ -75,31 +76,28 @@ def Stmt.render : Stmt → String
     "constrain.in " ++ array.render ++ ", " ++ element.render ++ " : "
       ++ arrayTy.render ++ ", " ++ elementTy.render
 
-/-- Accumulates rendered lines with their indentation, so that no renderer has to
-thread a prefix string through its recursion. -/
-private structure Lines where
-  indent : Nat
-  out : Array String
+/-! ## Line assembly
 
-private def Lines.empty : Lines := { indent := 0, out := #[] }
+Every construct renders to an `Array String` of *unindented* lines and its
+enclosing construct indents it. That keeps each renderer local — none has to know
+how deep it sits — and it is why blank-line placement is decided in exactly one
+place, `joinBlocks`, rather than by each caller guessing whether it is first. -/
 
-/-- Append one line at the current indentation. -/
-private def Lines.push (ls : Lines) (line : String) : Lines :=
-  { ls with out := ls.out.push ("".pushn ' ' (2 * ls.indent) ++ line) }
+/-- Indent a block by one level, leaving blank lines blank so that no rendered
+line ever carries trailing whitespace. -/
+private def indentBlock (lines : Array String) : Array String :=
+  lines.map fun line => if line.isEmpty then line else "  " ++ line
 
-/-- Append a blank line. Never indented, so trailing whitespace cannot appear. -/
-private def Lines.blank (ls : Lines) : Lines := { ls with out := ls.out.push "" }
+/-- Concatenate blocks with one blank line between consecutive non-empty ones.
+Empty blocks — a component with no members, a module with no globals —
+contribute nothing, not a stray separator. -/
+private def joinBlocks (blocks : Array (Array String)) : Array String :=
+  (blocks.filter (!·.isEmpty)).foldl
+    (fun acc block => if acc.isEmpty then block else acc.push "" ++ block) #[]
 
-/-- Render `body` one level deeper. -/
-private def Lines.nest (ls : Lines) (body : Lines → Lines) : Lines :=
-  let nested := body { ls with indent := ls.indent + 1 }
-  { nested with indent := ls.indent }
-
-private def Lines.pushAll (ls : Lines) (lines : Array String) : Lines :=
-  lines.foldl Lines.push ls
-
-private def Lines.toString (ls : Lines) : String :=
-  ls.out.foldl (fun acc line => acc ++ line ++ "\n") ""
+/-- `header` / indented `body` / `footer`. -/
+private def braced (header : String) (body : Array String) (footer : String) : Array String :=
+  #[header] ++ indentBlock body ++ #[footer]
 
 /-- The array literal is emitted on one line however long it is: a lookup table of
 a few hundred rows is a single logical value, and wrapping it would make the
@@ -138,40 +136,45 @@ private def renderParams (params : Array Param) : Array String :=
     |>.map (fun (text, i) => if i + 1 = params.size then text else text ++ ",")
     |>.toArray
 
-private def renderFunc (f : Func) (ls : Lines) : Lines :=
-  let opened :=
-    if f.params.isEmpty then
-      ls.push ("function.def @" ++ f.name ++ "()" ++ renderSignatureTail f ++ " {")
-    else
-      let withParams := (ls.push ("function.def @" ++ f.name ++ "(")).nest fun inner =>
-        inner.pushAll (renderParams f.params)
-      withParams.push (")" ++ renderSignatureTail f ++ " {")
-  let body := opened.nest fun inner =>
-    let stmts := (inner.pushAll (f.body.map Stmt.render))
-    match f.result with
-    | some (value, ty) => stmts.push ("function.return " ++ value.render ++ " : " ++ ty.render)
-    | none => stmts.push "function.return"
-  body.push "}"
+private def renderReturn (f : Func) : String :=
+  match f.result with
+  | some (value, ty) => "function.return " ++ value.render ++ " : " ++ ty.render
+  | none => "function.return"
 
-private def renderStruct (s : StructDef) (ls : Lines) : Lines :=
-  let opened := ls.push ("struct.def @" ++ s.name ++ " {")
-  let body := opened.nest fun inner =>
-    let withMembers := inner.pushAll (s.members.map renderMember)
-    let withCompute := renderFunc s.compute (if s.members.isEmpty then withMembers else withMembers.blank)
-    renderFunc s.constrain withCompute.blank
-  body.push "}"
+private def renderFunc (f : Func) : Array String :=
+  let opening :=
+    if f.params.isEmpty then
+      #["function.def @" ++ f.name ++ "()" ++ renderSignatureTail f ++ " {"]
+    else
+      #["function.def @" ++ f.name ++ "("]
+        ++ indentBlock (renderParams f.params)
+        ++ #[")" ++ renderSignatureTail f ++ " {"]
+  opening ++ indentBlock (f.body.map Stmt.render ++ #[renderReturn f]) ++ #["}"]
+
+private def renderStruct (s : StructDef) : Array String :=
+  braced ("struct.def @" ++ s.name ++ " {")
+    (joinBlocks #[s.members.map renderMember, renderFunc s.compute, renderFunc s.constrain])
+    "}"
 
 /-- Render a module as textual LLZK.
 
 The result ends in a newline and contains no trailing whitespace on any line. -/
 def Module.render (m : Module) : String :=
-  let header := Lines.empty.push
-    ("module attributes {llzk.lang, llzk.main = " ++ (Ty.struct m.main).render ++ "} {")
-  let body := header.nest fun inner =>
-    let withGlobals := inner.pushAll (m.globals.map renderGlobal)
-    m.structs.foldl
-      (fun acc s => renderStruct s (if acc.out.isEmpty then acc else acc.blank))
-      withGlobals
-  (body.push "}").toString
+  let body := joinBlocks (#[m.globals.map renderGlobal] ++ m.structs.map renderStruct)
+  let lines :=
+    braced ("module attributes {llzk.lang, llzk.main = " ++ (Ty.struct m.main).render ++ "} {")
+      body "}"
+  lines.foldl (fun acc line => acc ++ line ++ "\n") ""
+
+/-- Render a compilation outcome: the module, or every reason there is none.
+
+Failure is rendered rather than thrown so that the negative fixtures — gate G8 —
+can pin the exact diagnostics the same way the positive ones pin the exact
+module. -/
+def renderResult : Except (Array Diagnostic) Module → String
+  | .ok m => m.render
+  | .error diagnostics =>
+    diagnostics.foldl (fun acc d => acc ++ d.render ++ "\n")
+      "compilation failed:\n"
 
 end LLZK

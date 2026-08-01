@@ -11,13 +11,14 @@ Two properties are worth stating, because they are the reason this layer exists
 at all rather than the lowering concatenating strings:
 
 * **Values are allocated, never spelled.** `Value` is opaque and only
-  `BuilderM.fresh` produces one, so a lowering cannot invent an undefined SSA
+  `Builder.fresh` produces one, so a lowering cannot invent an undefined SSA
   name or reuse one.
 * **Malformed shapes are unrepresentable.** A `StructDef` has exactly the
   `@compute`/`@constrain` pair LLZK requires; a `Func` carries its result as one
   `Option (Value × Ty)`, so the declared return type and the returned value
   cannot disagree, and a function body cannot be missing its terminator or carry
-  two.
+  two. `Func` can only be built by the two component builders, so there is no way
+  to emit a function that is neither a `@compute` nor a `@constrain`.
 
 Rendering lives in `Clean.Backend.LLZK.Print`; this module has no notion of
 syntax.
@@ -42,7 +43,7 @@ defined. -/
 structure Value where
   private mk ::
   index : Nat
-deriving DecidableEq, Repr, Inhabited
+deriving DecidableEq, Repr
 
 /-- The binary `felt` operations Stage 1 emits.
 
@@ -60,7 +61,7 @@ deriving DecidableEq, Repr
 
 /-- Whether an operation is a field operation in LLZK's sense. A function whose
 body contains a non-native operation must declare
-`FuncAttr.allowNonNativeFieldOps`; `Func.mk` maintains that invariant. -/
+`FuncAttr.allowNonNativeFieldOps`; `Builder.assemble` maintains that invariant. -/
 def FeltBinOp.isNative : FeltBinOp → Bool
   | .add | .sub | .mul | .div => true
   | .uintdiv | .umod => false
@@ -104,8 +105,8 @@ structure Param where
   argName : Option String
 deriving Repr
 
-/-- A function parameter before SSA allocation. `Builder.function` turns each of
-these into a `Param` with a freshly allocated `Value`. -/
+/-- A function parameter before SSA allocation. The component builders turn each
+of these into a `Param` with a freshly allocated `Value`. -/
 structure ParamSpec where
   ty : Ty
   argName : Option String := none
@@ -113,10 +114,12 @@ deriving Repr
 
 /-- A function.
 
-Build these with `Builder.function`, which allocates the parameter values,
-threads the body, and derives `attrs` from the emitted statements. The fields are
-public so that `Print` and tests can read them. -/
+The constructor is private: the only way to build one is
+`Builder.computeFunction` or `Builder.constrainFunction`, which allocate the
+parameter values, thread the body, and derive `attrs` from the emitted
+statements. The fields stay readable so that `Print` and tests can inspect them. -/
 structure Func where
+  private mk ::
   name : String
   params : Array Param
   body : Array Stmt
@@ -239,25 +242,61 @@ def constrainIn (array : Value) (arrayTy : Ty) (element : Value) (elementTy : Ty
     BuilderM Unit :=
   emit (.constrainIn array arrayTy element elementTy)
 
-/-- Build a function.
+/-! ### Building the two functions of a component
 
-Allocates one SSA value per parameter *before* running `body`, so body values can
-never collide with parameters, and derives `attrs` from what was actually
-emitted, so a function using `felt.uintdiv`/`felt.umod` cannot be rendered
-without `function.allow_non_native_field_ops`. -/
-def function (name : String) (paramSpecs : Array ParamSpec)
-    (body : Array Value → BuilderM (Option (Value × Ty))) : Func :=
-  let alloc : BuilderM (Array Param) :=
-    paramSpecs.mapM fun spec => do
-      let value ← fresh
-      return { value, ty := spec.ty, argName := spec.argName }
-  let build : BuilderM (Array Param × Option (Value × Ty)) := do
-    let params ← alloc
-    let result ← body (params.map (·.value))
-    return (params, result)
-  let ((params, result), state) := build { nextIndex := 0, stmts := #[] }
-  { name, params, body := state.stmts, result
-    attrs := if state.stmts.any (·.needsNonNativeFieldOps) then #[.allowNonNativeFieldOps] else #[] }
+There is no general "build a function" entry point, because LLZK components have
+exactly two functions and this backend emits nothing else. Both builders hand the
+body `%self` and the input values *directly* rather than as one array to index
+into, so no caller has an out-of-range case to handle, and both allocate every
+parameter before the body runs, so body values cannot collide with parameters.
+
+`attrs` is derived from the statements actually emitted, so a function using
+`felt.uintdiv`/`felt.umod` cannot be rendered without
+`function.allow_non_native_field_ops`.
+
+Both are `Except`-valued over an arbitrary error type: this module has no notion
+of diagnostics, but a lowering does, and threading its failures out of the body
+is the only way the builder can stay the sole constructor of a `Func`. -/
+
+/-- Allocate one SSA value per input specification. -/
+private def allocParams (specs : Array ParamSpec) : BuilderM (Array Param) :=
+  specs.mapM fun spec => do
+    let value ← fresh
+    return { value, ty := spec.ty, argName := spec.argName }
+
+/-- Run a body against a fresh builder state and assemble the function. -/
+private def assemble {ε : Type} (name : String)
+    (action : ExceptT ε BuilderM (Array Param × Option (Value × Ty))) : Except ε Func :=
+  let (outcome, state) := action.run { nextIndex := 0, stmts := #[] }
+  outcome.map fun (params, result) =>
+    { name, params, body := state.stmts, result
+      attrs :=
+        if state.stmts.any (·.needsNonNativeFieldOps) then #[.allowNonNativeFieldOps] else #[] }
+
+/-- Build a component's `@compute`.
+
+The `struct.new` and the `function.return %self` are emitted here rather than by
+the caller, because every `@compute` does exactly that; the body's job is only to
+fill `%self` in. -/
+def computeFunction {ε : Type} (structTy : Ty) (inputs : Array ParamSpec)
+    (body : Value → Array Value → ExceptT ε BuilderM Unit) : Except ε Func :=
+  assemble "compute" do
+    let params ← allocParams inputs
+    let self ← structNew structTy
+    body self (params.map (·.value))
+    return (params, some (self, structTy))
+
+/-- Build a component's `@constrain`.
+
+`%self` is the first parameter, followed by the same inputs `@compute` takes, and
+the function returns nothing. -/
+def constrainFunction {ε : Type} (structTy : Ty) (inputs : Array ParamSpec)
+    (body : Value → Array Value → ExceptT ε BuilderM Unit) : Except ε Func :=
+  assemble "constrain" do
+    let self ← fresh
+    let params ← allocParams inputs
+    body self (params.map (·.value))
+    return (#[{ value := self, ty := structTy, argName := none }] ++ params, none)
 
 end Builder
 end LLZK
