@@ -1,0 +1,28 @@
+# S05 acceptance gates
+
+Base integration commit: ce514056 (S04 accepted)
+Date (UTC): 2026-08-01T03:57:28Z
+
+## G1
+$ python3 scripts/check-consecutive-empty-lines.py   PASS
+$ lake build --wfail Clean                           PASS (1818 jobs)
+$ lake build CleanTests                              PASS (1716 jobs)
+
+## G2 — positive golden
+
+`decompose` witnesses both recognized shapes over the same subexpression
+and lowers to felt.umod / felt.uintdiv against felt.const 256, with
+function.allow_non_native_field_ops derived automatically.
+
+## G8 — fail closed
+
+  divisor 0            -> refused: Lean's Nat modulo by zero is total, LLZK's is not
+  divisor = the prime  -> refused: felt.const would reduce it modulo the prime
+  Addition8FullCarry   -> now ONE diagnostic (the lookup); both witness
+                          cells are accepted, down from three diagnostics
+
+## Gates NOT claimed
+
+G3, G4, G5, G6, G7. In particular G5/G6 would be the real check that
+felt.umod/felt.uintdiv agree with Clean's witness interpreter on these
+shapes. The argument in Witness.lean and D011 is prose, not evidence.

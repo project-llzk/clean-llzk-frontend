@@ -65,10 +65,10 @@ variable {F : Type} [FiniteField F]
 
 /-- Recognize one flat operation as the witness cells and assertions it
 contributes. -/
-private def recognizeOperation (index : Nat) : FlatOperation F →
+private def recognizeOperation (prime : Nat) (index : Nat) : FlatOperation F →
     Except Diagnostic (Array FieldExpr × Array FieldExpr)
   | .witness _ program => do
-    let cells ← Witness.recognize s!"operation {index} (witness)" program
+    let cells ← Witness.recognize prime s!"operation {index} (witness)" program
     return (cells, #[])
   | .assert e => .ok (#[], #[FieldExpr.ofExpression e])
   | .lookup l =>
@@ -96,7 +96,8 @@ private def checkField (cfg : Config) : Except Diagnostic Unit :=
 def recognize (cfg : Config) (src : Source F) : Except (Array Diagnostic) Recognized := do
   let operations ← collect
     (#[checkField (F := F) cfg |>.map fun _ => (#[], #[])]
-      ++ (src.operations.toArray.zipIdx.map fun (op, i) => recognizeOperation i op))
+      ++ (src.operations.toArray.zipIdx.map fun (op, i) =>
+            recognizeOperation cfg.field.prime i op))
   return {
     inputSize := src.inputSize
     witnesses := operations.flatMap (·.1)

@@ -153,3 +153,46 @@ silently performed in the wrong field.
 The registry is transcribed from `lib/Util/Field.cpp`, `Field::initKnownFields`,
 at the pinned LLZK revision. Adding a field means adding it there, with its
 prime — not passing a new string.
+
+## D011 — Match the natural division/modulo shapes whole, with a literal divisor
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S05
+
+`Witgen.NExpr` denotes unbounded `ℕ`. Lowering natural arithmetic to `felt.*`
+piecewise is therefore wrong in general, because field reduction changes
+intermediate values. The backend recognizes exactly two *whole* shapes:
+
+```
+ofNat (mod (val x) (const c))  ->  felt.umod    [x], felt.const c
+ofNat (div (val x) (const c))  ->  felt.uintdiv [x], felt.const c
+```
+
+Matching the whole shape rather than `val`, `mod` and `ofNat` separately is what
+makes this sound: no natural value escapes the pattern, so there is no
+intermediate that could have exceeded the field.
+
+The divisor is a `Nat` literal in `FieldExpr`, not a nested expression, so two
+side conditions can be checked at recognition time:
+
+- `c ≠ 0`. Lean's `Nat` division and modulo by zero are total (both `0`); LLZK's
+  are not. Accepting this would be a silent semantic difference.
+- `c < p`. `felt.const c` denotes `c mod p`, so a divisor at or above the prime
+  would become a different number.
+
+Given those, the lowering is faithful for the prime fields in
+`FieldSpec.registry`: `FiniteField.val x` is the canonical representative in
+`[0, p)`, which is exactly the operand interpretation LLZK's `umod`/`uintdiv`
+use, and the result re-enters the field through `FiniteField.fromNat`, whose
+`val_fromNat` law applies because `val x % c` and `val x / c` are both at most
+`val x`, hence below the field size.
+
+This argument is prose, not a proof. Turning it into one is a P5 obligation, and
+it is the reason `FieldExpr` is a small closed language (D009): there is
+something tractable to state it about.
+
+Every other `NExpr` shape stays rejected. The general treatment — `NExpr.val` to
+`cast.toindex`, natural arithmetic on `index`, `FExpr.ofNat` to `cast.tofelt` —
+needs an index bounds policy and LLZK interpreter support that do not exist yet,
+and is deliberately not an implicit backlog item.

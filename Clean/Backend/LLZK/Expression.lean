@@ -37,6 +37,14 @@ inductive FieldExpr where
   | const (value : Nat)
   | add (a b : FieldExpr)
   | mul (a b : FieldExpr)
+  /-- Unsigned quotient of the canonical representative of `a` by the literal
+  `divisor`. Witness-only: `Witness.ofFExpr` is the only recognizer that produces
+  it, so it cannot appear in a constraint. See D011 for why the divisor is a
+  literal and what makes the lowering faithful. -/
+  | uintdiv (a : FieldExpr) (divisor : Nat)
+  /-- Unsigned remainder of the canonical representative of `a` modulo the
+  literal `divisor`. Witness-only; see `uintdiv`. -/
+  | umod (a : FieldExpr) (divisor : Nat)
 deriving DecidableEq, Repr
 
 namespace FieldExpr
@@ -82,8 +90,16 @@ def lower (context : String) (fieldTy : Ty) (env : Env) : FieldExpr → LowerM V
               message := s!"expression reads circuit variable {index}, which no input or \
                             earlier witness defines (only {env.size} are in scope here)" }
   | .const value => Builder.feltConst value fieldTy
-  | .add a b => do Builder.feltBin .add (← lower context fieldTy env a) (← lower context fieldTy env b) fieldTy
-  | .mul a b => do Builder.feltBin .mul (← lower context fieldTy env a) (← lower context fieldTy env b) fieldTy
+  | .add a b => do
+    Builder.feltBin .add (← lower context fieldTy env a) (← lower context fieldTy env b) fieldTy
+  | .mul a b => do
+    Builder.feltBin .mul (← lower context fieldTy env a) (← lower context fieldTy env b) fieldTy
+  | .uintdiv a divisor => do
+    Builder.feltBin .uintdiv (← lower context fieldTy env a) (← Builder.feltConst divisor fieldTy)
+      fieldTy
+  | .umod a divisor => do
+    Builder.feltBin .umod (← lower context fieldTy env a) (← Builder.feltConst divisor fieldTy)
+      fieldTy
 
 end FieldExpr
 end LLZK
