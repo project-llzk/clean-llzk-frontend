@@ -139,20 +139,49 @@ the two parameter lists cannot disagree (R2-04).
 Each used table becomes one `global.def const`. Only single-column tables reach
 here — `ExportTable.diagnose` rejects wider ones — so flattening the rows is the
 identity on their shape and the emitted array length is the row count. -/
-def lower (cfg : Config) (r : Recognized) : Except Diagnostic Module := do
+private def lower (cfg : Config) (r : Recognized) : Except Diagnostic Module := do
   let fieldTy := Ty.felt cfg.field.name
-  return {
-    globals := r.tables.map fun table => {
-      name := table.name
-      elemTy := fieldTy
-      values := table.rows.flatten }
-    root := ← Builder.component (members r fieldTy) (inputSpecs r fieldTy)
-      (computeBody fieldTy r) (constrainBody fieldTy r) }
+  let globals := r.tables.map fun table => {
+    name := table.name
+    elemTy := fieldTy
+    values := table.rows.flatten : ConstArray }
+  match ← Builder.component (members r fieldTy) (inputSpecs r fieldTy)
+      (computeBody fieldTy r) (constrainBody fieldTy r) with
+  | some root => return { globals, root }
+  | none =>
+    .error { context := "emitter"
+             message := "a lowered function referenced an SSA value it did not allocate. This is \
+                         a defect in the backend, not in the circuit: please report it with the \
+                         circuit that triggered it" }
 
-variable {F : Type} [FiniteField F] [CanonicalRepr F]
+/-- Lower a `Recognized` that was not produced by `recognize`, validating the
+parts of `Config` that `recognize` would have.
+
+`lower` itself is private, because it runs no validation at all: `Recognized` is
+a public structure, so a caller could hand it a table name that is not a symbol,
+a row value at or above the prime, or a field that is not in LLZK's registry, and
+get text out with an empty diagnostic array (R4b-4). The corpus's registry
+conformance entries are built this way — they have no Clean circuit behind them —
+and they go through here.
+
+This is *not* the fail-closed entry point for circuits. That is `compile`, in
+`WitnessCheck.lean`, which additionally runs both halves of G9. Nothing that has
+a Clean source should come through this door. -/
+def lowerRecognized (cfg : Config) (r : Recognized) : Except (Array Diagnostic) Module := do
+  if !FieldSpec.registry.contains cfg.field then
+    throw #[{ context := "field"
+              message := s!"configured field '{cfg.field.name}' with prime {cfg.field.prime} is \
+                            not an entry of `FieldSpec.registry`" }]
+  match diagnoseRegistry cfg.field.prime cfg.tables with
+  | #[] => pure ()
+  | problems => throw problems
+  lower cfg r |>.mapError (#[·])
+
+variable {F : Type} [FiniteField F]
 
 /-- Compile a circuit that has already been reduced to a `Source`. -/
-def compileSource (cfg : Config) (src : Source F) : Except (Array Diagnostic) Module := do
+def compileSource [CanonicalRepr F] (cfg : Config) (src : Source F) :
+    Except (Array Diagnostic) Module := do
   lower cfg (← recognize cfg src) |>.mapError (#[·])
 
 /-- Circuits this backend can read.

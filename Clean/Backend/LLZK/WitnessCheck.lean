@@ -112,7 +112,7 @@ theorem eval_ofExpression (σ : Nat → F) (env : Environment F) (hσ : ∀ i, �
     (e : Expression F) : eval σ (ofExpression e) = e.eval env := by
   induction e with
   | var v => simp [eval, ofExpression, Expression.eval, hσ]
-  | const c => simp [eval, ofExpression, Expression.eval, LLZK.fromNat_val]
+  | const c => simp [eval, ofExpression, Expression.eval, FiniteField.fromNat_val]
   | add a b iha ihb => simp [eval, ofExpression, Expression.eval, iha, ihb]
   | mul a b iha ihb => simp [eval, ofExpression, Expression.eval, iha, ihb]
 
@@ -128,7 +128,7 @@ theorem eval_ofWitgen (ctx : Witgen.Ctx F) (σ : Nat → F)
   intro e
   induction e using ofWitgen.induct with
   | case1 e => intro w h; cases h; exact eval_ofExpression σ _ hσ e
-  | case2 c => intro w h; cases h; simp [eval, Witgen.FExpr.eval, LLZK.fromNat_val]
+  | case2 c => intro w h; cases h; simp [eval, Witgen.FExpr.eval, FiniteField.fromNat_val]
   | case3 a b iha ihb =>
     intro w h
     simp only [ofWitgen, Option.bind_eq_some_iff, Option.map_eq_some_iff] at h
@@ -156,6 +156,10 @@ end WExpr
 /-- What `@compute` produces: one expression per witness cell, then one per
 output field element. -/
 structure WitnessSet where
+  /-- How many field elements the component takes. Compared, for the reason
+  `ConstraintSet.inputs` gives: without it a module built for a 1-input circuit
+  matched a 4-input source (R4a-4). -/
+  inputs : Nat
   cells : List WExpr
   outputs : List WExpr
 deriving DecidableEq, Repr
@@ -175,7 +179,8 @@ def ofSource (src : Source F) : Option WitnessSet := do
   for op in src.operations do
     if let .witness _ program := op then
       cells := cells ++ (← ofProgram program)
-  return { cells, outputs := src.outputs.toList.map WExpr.ofExpression }
+  return { inputs := src.inputSize, cells,
+           outputs := src.outputs.toList.map WExpr.ofExpression }
 
 /-! ## Reading the emitted `@compute`
 
@@ -257,7 +262,7 @@ def ofModule (m : Module) : Option WitnessSet := do
   for stmt in m.root.compute.body do
     let some next := step params.size reader stmt | none
     reader := next
-  return { cells := reader.cells, outputs := reader.outputs }
+  return { inputs := params.size, cells := reader.cells, outputs := reader.outputs }
 
 /-- Whether the emitted `@compute` computes the circuit's witnesses and outputs.
 
@@ -283,7 +288,7 @@ both sides.
 
 namespace LLZK
 
-variable {F : Type} [FiniteField F] [CanonicalRepr F] [DecidableEq F]
+variable {F : Type} [FiniteField F] [DecidableEq F]
 
 /-- What the emitter reports when its own `@compute` fails the comparison.
 Reaching this is a bug in the lowering, not in the circuit. -/
@@ -307,14 +312,15 @@ def verify (src : Source F) (m : Module) : Except (Array Diagnostic) Module :=
 
 /-- Compile a flattened circuit and verify **both** halves of G9 before returning
 it. -/
-def compileSourceVerified (cfg : Config) (src : Source F) : Except (Array Diagnostic) Module :=
+def compileSourceVerified [CanonicalRepr F] (cfg : Config) (src : Source F) :
+    Except (Array Diagnostic) Module :=
   match ConstraintSet.compileSource' cfg src with
   | .error diagnostics => .error diagnostics
   | .ok m => verify src m
 
-omit [CanonicalRepr F] in
 /-- **Every module this backend emits computes the circuit's witnesses.** -/
-theorem witnessAgree_of_compileSourceVerified {cfg : Config} {src : Source F} {m : Module}
+theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
+    {src : Source F} {m : Module}
     (h : compileSourceVerified cfg src = .ok m) : WitnessSet.agree src m = true := by
   unfold compileSourceVerified verify at h
   split at h
@@ -325,10 +331,10 @@ theorem witnessAgree_of_compileSourceVerified {cfg : Config} {src : Source F} {m
       exact h ▸ ha
     · exact absurd h (by simp)
 
-omit [CanonicalRepr F] in
 /-- **…and carries its constraint system.** The other half, lifted through the
 same entry point. -/
-theorem constraintsAgree_of_compileSourceVerified {cfg : Config} {src : Source F} {m : Module}
+theorem constraintsAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
+    {src : Source F} {m : Module}
     (h : compileSourceVerified cfg src = .ok m) : ConstraintSet.agree src m = true := by
   unfold compileSourceVerified verify at h
   split at h
@@ -343,7 +349,7 @@ theorem constraintsAgree_of_compileSourceVerified {cfg : Config} {src : Source F
 
 Verified on both sides — see the two theorems above. There is no name to pass:
 the component is always `@Main` (D015). -/
-def compile {C : Type} [Compilable C F] (cfg : Config) (c : C) :
+def compile {C : Type} [CanonicalRepr F] [Compilable C F] (cfg : Config) (c : C) :
     Except (Array Diagnostic) Module :=
   compileSourceVerified cfg (Compilable.source (F := F) c)
 
@@ -351,11 +357,11 @@ def compile {C : Type} [Compilable C F] (cfg : Config) (c : C) :
 
 The interactive form: `#eval IO.print (LLZK.emit cfg circuit)`. The artifact form
 is `Clean/Backend/LLZK/EmitMain.lean`. -/
-def emit {C : Type} [Compilable C F] (cfg : Config) (c : C) : String :=
+def emit {C : Type} [CanonicalRepr F] [Compilable C F] (cfg : Config) (c : C) : String :=
   renderResult (compile cfg c)
 
 /-- The same, for a circuit already reduced to a `Source`. -/
-def emitSource (cfg : Config) (src : Source F) : String :=
+def emitSource [CanonicalRepr F] (cfg : Config) (src : Source F) : String :=
   renderResult (compileSourceVerified cfg src)
 
 end LLZK

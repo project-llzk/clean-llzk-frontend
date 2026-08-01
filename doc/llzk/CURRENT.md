@@ -3,9 +3,9 @@
 Updated: 2026-08-01  
 Active milestone: **Stage 1 repaired and re-reviewed** — all gates G0–G10 green
 against the pinned tools  
-Last accepted session: S19 — the witness side of G9  
+Last accepted session: R4 — two independent reviews, and their repairs  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: recorded in `sessions/S19-witness-side.md` § Handoff  
+Integration commit: recorded in `sessions/R4-independent-review.md` § Handoff  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
@@ -44,9 +44,12 @@ vectors, both witgen backends, 2 renderer fixtures.
   - **S16–S18**, closing the three gaps the repair had documented rather than
     fixed: D012's lookup rows (proved), G9's scope (now every circuit, not the
     corpus), and R2-05's field law (now a required class).
-  - **S19**, the witness side of G9, plus the last two residuals: table
-    certificates are now required to build a supported `Config`, and the corpus
-    tests `Addition8FullCarry` outside its `Assumptions`.
+  - **S19**, the witness side of G9, and the corpus outside
+    `Addition8FullCarry`'s `Assumptions`.
+  - **R4**, two *independent* adversarial reviews — the first review of this work
+    by anything other than the session that wrote it. Nine findings, five
+    breaking a written claim, two of them severe. All fixed and every
+    counterexample re-run. `review/R4-findings.md`.
   - `Gadgets.Addition8FullCarry` compiles to LLZK, `llzk-opt` accepts,
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
@@ -79,6 +82,9 @@ rather than notes about it:
 - the witness gates, by `require_llzk_witgen_discriminates`, which runs
   `llzk-witgen` against a perturbed witness before the loop and aborts if it
   passes (R2-06);
+- G3, G4 and G10, by `require_llzk_opt_discriminates`, which requires `llzk-opt`
+  to reject a non-MLIR file — a shim answering only `--version` used to make all
+  three vacuous while the harness printed PASS (R4b-2);
 - G9, by `Test/Constraints.lean`, which perturbs the Clean side six ways and
   pins that the comparison goes red for each;
 - G10a, by the control in `evidence/S08-S15/controls.txt`: a module whose root is
@@ -86,33 +92,42 @@ rather than notes about it:
 
 ## What is still not established
 
-Two things, and neither is closable by more of this kind of work.
+Two boundaries, and four residual risks R4's reviewers named.
+
+**Boundaries.** Neither is closable by more checking.
 
 1. **D017 — the reading of LLZK.** That `felt.add` is `+`, `constrain.eq` is
    equality, `constrain.in` is membership, `felt.umod` reads its operands as
    canonical representatives, and `!felt.type<"babybear">` is `ZMod 2013265921`.
-   Every emitted operation rests on it, and nothing in Lean settles it without a
-   formal model of LLZK — which is VeIR's job (D003), not this backend's. G5–G7
-   are the empirical evidence for the `@compute` half, on 30 vectors and two
-   independent LLZK backends; there is no executor for `@constrain`, so its half
-   has none.
+   Every emitted operation rests on it; settling it needs a formal LLZK model,
+   which is VeIR's job (D003). G5–G7 are the empirical evidence for the
+   `@compute` half, on 30 vectors and two independent LLZK backends; `@constrain`
+   has no executor, so its half has none.
 2. **G9 validates each translation; it does not verify the translator** (D018,
    D020). A lowering bug surfaces as a refusal to compile, not as a compile-time
-   impossibility. The refusal itself *is* tested — `verify` takes the module as
-   an argument precisely so a test can hand it one circuit's module and another
-   circuit's source — but a verified translator would make the refusal provably
-   dead instead. Closing this is S20: a simulation argument over the `BuilderM`
+   impossibility. Closing it is S20: a simulation argument over the `BuilderM`
    state monad.
 
-Two smaller things, stated so they are not mistaken for gaps:
+**Residual risks inside G9**, named by R4 and not closed:
 
-- The whole-vector witness statement — that `@compute` produces exactly
-  `FlatOperation.dynamicWitnesses` — needs the block-prefix argument R2-03 is
-  about, which `Analyze` enforces rather than proves. G9's witness half compares
-  expressions cell by cell; G5–G7 cover the vector.
-- No solver has run on an emitted module. G10 stops at admissibility and
-  lowering because `llzk-smt-check` needs SMT-LIB that no pass in the pinned
-  `llzk-opt` produces. That is a fact about the toolchain, recorded in `GATES.md`.
+- Nothing checks that the member `@w{k}` `@compute` writes is the one
+  `@constrain` reads, beyond both readers applying the same `witnessMember`.
+- "Witness cell `k` ↔ circuit variable `inputSize + k`" is a tautology inside the
+  check, so G9 cannot detect an error in `Analyze`'s offset bookkeeping. That is
+  covered by fixtures instead (R2-03's `selfReadingBlock`, and R4's three
+  offset-threading probes).
+- Constant encoding is a *shared* convention of the two readers — the emitter
+  writes `val`, the reader reads `fromNat` — so it is the one thing the
+  cross-check cannot see. `CanonicalRepr` (D019) is what pins it, which is why
+  that class had to be genuinely required rather than nominally present.
+- `ConstraintSet.ofModule` does not check the `Ty` operands, nor the length or
+  values of the global a `constrain.in` points at. `llzk-opt` (G3) does the
+  former; the latter is D012's territory.
+
+**Two smaller things**, stated so they are not mistaken for gaps: the
+whole-vector witness statement needs the block-prefix argument `Analyze`
+enforces rather than proves; and no solver has run on an emitted module, because
+`llzk-smt-check` needs SMT-LIB that no pass in the pinned `llzk-opt` produces.
 
 ## Known constraints
 
@@ -126,13 +141,13 @@ Two smaller things, stated so they are not mistaken for gaps:
 
 ## Next session
 
-- **R4 — two independent adversarial reviews** were run against this tree, one
-  on the proof track and one on the emitter and harness. Reconcile their
-  findings; they are the first review of this work by anything other than the
-  session that wrote it, which R3 correctly flagged as its own weakness.
 - **S20 — the lowering as a theorem.** Replace D018/D020's translation validation
   with a preservation theorem about `lower`: the `BuilderM` simulation argument.
   `Constraints.lean` and `WitnessCheck.lean` already fix the statements it has to
-  prove, and doing it would make both refusal branches provably dead.
+  prove, and it would close three of the four residual risks above by making the
+  cross-check unnecessary rather than merely broader.
+- **A Clean-side change for D012.** The certificate cannot be enforced while
+  `Table.toRaw` erases the `Table`. Carrying it into `Lookup` is a change to
+  Clean's core, with its own review.
 - **Stage 2.** Subcircuits as named components alongside `@Main`, which is the
   shape D015 was chosen to be compatible with.

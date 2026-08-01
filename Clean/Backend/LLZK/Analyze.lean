@@ -99,7 +99,7 @@ private def collect {α : Type} (results : Array (Except Diagnostic α)) :
   else
     .error errors
 
-variable {F : Type} [FiniteField F] [CanonicalRepr F]
+variable {F : Type} [FiniteField F]
 
 /-- What one flat operation contributes: witness cells, assertions, lookups. -/
 private structure Contribution where
@@ -154,24 +154,44 @@ private def recognizeOperation (tables : Array ExportTable) (prime : Nat) (base 
              message := s!"interaction on channel '{i.channel.name}'; channel interactions are \
                            outside the scalar circuit subset" }
 
-/-- Check that the circuit's field is the one the configuration names.
+/-- Check that the configured field is one LLZK knows, and is the circuit's.
 
-LLZK's registry owns the prime for a field name, and `llzk-opt` rejects a module
-that disagrees. Comparing here turns a wrong `Config.field` into a diagnostic
-rather than arithmetic that is silently in the wrong field. -/
+**Two checks, and the first was missing until R4b found it.** Comparing only the
+prime is not enough: `FieldSpec` is a public structure, so `Config.field` can be
+any `(name, prime)` pair, and it is the *name* that `Print` renders into
+`!felt.type<"…">` and that LLZK uses to pick the modulus. A configuration of
+`{ name := "bn254", prime := 2013265921 }` passed the prime comparison, emitted a
+babybear circuit typed as `bn254`, and was accepted by `llzk-opt`, both witgen
+backends and both halves of G9 — because none of them look at the field name.
+The `-1` coefficient the lowering emits is `p - 1` for the *configured* prime, so
+the emitted constraint system was a different one. That is exactly the failure
+mode D010 exists to prevent.
+
+Requiring the whole `FieldSpec` to be a registry entry also removes the only
+place a caller-supplied string reaches the renderer, which is why `Print` needs
+no escaping: every other name it emits (`w{k}`, `out{j}`, `arg{i}`, `Main`) is
+generated, and global names are checked by `diagnoseRegistry`. -/
 private def checkField (cfg : Config) : Except Diagnostic Unit :=
-  if FiniteField.size F = cfg.field.prime then .ok ()
-  else
+  if !FieldSpec.registry.contains cfg.field then
+    .error { context := "field"
+             message := s!"configured field '{cfg.field.name}' with prime {cfg.field.prime} is \
+                           not an entry of `FieldSpec.registry`; LLZK owns the prime for a field \
+                           name, so a pair it does not know would be emitted as \
+                           `!felt.type<\"{cfg.field.name}\">` and interpreted in whatever field \
+                           LLZK has under that name" }
+  else if FiniteField.size F ≠ cfg.field.prime then
     .error { context := "field"
              message := s!"configured field '{cfg.field.name}' has prime {cfg.field.prime}, but \
                            the circuit's field has {FiniteField.size F} elements" }
+  else .ok ()
 
 /-- Recognize a whole circuit, or report every reason it cannot be compiled.
 
 The registry is diagnosed first and separately: a malformed entry is reported
 even when no lookup happens to reach it, and once it is known well-formed the
 per-lookup resolution has less to re-check. -/
-def recognize (cfg : Config) (src : Source F) : Except (Array Diagnostic) Recognized := do
+def recognize [CanonicalRepr F] (cfg : Config) (src : Source F) :
+    Except (Array Diagnostic) Recognized := do
   match diagnoseRegistry cfg.field.prime cfg.tables with
   | #[] => pure ()
   | registryProblems => throw registryProblems

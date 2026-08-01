@@ -57,8 +57,8 @@ structure Entry where
   witnessAgree : Option Bool
 
 /-- Build an entry from a flattened circuit. -/
-def Entry.ofSource {F : Type} [FiniteField F] [DecidableEq F] (cfg : Config) (name : String)
-    (src : Source F) (inputs : Array (Array Nat)) : Entry where
+def Entry.ofSource {F : Type} [FiniteField F] [CanonicalRepr F] [DecidableEq F]
+    (cfg : Config) (name : String) (src : Source F) (inputs : Array (Array Nat)) : Entry where
   name := name
   module := compileSourceVerified cfg src
   vectors := inputs.map fun values => (values, LLZK.witness src values)
@@ -104,7 +104,7 @@ def registryEntry (spec : FieldSpec) : Entry :=
     outputs := #[.mul (.var 0) (.var 0)] }
   let x := spec.prime - 1
   { name := "Square_" ++ spec.name
-    module := (lower { field := spec } square).mapError (#[·])
+    module := lowerRecognized { field := spec } square
     vectors := #[(#[x], .ok { inputs := #[x], cells := #[], outputs := #[x * x % spec.prime] })]
     -- No Clean circuit behind these, so there is nothing independent to compare
     -- the emitted constraints against; checking them against the `Recognized`

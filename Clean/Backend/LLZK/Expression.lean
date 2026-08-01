@@ -50,7 +50,7 @@ deriving DecidableEq, Repr
 
 namespace FieldExpr
 
-variable {F : Type} [FiniteField F] [CanonicalRepr F]
+variable {F : Type} [FiniteField F]
 
 /-- Recognize a Clean circuit expression.
 
@@ -103,9 +103,13 @@ def lower (context : String) (fieldTy : Ty) (env : Env) : FieldExpr → LowerM V
     | some value => pure value
     | none =>
       throw { context
-              message := s!"expression reads circuit variable {index}, which no input or \
-                            earlier witness defines; variables 0 to {env.size - 1} are in scope \
-                            here" }
+              message :=
+                if env.size = 0 then
+                  s!"expression reads circuit variable {index}, but nothing is in scope here: \
+                     the circuit has no inputs and no earlier witness cells"
+                else
+                  s!"expression reads circuit variable {index}, which no input or earlier \
+                     witness defines; variables 0 to {env.size - 1} are in scope here" }
   | .const value => Builder.feltConst value fieldTy
   | .add a b => do
     Builder.feltBin .add (← lower context fieldTy env a) (← lower context fieldTy env b) fieldTy

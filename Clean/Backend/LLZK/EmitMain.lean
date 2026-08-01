@@ -85,13 +85,16 @@ def emitCorpus (directory : System.FilePath) : IO UInt32 := do
   for fixture in Corpus.syntaxFixtures do
     if ← emitSyntaxFixture syntaxDirectory fixture then failed := true
   if failed then return 1
-  let checked := Corpus.corpus.filter (·.constraintsAgree = some true)
+  let checked := Corpus.corpus.filter fun e =>
+    e.constraintsAgree = some true && e.witnessAgree = some true
   IO.println s!"{Corpus.corpus.size} circuit(s), \
     {Corpus.corpus.foldl (fun n e => n + e.vectors.size) 0} input vector(s), \
     {Corpus.syntaxFixtures.size} renderer fixture(s)"
   IO.println s!"G9: {checked.size} of {Corpus.corpus.size} circuit(s) have a Clean source; for \
     each, the emitted @constrain is the same constraint system and the emitted @compute \
-    computes the same witnesses"
+    computes the same witnesses. The other \
+    {Corpus.corpus.size - checked.size} are the registry conformance entries, built from a \
+    `Recognized` with no Clean circuit behind them, so G9 does not apply to them"
   return 0
 
 def emitMain (args : List String) : IO UInt32 := do

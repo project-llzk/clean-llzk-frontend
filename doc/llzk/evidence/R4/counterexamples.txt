@@ -1,0 +1,24 @@
+# R4 - every reviewer counterexample, re-run against the fix
+
+Date (UTC): 2026-08-01
+
+## R4b-1 / R4a-7 (registry), R4b-6 (empty scope), R4b-3 (ghost SSA), R4a-4 (input arity)
+
+  compilation failed:
+  field: configured field 'bn254' with prime 2013265921 is not an entry of `FieldSpec.registry`; LLZK owns the prime for a field name, so a pair it does not know would be emitted as `!felt.type<"bn254">` and interpreted in whatever field LLZK has under that name
+  compilation failed:
+  output 0: expression reads circuit variable 0, but nothing is in scope here: the circuit has no inputs and no earlier witness cells
+  R4b-3 ghost module built? false  (want false)
+  R4a-4 1-input module vs 4-input source: constraints=false witness=false  (want false false)
+
+## R4a-5 - struct.readm of a member the struct does not declare
+
+  R4a-5 ofModule accepts readm of undeclared @w0? false  (want false)
+
+## R4b-2 - the llzk-opt shim that made G3, G4 and G10 vacuous
+
+  $ printf '#!/usr/bin/env bash\n[[ "$1" == "--version" ]] && { echo "LLZK version 3.0.0"; exit 0; }\nexit 0\n' > shim/llzk-opt
+  $ LLZK_OPT=shim/llzk-opt LLZK_WITGEN=<real> bash scripts/llzk/e2e.sh
+  error: llzk-opt self-test: shim/llzk-opt accepted a file that is not MLIR,
+         so G3, G4 and G10 are not checking anything.
+  exit status: 1                                              RED (was PASS, exit 0)

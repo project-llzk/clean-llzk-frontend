@@ -132,16 +132,27 @@ theorem certified_membership {e : ExportTable} {table : Table F field}
   · rintro ⟨n, hn, rfl⟩
     rwa [FiniteField.val_fromNat n (hcanonical n hn)]
 
-/-! ## Requiring the certificate
+/-! ## Carrying the certificate — and what that is *not*
 
-Proving the obligation is worth less if nothing asks for it. `Config.tables`
-takes bare `ExportTable`s and must keep doing so — the negative fixtures that
-pin `diagnose`'s messages need to build malformed registries on purpose — so the
-requirement lives one level up, in the way a *supported* configuration is built.
+`Config.ofCertified` below takes tables paired with their proofs, and
+`Examples.withBytes` uses it, so the corpus's only lookup table carries its
+certificate next to the rows rather than in a docstring. Changing the rows breaks
+the build.
 
-`Config.ofCertified` cannot be called without a proof. It is what
-`Examples.withBytes` uses, so the corpus's only lookup table carries its
-certificate by construction rather than by a note in a docstring.
+**It is not a guarantee, and an earlier version of this comment said it was.**
+R4a-2 broke that claim: `CertifiedTable` lets the caller choose *both* the export
+table and the Clean table, and nothing ties the latter to the table the circuit's
+`.lookup` operations name — that is a `RawTable`, resolved by *name* in
+`recognizeLookup`, and `Table.toRaw` has already erased which `Table` it came
+from. So one can define `selfTable e` with `Contains _ x := val x ∈ e.values`,
+prove `e.Certifies (selfTable e)` by `Iff.rfl`, and certify any rows at all.
+`Config.mk` is public too.
+
+What this buys is therefore documentation with a proof obligation attached, not
+an enforced invariant. Closing it properly needs the `Table` to survive into
+`Lookup`, which is a change to Clean's core, not to this backend. Until then D012
+records exactly this: the obligation is stated and proved for the tables in use,
+and the compiler cannot demand it.
 -/
 
 /-- An export table together with the proof that its values are the Clean
@@ -151,10 +162,11 @@ structure CertifiedTable (F : Type) [FiniteField F] where
   table : Table F field
   certificate : exported.Certifies table
 
-/-- Build a configuration whose every lookup table is certified.
+/-- Build a configuration from tables that carry their certificates.
 
-The only way to obtain a `Config` for a circuit with lookups without asserting
-anything: each entry carries its own proof. -/
+Not "the only way" — `Config.mk` is public, and it has to be, because the
+negative fixtures build malformed registries on purpose. And not a guarantee
+about the circuit's table; see the section comment above. -/
 def Config.ofCertified (spec : FieldSpec) (tables : Array (CertifiedTable F)) : Config where
   field := spec
   tables := tables.map (·.exported)

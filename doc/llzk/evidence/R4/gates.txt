@@ -1,0 +1,200 @@
+# R4 - gates after the repairs
+
+Date (UTC): 2026-08-01
+
+== G0: state and pins ==
+Clean base: 1e563b9c27991b3795eb440c1ee0757edb4ce8b1
+HEAD:       32d201d0642759a6bfb05f95a8eea1f0a31b5591
+upstream:   git@github.com:Verified-zkEVM/clean.git
+toolchain:  leanprover/lean4:v4.30.0
+pin check:  PASS
+
+== tools ==
+LLZK_OPT: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/llzk-opt
+  LLZK version 3.0.0
+LLZK_WITGEN: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/llzk-witgen
+  version: not self-reported; provenance from LLZK_OPT (same installation)
+
+== G1: Lean ==
+Checking for consecutive empty lines in Lean files...
+
+✓ No consecutive empty lines found.
+Build completed successfully (1829 jobs).
+⚠ [1691/1729] Replayed Clean.Utils.Test.TestCircuitProofStart
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:17:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:29:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:40:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:49:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:58:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:71:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:88:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:129:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:157:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:183:0: declaration uses `sorry`
+Build completed successfully (1729 jobs).
+
+== G2: emit the corpus ==
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Decompose.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Addition8FullCarry.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Passthrough.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/ConstOut.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_babybear.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_mersenne31.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_koalabear.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_goldilocks.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_bn254.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_grumpkin.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/syntax/Demo.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/syntax/Empty.llzk
+11 circuit(s), 30 input vector(s), 2 renderer fixture(s)
+G9: 5 of 11 circuit(s) have a Clean source; for each, the emitted @constrain is the same constraint system and the emitted @compute computes the same witnesses. The other 6 are the registry conformance entries, built from a `Recognized` with no Clean circuit behind them, so G9 does not apply to them
+
+== harness self-test ==
+llzk-witgen self-test: green on the expected witness, red on a perturbed one
+llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file
+
+== Addition8FullCarry ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+-- G5/G7: interpreter vs Clean, vector 1
+-- G6/G7: execution engine vs Clean, vector 1
+-- G5/G7: interpreter vs Clean, vector 2
+-- G6/G7: execution engine vs Clean, vector 2
+-- G5/G7: interpreter vs Clean, vector 3
+-- G6/G7: execution engine vs Clean, vector 3
+-- G5/G7: interpreter vs Clean, vector 4
+-- G6/G7: execution engine vs Clean, vector 4
+-- G5/G7: interpreter vs Clean, vector 5
+-- G6/G7: execution engine vs Clean, vector 5
+-- G5/G7: interpreter vs Clean, vector 6
+-- G6/G7: execution engine vs Clean, vector 6
+-- G5/G7: interpreter vs Clean, vector 7
+-- G6/G7: execution engine vs Clean, vector 7
+-- G5/G7: interpreter vs Clean, vector 8
+-- G6/G7: execution engine vs Clean, vector 8
+   ok
+== ConstOut ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+-- G5/G7: interpreter vs Clean, vector 1
+-- G6/G7: execution engine vs Clean, vector 1
+   ok
+== Decompose ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+-- G5/G7: interpreter vs Clean, vector 1
+-- G6/G7: execution engine vs Clean, vector 1
+-- G5/G7: interpreter vs Clean, vector 2
+-- G6/G7: execution engine vs Clean, vector 2
+-- G5/G7: interpreter vs Clean, vector 3
+-- G6/G7: execution engine vs Clean, vector 3
+-- G5/G7: interpreter vs Clean, vector 4
+-- G6/G7: execution engine vs Clean, vector 4
+-- G5/G7: interpreter vs Clean, vector 5
+-- G6/G7: execution engine vs Clean, vector 5
+   ok
+== Multiply ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+-- G5/G7: interpreter vs Clean, vector 1
+-- G6/G7: execution engine vs Clean, vector 1
+-- G5/G7: interpreter vs Clean, vector 2
+-- G6/G7: execution engine vs Clean, vector 2
+-- G5/G7: interpreter vs Clean, vector 3
+-- G6/G7: execution engine vs Clean, vector 3
+   ok
+== Passthrough ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+-- G5/G7: interpreter vs Clean, vector 1
+-- G6/G7: execution engine vs Clean, vector 1
+-- G5/G7: interpreter vs Clean, vector 2
+-- G6/G7: execution engine vs Clean, vector 2
+   ok
+== Square_babybear ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+   ok
+== Square_bn254 ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+   ok
+== Square_goldilocks ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+   ok
+== Square_grumpkin ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+   ok
+== Square_koalabear ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+   ok
+== Square_mersenne31 ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0
+-- G6/G7: execution engine vs Clean, vector 0
+   ok
+
+== renderer fixtures ==
+-- G3/G4: Demo
+-- G10: Demo
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+-- G3/G4: Empty
+-- G10: Empty
+   G10b: out of scope — the module declares no felt type, so the pass cannot deduce a prime field
+
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10
+  11 circuit(s), 30 input vector(s), both witgen backends.
+  2 renderer fixture(s), syntax only.
+  G8 and G9 are carried inside G1 and G2: the rejection fixtures by
+  'lake build CleanTests', the constraint comparison by both that and the
+  emitter, which refuses to write a circuit whose constraints disagree.
+  G10a: all 11 + 2 module(s) admitted by --llzk-product-program.
+  G10b: 9 module(s) lowered to SMT, 4 out of scope for a declared reason.
+
+G9 is not a property of this corpus: both halves of it -- @constrain against
+the circuit's constraints, and @compute against its witness programs -- are
+preconditions of emission, so no module leaves this backend without them.
+What remains is the reading of LLZK's own semantics, recorded as D017: that
+felt.add is +, constrain.in is membership, felt.umod reads its operands as
+canonical representatives. G10 shows the modules are admissible to LLZK's
+analysis pipeline; it runs no solver.
+
+exit status: 0

@@ -9,7 +9,8 @@ expected_toolchain="leanprover/lean4:v4.30.0"
 
 cd "${repo_root}"
 
-actual_upstream="$(git remote get-url upstream)"
+actual_upstream="$(git remote get-url upstream 2>/dev/null)" \
+  || llzk_fail "no git remote named 'upstream'; this worktree is not the project home (D002)"
 if [[ "${actual_upstream}" != "${expected_upstream}" ]]; then
   echo "error: upstream is ${actual_upstream}, expected ${expected_upstream}" >&2
   exit 1

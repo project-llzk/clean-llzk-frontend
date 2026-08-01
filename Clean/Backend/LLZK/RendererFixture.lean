@@ -62,15 +62,19 @@ def demoModule : Except Diagnostic Module := do
       let table ← Builder.globalRead "Bytes" bytes
       Builder.constrainIn table bytes w0 felt
       Builder.constrainEq out0 lhs felt)
-  return { globals := #[{ name := "Bytes", elemTy := felt, values := #[0, 1, 2, 3] }], root }
+  match root with
+  | some root => return { globals := #[{ name := "Bytes", elemTy := felt, values := #[0, 1, 2, 3] }],
+                          root }
+  | none => .error { context := "renderer fixture", message := "unallocated SSA value" }
 
 /-- A component with no members, no parameters and no constraints, so the
 renderer's empty-member and empty-parameter paths are covered — and so that
 `llzk-opt` is asked whether it accepts one, which it does. -/
 def emptyModule : Except Diagnostic Module := do
-  let root ← Builder.component (ε := Diagnostic) #[] #[]
-    (fun _ _ => pure ()) (fun _ _ => pure ())
-  return { globals := #[], root }
+  match ← Builder.component (ε := Diagnostic) #[] #[]
+      (fun _ _ => pure ()) (fun _ _ => pure ()) with
+  | some root => return { globals := #[], root }
+  | none => .error { context := "renderer fixture", message := "unallocated SSA value" }
 
 /-- The fixtures the harness materializes, under the names it writes them as. -/
 def all : Array (String × Except Diagnostic Module) :=

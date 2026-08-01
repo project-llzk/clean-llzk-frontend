@@ -32,10 +32,21 @@ that the comparison can go *red*, which is what makes the green worth anything.
 
 ## What this establishes, and what it assumes
 
-`ofSource_holds_iff` proves that the Clean-side polynomials hold at an assignment
-exactly when `ConstraintsHoldFlat` does. So when the two polynomial sets agree,
-the emitted constraint system is satisfied by exactly the assignments that
-satisfy Clean's — *given* that `ofModule` reads the emitted IR the way LLZK does.
+`ofSource_eqs_iff` proves that the Clean-side polynomials hold at an assignment
+exactly when the *assertion* half of `ConstraintsHoldFlat` does, together with
+the output definitions D008 adds. So when the two polynomial sets agree, the
+emitted `constrain.eq`s are satisfied by exactly the assignments that satisfy
+Clean's assertions — *given* that `ofModule` reads the emitted IR the way LLZK
+does.
+
+The **lookup half of `ConstraintsHoldFlat` has no such theorem here.**
+`lookups_perm_of_compileSource'` is a statement about `Poly` data: the emitted
+`constrain.in`s name the tables Clean's `.lookup`s named and query the same
+polynomials. Turning that into `Lookup.Contains` needs
+`TableCert.certified_membership`, which needs a certificate for the table the
+circuit actually uses — and `RawTable` has erased which `Table` that is. So the
+composed end-to-end statement does not exist, and R4a-6 was right to say the
+docstring implied it did.
 
 That last clause is an assumption, and it is deliberately a small and inspectable
 one: `felt.add` is `+`, `felt.mul` is `*`, `felt.const n` is `fromNat n`,
@@ -90,6 +101,14 @@ theorem Expression.eval_toPoly (env : Environment F) (outs : Nat → F) (e : Exp
 
 /-- A constraint system in normal form. -/
 structure ConstraintSet (F : Type) where
+  /-- How many field elements the component takes.
+
+  Compared, not merely used: R4a-4 showed that a module built for a 1-input
+  circuit matched a 4-input source, because the module-side count was only ever
+  an *offset* inside `memberVar` and the Clean side never read
+  `Source.inputSize` at all. That is precisely the D014 blind spot this reader
+  claims to avoid. -/
+  inputs : Nat
   /-- Each polynomial must evaluate to zero. -/
   eqs : List (Poly F)
   /-- Each queried polynomial must be a row of the table of that name. -/
@@ -111,6 +130,7 @@ extractors, and they are the ones `constraintsHoldFlat_iff_forall_mem` is stated
 over — so this reader is not a re-reading of the operation list that could
 disagree with Clean about which operations are constraints. -/
 def ofSource (src : Source F) : ConstraintSet F where
+  inputs := src.inputSize
   eqs :=
     (FlatOperation.constraints src.operations).map Expression.toPoly
     ++ outputEqs src.outputs.toList
@@ -122,7 +142,9 @@ def ofSource (src : Source F) : ConstraintSet F where
 definitions.**
 
 The left-hand side is what the polynomial comparison checks; the right-hand side
-is Clean's own semantics of the circuit. So once `ofModule` agrees with
+is the assertion half of Clean's own semantics of the circuit — `constraints`,
+not `lookups`; see the module docstring for why the lookup half has no
+counterpart. So once `ofModule` agrees with
 `ofSource`, the emitted `constrain.eq`s are satisfied by exactly the assignments
 that satisfy Clean's assertions — with the output members pinned to the output
 expressions, which is what D008 says they are for and what A4 argued informally. -/
@@ -161,22 +183,19 @@ private inductive Slot (F : Type) where
   /-- `%self`. Only legal as the first operand of a member read. -/
   | self
 
-/-- `fromNat` inverts `val`, so a `felt.const` emitted from a Clean constant
-reads back as that constant. Without this the two sides would not even agree on
-constants.
-
-Not an assumption: it follows from `val_fromNat` and `val_injective`, the laws
-`FiniteField` already carries. -/
-theorem fromNat_val {G : Type} [FiniteField G] (c : G) :
-    FiniteField.fromNat (FiniteField.val c) = c :=
-  FiniteField.val_injective (FiniteField.val_fromNat _ (FiniteField.val_lt c))
-
 variable [FiniteField F]
 
 namespace ConstraintSet
 
-/-- The cell a member name denotes, given the component's shape. -/
-private def memberVar (inputSize numWitnesses numOutputs : Nat) (name : String) : Option PVar :=
+/-- The cell a member name denotes, given the component's shape.
+
+`declared` is the set of member names the struct actually has. Without it the
+reader accepted a `struct.readm %self[@w0]` in a component whose only member is
+`@junk` (R4a-5) — the same class of hole R3-02 fixed for `global.read` and left
+open for members. -/
+private def memberVar (inputSize numWitnesses numOutputs : Nat) (declared : Array String)
+    (name : String) : Option PVar := do
+  guard (declared.contains name)
   match (List.range numWitnesses).find? (fun k => witnessMember k = name) with
   | some k => some (.circuit (inputSize + k))
   | none =>
@@ -207,7 +226,7 @@ private def Reader.define (r : Reader F) (v : Value) (s : Slot F) : Option (Read
 `globals` is the set of names the module actually defines, so that a
 `global.read` of a name no `global.def` provides is a mismatch here and not only
 in `llzk-opt`. -/
-private def step (inputSize numWitnesses numOutputs : Nat) (globals : Array String)
+private def step (inputSize numWitnesses numOutputs : Nat) (declared globals : Array String)
     (r : Reader F) : Stmt → Option (Reader F)
   | .feltConst dst value _ => r.define dst (.poly (Poly.const (FiniteField.fromNat value)))
   | .feltBin dst op lhs rhs _ => do
@@ -220,7 +239,7 @@ private def step (inputSize numWitnesses numOutputs : Nat) (globals : Array Stri
     r.define dst (.poly combined)
   | .readMember dst self member _ => do
     let .self ← r.get self | none
-    let cell ← memberVar inputSize numWitnesses numOutputs member
+    let cell ← memberVar inputSize numWitnesses numOutputs declared member
     r.define dst (.poly (Poly.var cell))
   | .globalRead dst name _ => do
     guard (globals.contains name)
@@ -260,11 +279,12 @@ def ofModule (m : Module) : Option (ConstraintSet F) := do
     | .felt _ => true
     | _ => false)
   let globals := m.globals.map (·.name)
+  let declared := m.root.members.map (·.name)
   let mut reader : Reader F := { slots, eqs := [], lookups := [] }
   for stmt in m.root.constrain.body do
-    let some next := step inputSize numWitnesses numOutputs globals reader stmt | none
+    let some next := step inputSize numWitnesses numOutputs declared globals reader stmt | none
     reader := next
-  return { eqs := reader.eqs, lookups := reader.lookups }
+  return { inputs := inputSize, eqs := reader.eqs, lookups := reader.lookups }
 
 /-! ## The comparison -/
 
@@ -279,11 +299,12 @@ def agree (src : Source F) (m : Module) : Bool :=
   | none => false
   | some emitted =>
     let clean := ofSource src
-    emitted.eqs.isPerm clean.eqs && emitted.lookups.isPerm clean.lookups
+    emitted.inputs == clean.inputs
+      && emitted.eqs.isPerm clean.eqs && emitted.lookups.isPerm clean.lookups
 
 /-- The check, run through the whole compilation rather than on a module handed
 in — so what is compared is what the emitter actually produces. -/
-def agreeCompiled (cfg : Config) (src : Source F) : Bool :=
+def agreeCompiled [CanonicalRepr F] (cfg : Config) (src : Source F) : Bool :=
   match compileSource cfg src with
   | .error _ => false
   | .ok m => agree src m
@@ -318,7 +339,8 @@ private def mismatch : Diagnostic where
 
 /-- Compile a flattened circuit, and verify that what came out carries the
 circuit's constraint system before returning it. -/
-def compileSource' (cfg : Config) (src : Source F) : Except (Array Diagnostic) Module :=
+def compileSource' [CanonicalRepr F] (cfg : Config) (src : Source F) :
+    Except (Array Diagnostic) Module :=
   match compileSource cfg src with
   | .error diagnostics => .error diagnostics
   | .ok m => if agree src m then .ok m else .error #[mismatch]
@@ -327,7 +349,7 @@ def compileSource' (cfg : Config) (src : Source F) : Except (Array Diagnostic) M
 
 Not "every module in the corpus" — the comparison is a precondition of emission,
 so this is a theorem about all circuits. -/
-theorem agree_of_compileSource' {cfg : Config} {src : Source F} {m : Module}
+theorem agree_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F} {m : Module}
     (h : compileSource' cfg src = .ok m) : agree src m = true := by
   unfold compileSource' at h
   split at h
@@ -349,7 +371,7 @@ informally.
 
 Order is irrelevant on both sides because the constraints are a conjunction, and
 that is why a permutation suffices. -/
-theorem eqs_iff_of_compileSource' {cfg : Config} {src : Source F} {m : Module}
+theorem eqs_iff_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F} {m : Module}
     {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
     (hm : ofModule (F := F) m = some C) (env : Environment F) (outs : Nat → F) :
     (∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
@@ -357,7 +379,7 @@ theorem eqs_iff_of_compileSource' {cfg : Config} {src : Source F} {m : Module}
         ∧ (∀ e j, (e, j) ∈ src.outputs.toList.zipIdx → outs j = e.eval env) := by
   have ha := agree_of_compileSource' h
   simp only [agree, hm, Bool.and_eq_true] at ha
-  have hperm : C.eqs.Perm (ofSource src).eqs := List.isPerm_iff.mp ha.1
+  have hperm : C.eqs.Perm (ofSource src).eqs := List.isPerm_iff.mp ha.1.2
   rw [← ofSource_eqs_iff src env outs]
   exact ⟨fun hh p hp => hh p (hperm.mem_iff.mpr hp),
          fun hh p hp => hh p (hperm.mem_iff.mp hp)⟩
@@ -368,8 +390,8 @@ Each `constrain.in` the module emits names the table Clean's `.lookup` named and
 queries the same polynomial, with the same multiplicity. What that *means* — that
 membership in the emitted array is Clean's `Contains` — is
 `TableCert.certified_membership`, and needs the table certified. -/
-theorem lookups_perm_of_compileSource' {cfg : Config} {src : Source F} {m : Module}
-    {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
+theorem lookups_perm_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F}
+    {m : Module} {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
     (hm : ofModule (F := F) m = some C) :
     C.lookups.Perm (ofSource src).lookups := by
   have ha := agree_of_compileSource' h

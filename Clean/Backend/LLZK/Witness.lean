@@ -134,7 +134,7 @@ private def describeStep {F : Type} : Witgen.Step F → String
 
 namespace FieldExpr
 
-variable {F : Type} [FiniteField F] [CanonicalRepr F]
+variable {F : Type} [FiniteField F]
 
 /-- Check the side conditions that make a literal divisor safe to lower.
 
@@ -179,7 +179,7 @@ end FieldExpr
 
 namespace Witness
 
-variable {F : Type} [FiniteField F] [CanonicalRepr F] {m : Nat}
+variable {F : Type} [FiniteField F] {m : Nat}
 
 /-- Recognize the output of a witness program: one expression per witness cell. -/
 private def ofVExpr (prime : Nat) (context : String) : {n : Nat} → Witgen.VExpr F n →

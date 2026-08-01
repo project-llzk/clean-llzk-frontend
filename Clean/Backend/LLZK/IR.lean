@@ -14,9 +14,14 @@ Stated as what a lowering *cannot* do, because the previous, stronger phrasing
 ("a struct that is not a valid LLZK component cannot be built") was false — see
 R2-04:
 
-* **Values are allocated, never spelled.** `Value` has a private constructor and
-  `Builder.fresh` is private, so the only values a body can name are the ones the
-  typed emitters returned to it and the parameters the builder handed it.
+* **A body cannot name an SSA value nothing defines.** `Value` has a private
+  constructor and `Builder.fresh` is private, so a body cannot spell one. That
+  alone is not enough — `Param.value` is a public projection, so a body could
+  capture a `Value` belonging to a *different* component and reference an index
+  its own function never allocated (R4b-3 built exactly that, and `llzk-opt` said
+  "use of undeclared SSA value name"). `Builder.assemble` therefore checks that
+  every operand a body emitted is below the number of values that body allocated,
+  and refuses the function otherwise.
 * **A function's result cannot disagree with its signature.** `Func.result` is
   one `Option (Value × Ty)`, so the declared return type and the rendered
   `function.return` come from the same place, and a body can neither lack a
@@ -124,6 +129,18 @@ deriving Repr
 def Stmt.needsNonNativeFieldOps : Stmt → Bool
   | .feltBin _ op _ _ _ => !op.isNative
   | _ => false
+
+/-- Every value a statement *reads*. Its destination, if it has one, is not an
+operand — it is what the statement defines. Used by `Builder.assemble` to check
+that a body references nothing outside its own allocation. -/
+def Stmt.operands : Stmt → Array Value
+  | .feltConst .. | .structNew .. => #[]
+  | .feltBin _ _ lhs rhs _ => #[lhs, rhs]
+  | .readMember _ self _ _ => #[self]
+  | .writeMember self _ value _ => #[self, value]
+  | .globalRead .. => #[]
+  | .constrainEq lhs rhs _ => #[lhs, rhs]
+  | .constrainIn array _ element _ => #[array, element]
 
 /-- A function attribute this backend emits.
 
@@ -307,14 +324,27 @@ private def allocParams (specs : Array ParamSpec) : BuilderM (Array Param) :=
     let value ← fresh
     return { value, ty := spec.ty, argName := spec.argName }
 
-/-- Run a body against a fresh builder state and assemble the function. -/
+/-- Every value a function's statements and terminator reference. -/
+private def referenced (stmts : Array Stmt) (result : Option (Value × Ty)) : Array Value :=
+  stmts.flatMap Stmt.operands ++ (match result with | some (v, _) => #[v] | none => #[])
+
+/-- Run a body against a fresh builder state and assemble the function.
+
+Refuses a body that references a value it did not allocate. `Value`'s private
+constructor stops a body *spelling* one; this stops it *importing* one, which
+`Param.value` being a public projection otherwise allows (R4b-3). The `ε`-valued
+signature has no room for a diagnostic, so the failure is a `none` — the two
+callers of `component` turn it into one. -/
 private def assemble {ε : Type} (name : String)
-    (action : ExceptT ε BuilderM (Array Param × Option (Value × Ty))) : Except ε Func :=
+    (action : ExceptT ε BuilderM (Array Param × Option (Value × Ty))) : Except ε (Option Func) :=
   let (outcome, state) := action.run { nextIndex := 0, stmts := #[] }
   outcome.map fun (params, result) =>
-    { name, params, body := state.stmts, result
-      attrs :=
-        if state.stmts.any (·.needsNonNativeFieldOps) then #[.allowNonNativeFieldOps] else #[] }
+    if (referenced state.stmts result).all (·.index < state.nextIndex) then
+      some { name, params, body := state.stmts, result
+             attrs :=
+               if state.stmts.any (·.needsNonNativeFieldOps) then #[.allowNonNativeFieldOps]
+               else #[] }
+    else none
 
 /-- Build the component from one parameter specification shared by both functions.
 
@@ -329,7 +359,7 @@ and returns nothing. -/
 def component {ε : Type} (members : Array Member) (inputs : Array ParamSpec)
     (computeBody : Value → Array Value → ExceptT ε BuilderM Unit)
     (constrainBody : Value → Array Value → ExceptT ε BuilderM Unit) :
-    Except ε StructDef := do
+    Except ε (Option StructDef) := do
   let compute ← assemble "compute" do
     let params ← allocParams inputs
     let self ← emitValue (.structNew ·)
@@ -340,7 +370,9 @@ def component {ε : Type} (members : Array Member) (inputs : Array ParamSpec)
     let params ← allocParams inputs
     constrainBody self (params.map (·.value))
     return (#[{ value := self, ty := rootTy, argName := none }] ++ params, none)
-  return { members, compute, constrain }
+  return match compute, constrain with
+    | some compute, some constrain => some { members, compute, constrain }
+    | _, _ => none
 
 end Builder
 end LLZK

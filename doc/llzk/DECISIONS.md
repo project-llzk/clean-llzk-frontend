@@ -311,12 +311,20 @@ does its work: for a certified table with canonical values, Clean's `Contains`
 holds of `x` exactly when `x` is one of the field elements the emitted array
 holds — which is what the emitted `constrain.in` asserts.
 
-**And the certificate is required, not merely available.** `Config.ofCertified`
-takes `CertifiedTable`s — an `ExportTable` paired with its proof — and it is what
-`Examples.withBytes` uses, so the corpus's only lookup table carries its
-certificate by construction. `Config.tables` still takes bare `ExportTable`s, and
-must: the negative fixtures that pin `diagnose`'s messages build malformed
-registries on purpose.
+**The certificate is carried, not enforced — and an earlier version of this
+entry said otherwise.** `Config.ofCertified` takes `CertifiedTable`s, and
+`Examples.withBytes` uses it, so the corpus's only lookup table has its proof
+next to its rows and changing the rows breaks the build. But R4a-2 broke the
+"cannot be called without a proof" reading: the caller chooses *both* the export
+table and the Clean table, and nothing ties the latter to the table the circuit's
+`.lookup` names — that is a `RawTable`, resolved by name, and `Table.toRaw` has
+erased which `Table` it came from. `selfTable e` with
+`Contains _ x := val x ∈ e.values` certifies any rows at all, and the reviewer
+compiled `Addition8FullCarry` with a one-row `@Bytes`.
+
+So the residual is precise: the obligation is stated, and proved for every table
+in use; the compiler cannot demand it. Closing that needs the `Table` to survive
+into `Lookup`, which is a change to Clean's core rather than to this backend.
 
 So what is left is not "the rows are trusted". It is D017's reading of
 `constrain.in` as membership, which is a statement about LLZK, and the same
@@ -479,6 +487,15 @@ does: `felt.add` is `+`, `felt.mul` is `*`, `felt.const n` is `fromNat n`,
 `constrain.in t, v` is membership. That is the same kind of assumption as D011,
 and deliberately a small and inspectable one.
 
+**One part of it is structurally uncheckable by this design, and R4a-1 named it.**
+The emitter encodes a constant as `FiniteField.val c` and `ofModule` decodes it
+as `FiniteField.fromNat`, through the same instance, with `fromNat_val` making
+the round trip exact. So the constant-encoding convention is a *shared*
+assumption of the two readers rather than a cross-checked one — the "neither
+reader can see the other's input" property does not extend to it. That is why
+D019's class has to be genuinely required: it is what pins the convention, and
+nothing downstream can catch it being wrong.
+
 Alternatives considered:
 
 - *A universal preservation theorem about the lowering.* Better, and still the
@@ -505,10 +522,18 @@ greens were against Control 4.
 
 `ConstraintSet.agree` is decidable, so the emitter runs it on its own output and
 refuses to return a module that fails. `ConstraintSet.compileSource'` is that
-step, and `compile`/`emit` — the only public entry points, which is why they live
-in `Constraints.lean` and not in `Circuit.lean` — go through it. There is no way
-to obtain a module from this backend that has not been compared against its Clean
-source.
+step, and `compile`/`emit` go through it — and through D020's witness half, which
+is why they live in `WitnessCheck.lean`.
+
+**Scope, corrected by R4a-3/R4b-4.** This entry used to say "there is no way to
+obtain a module from this backend that has not been compared against its Clean
+source". That was false: `lower` was public and ran no validation, and the six
+`Square_*` corpus entries — which have no Clean circuit behind them — went
+straight through it. `lower` is now private, and `lowerRecognized` is the
+validated door for a `Recognized` built by hand: it checks the field registry and
+the table registry, and says in its own docstring that it is not the fail-closed
+entry point for circuits. The accurate claim is the one the theorem supports:
+**no module obtained through `compile` or `emit` has gone unchecked.**
 
 `agree_of_compileSource'` is the theorem; `eqs_iff_of_compileSource'` and
 `lookups_perm_of_compileSource'` give it meaning by composing it with
@@ -536,6 +561,22 @@ one than a wrong module.
 
 Every recognizer and entry point requires `LLZK.CanonicalRepr F`, a class with
 two laws — `val (x + y) = (val x + val y) % size` and the same for `*`.
+
+**This was claimed before it was true.** S18 added the class and put it in six
+`variable` lines, and R4a-1 showed that Lean includes a `variable [C F]` binder
+only when the *instance itself is used* in the declaration — which it never was,
+since `CanonicalRepr`'s fields are mentioned nowhere outside `Field.lean`. Every
+binder was silently dropped, the two `omit … in` lines were no-ops, and the
+reviewer built a `FiniteField` on `F 5` whose `val` swaps 2 and 3, satisfying
+every `FiniteField` law, and compiled a circuit saying `x + 3` into a module
+saying `x + 2` with both halves of G9 green. The class is now in the *signatures*
+of `recognize`, `compileSource`, `compileSource'`, `compileSourceVerified`,
+`agreeCompiled`, `compile`, `emit`, `emitSource`, `witness` and
+`Entry.ofSource`, and `#check` confirms it survives elaboration.
+
+The lesson is the same one D005 learned: a claim about what the type system
+enforces has to be checked against the elaborated signature, not against the
+source that was written with the intention of enforcing it.
 
 This is R2-05, closed rather than recorded. D011's argument rests on
 `FiniteField.val x` being "the canonical representative in `[0, p)`, which is

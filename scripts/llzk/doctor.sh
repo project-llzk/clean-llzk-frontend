@@ -14,7 +14,7 @@ fi
 # shellcheck source=scripts/llzk/lib.sh
 source "${script_dir}/lib.sh"
 
-"${script_dir}/check-pins.sh"
+bash "${script_dir}/check-pins.sh"
 
 if ! command -v lake >/dev/null 2>&1; then
   echo "error: lake is not available" >&2

@@ -53,6 +53,7 @@ require_llzk_witgen_discriminates \
   "${selftest_input}" \
   "${out_dir}/${selftest_name}.0.expected.json" \
   "${out_dir}"
+require_llzk_opt_discriminates "${out_dir}" "${out_dir}/${selftest_name}.llzk"
 echo
 
 # G10 is in two halves.
@@ -69,6 +70,10 @@ echo
 # excused.
 #
 # Neither half checks constraints or witnesses. G9 does both, in Lean.
+# Without a floor, a change that put a felt.umod in every module would give
+# smt_ok=0, smt_skipped=13 and still print PASS — the count is the only signal
+# G10b produces, and nothing compared it to anything (R4b-5).
+LLZK_EXPECTED_SMT_OK="${LLZK_EXPECTED_SMT_OK:-9}"
 smt_ok=0
 smt_skipped=0
 smt_log="${out_dir}/.smt.log"
@@ -139,6 +144,10 @@ for fixture in "${fixtures[@]}"; do
   check_smt_pipeline "${fixture}"
 done
 echo
+
+(( smt_ok >= LLZK_EXPECTED_SMT_OK )) || fail "G10b: only ${smt_ok} module(s) lowered to SMT, \
+expected at least ${LLZK_EXPECTED_SMT_OK}. Something that used to be admissible no longer is. \
+Set LLZK_EXPECTED_SMT_OK if the corpus legitimately shrank."
 
 echo "PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10"
 echo "  ${#artifacts[@]} circuit(s), ${vectors} input vector(s), both witgen backends."

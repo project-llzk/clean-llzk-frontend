@@ -30,7 +30,7 @@ namespace LLZK
 
 open Lean (Json)
 
-variable {F : Type} [FiniteField F] [CanonicalRepr F]
+variable {F : Type} [FiniteField F]
 
 /-- Clean's witness for one input vector: every cell the LLZK module has a member
 or parameter for. -/
@@ -46,7 +46,8 @@ deriving Repr, DecidableEq
 or above the field size is refused rather than silently reduced, because
 `llzk-witgen` would be given the unreduced number and the two sides would then
 disagree for a reason that has nothing to do with the lowering. -/
-def witness (src : Source F) (inputs : Array Nat) : Except Diagnostic Witness := do
+def witness [CanonicalRepr F] (src : Source F) (inputs : Array Nat) :
+    Except Diagnostic Witness := do
   if inputs.size ≠ src.inputSize then
     throw { context := "differential input"
             message := s!"got {inputs.size} input value(s) but the circuit takes {src.inputSize}" }

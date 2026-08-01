@@ -95,6 +95,33 @@ vacuous."
   echo "llzk-witgen self-test: green on the expected witness, red on a perturbed one"
 }
 
+# require_llzk_opt_discriminates WORKDIR ARTIFACT
+#
+# The symmetric control to require_llzk_witgen_discriminates, and it was missing:
+# llzk-opt's only validation was `--version`, which is exactly the "existence
+# check" this file rejects as insufficient for llzk-witgen. Reversing R2-06's
+# attack -- a four-line shim that answers `--version` and exits 0 otherwise --
+# satisfied require_llzk_tools and made G3, G4 and G10 all vacuous while e2e.sh
+# printed PASS (R4b-2).
+#
+# Runs llzk-opt twice: once on a real emitted artifact, which must verify, and
+# once on a file that is not LLZK at all, which must not.
+require_llzk_opt_discriminates() {
+  local workdir="$1" artifact="$2" garbage="${1}/llzk-opt-selftest-garbage.llzk"
+
+  "${LLZK_OPT}" "${artifact}" -o /dev/null >/dev/null 2>&1 \
+    || llzk_fail "llzk-opt self-test: ${artifact} does not verify; every later green would be \
+meaningless"
+
+  printf 'this is not MLIR, let alone LLZK\n' > "${garbage}"
+  if "${LLZK_OPT}" "${garbage}" -o /dev/null >/dev/null 2>&1; then
+    llzk_fail "llzk-opt self-test: ${LLZK_OPT} accepted a file that is not MLIR, so G3, G4 and \
+G10 are not checking anything."
+  fi
+  rm -f "${garbage}"
+  echo "llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file"
+}
+
 # llzk_smt_declared_reason LOGFILE
 #
 # Echoes the declared reason --llzk-to-smt-no-cf could not lower a module, or
@@ -106,19 +133,31 @@ vacuous."
 # have excused an unrelated failure in the same module, which is how the first
 # version of this gate would have missed a root component not named @Main in
 # Addition8FullCarry.
-# The list holds only reasons an artifact in the corpus actually produces. A
-# tolerance nothing exercises is a hole: it can only ever excuse something. LLZK
-# 3.0.0 also leaves `global.read`/`constrain.in` unhandled, but no corpus module
-# reaches that point — Addition8FullCarry fails at `felt.uintdiv` first — so that
-# reason is deliberately absent and a lookup-only circuit would turn G10b red
-# until someone adds it with evidence.
+# The list holds only reasons an artifact in the corpus actually produces as an
+# *error*. A tolerance nothing exercises is a hole: it can only ever excuse
+# something. LLZK 3.0.0 also leaves `global.read`/`constrain.in` unhandled, but
+# it reports those as *warnings* — Addition8FullCarry's log carries both, and
+# then fails with the felt.uintdiv error — so there is no tolerated reason for
+# them and a lookup-only circuit would turn G10b red until someone adds one with
+# evidence.
 llzk_smt_declared_reason() {
-  local log="$1"
-  if grep -qE "failed to legalize operation 'felt\.(uintdiv|umod)'" "${log}"; then
-    echo "felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf"
-  elif grep -q 'no prime field specified' "${log}"; then
-    echo "the module declares no felt type, so the pass cannot deduce a prime field"
-  fi
+  local log="$1" line reason=""
+  # Every *error* line must be tolerated. Grepping the whole log for one
+  # tolerated pattern excused any other error that happened to appear beside it,
+  # and warnings are not errors: the real Addition8FullCarry log carries
+  # "unhandled operation" warnings for global.read and constrain.in *and* the
+  # felt.uintdiv error, which the previous whole-log grep conflated (R4b-5).
+  while IFS= read -r line; do
+    case "${line}" in
+      *"failed to legalize operation 'felt.uintdiv'"*|*"failed to legalize operation 'felt.umod'"*)
+        reason="felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf" ;;
+      *'no prime field specified'*)
+        reason="the module declares no felt type, so the pass cannot deduce a prime field" ;;
+      *) return 1 ;;
+    esac
+  done < <(grep 'error:' "${log}")
+  [[ -n "${reason}" ]] || return 1
+  echo "${reason}"
 }
 
 # require_llzk_tools
