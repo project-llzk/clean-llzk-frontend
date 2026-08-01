@@ -105,13 +105,35 @@ Kept small on purpose. Anything that changes the *meaning* of the output belongs
 here so it is visible at the call site; anything derivable from the circuit is
 derived. -/
 structure Config where
+  private mk ::
   /-- The registry field to emit. `Analyze` rejects a circuit whose prime is not
   `field.prime`, so a wrong choice here is a compile error, not silently wrong
   arithmetic. -/
   field : FieldSpec
   /-- Concrete rows for the lookup tables the circuit uses. A lookup with no
   matching entry is a compile error, never a silently dropped constraint. -/
-  tables : Array ExportTable := #[]
+  tables : Array ExportTable
 deriving Repr
+
+/-- A configuration with no lookup tables. -/
+def Config.forField (field : FieldSpec) : Config := ⟨field, #[]⟩
+
+/-- A configuration whose tables are **asserted, not certified**.
+
+The constructor is private and this is the only public way to put tables into a
+`Config`, so every place that supplies unproved rows says so by name and `grep`
+finds all of them. `Config.ofCertified` is the wrapper to use instead: it takes
+`CertifiedTable`s, which carry the proof that the rows are the Clean table's.
+
+Why this exists at all. The rows cannot be checked by the compiler — that is
+D012 — and the negative fixtures must be able to build malformed registries on
+purpose. Making the unchecked path *impossible* would delete those fixtures;
+making it *quiet* is what allowed R5's X1, where
+`{ field := .babybear, tables := #[fatBytes] }` compiled `Addition8FullCarry`
+into a module admitting `w0 = 300` with every gate green. So it is loud instead,
+and `scripts/llzk/check-unsafe-config.sh` fails if any non-test backend module
+names it. -/
+def Config.unsafeWithTables (field : FieldSpec) (tables : Array ExportTable) : Config :=
+  ⟨field, tables⟩
 
 end LLZK

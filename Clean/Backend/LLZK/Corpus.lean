@@ -104,7 +104,7 @@ def registryEntry (spec : FieldSpec) : Entry :=
     outputs := #[.mul (.var 0) (.var 0)] }
   let x := spec.prime - 1
   { name := "Square_" ++ spec.name
-    module := lowerRecognized { field := spec } square
+    module := lowerRecognized (.forField spec) square
     vectors := #[(#[x], .ok { inputs := #[x], cells := #[], outputs := #[x * x % spec.prime] })]
     -- No Clean circuit behind these, so there is nothing independent to compare
     -- the emitted constraints against; checking them against the `Recognized`

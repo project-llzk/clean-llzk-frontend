@@ -147,6 +147,18 @@ def ofSource (cfg : Config) (src : Source F) : ConstraintSet F where
       fun l => (l.entry.toArray.map fun e => (l.table.name, Expression.toPoly e)).toList
   -- The tables the circuit actually looks into, found by walking the operations
   -- rather than by asking the emitter which ones it kept.
+  --
+  -- **This conjunct does not check that the rows are the Clean table's rows,**
+  -- and an earlier docstring implied it did. Both sides derive from
+  -- `cfg.tables`: here directly, and in the module via `recognize` and `lower`
+  -- with the same filter. On the only path that exists it is a tautology, which
+  -- is R5's X1. What it does catch is the emitter dropping, renaming or
+  -- reordering a table relative to the operations that look into it — a real
+  -- failure mode, and the whole of what it establishes.
+  --
+  -- Tying the rows to the Clean table is `ExportTable.Certifies`
+  -- (`TableCert.lean`), discharged at the call site by `Config.ofCertified`;
+  -- G12 keeps every other supplier out of non-test code.
   globals :=
     (cfg.tables.filter fun table =>
       (FlatOperation.lookups src.operations).any (·.table.name = table.name)).toList.map

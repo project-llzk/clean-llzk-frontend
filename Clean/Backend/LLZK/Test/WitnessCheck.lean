@@ -106,6 +106,52 @@ private def outConst : Source Bab := source 1 [wit (.mul x x)] #[.const 7]
 #guard !cross babybear mulSrc decSrc
 #guard !cross babybear decSrc mulSrc
 
+/-! ## Copies collapse, and only copies
+
+A witness cell whose program is a bare variable is a copy: `FieldExpr.lower`
+emits nothing and `@compute` writes the value that already stood for the
+original. So `witness x; return x` and `witness x; return that cell` emit
+*byte-identical* modules, and a reader of the module alone cannot distinguish
+them — which means neither side of the comparison may. Both canonicalise a copy
+to the variable it copies.
+
+R5c found this by having a correct module for `copyCell`, a proved
+`FormalCircuit`, refused with "this is a defect in the backend, please report
+it". The last three guards are the ones that keep the fix from being a blanket
+weakening: a computed cell still has its own identity. -/
+
+private def cellOfInput : Witgen.FExpr Bab := .expr (.var ⟨1⟩)
+
+private def copyOutInput : Source Bab := source 1 [wit x] #[.var ⟨0⟩]
+private def copyOutCell : Source Bab := source 1 [wit x] #[.var ⟨1⟩]
+private def copyOfCopy : Source Bab :=
+  source 1 [wit x, wit cellOfInput] #[.var ⟨2⟩, .var ⟨0⟩]
+/-- `x + 0` is *computed*, not copied: it gets its own SSA statement. -/
+private def notACopy : Source Bab := source 1 [wit (.add x (.const 0))] #[.var ⟨0⟩]
+
+#guard cross babybear copyOutInput copyOutInput
+#guard cross babybear copyOutCell copyOutCell
+#guard cross babybear copyOfCopy copyOfCopy
+#guard cross babybear notACopy notACopy
+#guard cross babybear (Compilable.source copyCell) (Compilable.source copyCell)
+
+-- The same module, so necessarily the same reading, in both directions.
+#guard cross babybear copyOutInput copyOutCell
+#guard cross babybear copyOutCell copyOutInput
+
+-- What the two sides actually read. A copy resolves to the variable it copies;
+-- a computed cell does not, and its own index is still a distinct name.
+#guard (WitnessSet.ofSource copyOutCell).map (·.outputs) == some [.cell 0]
+#guard (WitnessSet.ofSource copyOfCopy).map (·.cells) == some [.cell 0, .cell 0]
+#guard (WitnessSet.ofSource notACopy).map (·.cells)
+  == some [.add (.cell 0) (.const 0)]
+#guard (WitnessSet.ofSource notACopy).map (·.outputs) == some [.cell 0]
+
+-- Collapsing copies must not collapse anything else: a two-cell circuit whose
+-- cells are genuinely different still refuses the swapped reading.
+#guard !cross babybear notACopy copyOutInput
+#guard !cross babybear copyOutInput notACopy
+
 /-! ## The reader is fail-closed on `@constrain`'s statement forms
 
 `WitnessSet.ofModule` models `@compute` only. Feeding it a module is safe

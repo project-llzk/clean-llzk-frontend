@@ -160,12 +160,12 @@ structure CertifiedTable (F : Type) [FiniteField F] where
 
 /-- Build a configuration from tables that carry their certificates.
 
-Not "the only way" — `Config.mk` is public, and it has to be, because the
-negative fixtures build malformed registries on purpose. And not a guarantee
-about the circuit's table; see the section comment above. -/
-def Config.ofCertified (spec : FieldSpec) (tables : Array (CertifiedTable F)) : Config where
-  field := spec
-  tables := tables.map (·.exported)
+Since R5's X1 this is the only way to supply tables without naming
+`Config.unsafeWithTables`, which `scripts/llzk/check-unsafe-config.sh` forbids
+outside `Test/`. Still not a guarantee about the circuit's table; see the
+section comment above. -/
+def Config.ofCertified (spec : FieldSpec) (tables : Array (CertifiedTable F)) : Config :=
+  Config.unsafeWithTables spec (tables.map (·.exported))
 
 /-! ## The obligation, discharged end to end for the table the corpus uses
 

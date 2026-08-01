@@ -778,3 +778,34 @@ decision, refactor under G0–G10, get it reviewed, then prove. Not the reverse.
 
 Recorded because "S20 is large" was an estimate, and this is the actual reason
 and the actual size.
+
+## D022 — The unchecked lookup-table path is private, loud, and confined
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S22, closing R5's X1
+
+`Config`'s constructor is now private. The only public way to supply lookup
+tables is `Config.unsafeWithTables`, and `Config.ofCertified` is the wrapper
+that supplies an `ExportTable.Certifies` proof. G12
+(`scripts/llzk/check-unsafe-config.sh`) fails if any non-test module names the
+unsafe one.
+
+R5's X1 was not that an unchecked path existed — D012 says the compiler cannot
+check the rows, and the negative fixtures must be able to build malformed
+registries. It was that the unchecked path was the *quiet default*:
+`{ field := .babybear, tables := #[fatBytes] }` compiled `Addition8FullCarry`
+into a module admitting `w0 = 300`, which Clean's `ByteTable` rejects, with every
+gate green.
+
+Alternatives rejected:
+
+- *Delete the unchecked path.* It would delete the negative fixtures, which are
+  the only tests of the registry diagnostics.
+- *Keep it and rely on the `ConstraintSet.globals` conjunct.* That was the R4
+  answer and it does nothing: both sides read `cfg.tables`, so the conjunct is a
+  tautology. Its docstring now says so.
+
+What is still true and unchanged: nothing ties an `ExportTable` to the `Table` a
+`RawTable` erased except a proof someone writes. The change is that the proof is
+now the path of least resistance and its absence is greppable and gated.

@@ -17,6 +17,7 @@ accumulated gates from a clean checkout.
 | G9 — Semantics | The emitted `@constrain` and `@compute` are the circuit's |
 | G10 — Pipeline | Every artifact is admissible to LLZK's analysis pipeline |
 | G11 — Harness | The scripts' own failure branches behave as written |
+| G12 — Confinement | No non-test module supplies uncertified lookup tables |
 
 ## G0 — State
 

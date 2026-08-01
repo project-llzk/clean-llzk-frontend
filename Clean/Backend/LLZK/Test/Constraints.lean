@@ -172,12 +172,44 @@ private def twoCellSrc : Source Bab :=
 -- each `constrain.in` names and never what the table holds, so a `@Bytes` global
 -- with one row instead of 256 passed (R4).
 private def oneRowBytes : Config :=
-  { field := .babybear, tables := #[{ name := "Bytes", arity := 1, rows := #[#[0]] }] }
+  .unsafeWithTables .babybear #[{ name := "Bytes", arity := 1, rows := #[#[0]] }]
 
 #guard cross withBytes addSrc addSrc
 #guard match compileSource withBytes addSrc with
   | .ok m => !(agree oneRowBytes addSrc m)
   | .error _ => false
+
+/-! ### R5's X1: what an uncertified table actually costs
+
+The control above compares a module built with one config against a
+`ConstraintSet` built from another, and R5 was right that production never
+produces that pairing — so it never exercised the attack, which is to compile
+*with* the bad config. These do.
+
+`fatBytes` is R5's witness: 512 rows where Clean's `ByteTable` has 256. -/
+
+private def fatBytes : Config :=
+  .unsafeWithTables .babybear #[{ name := "Bytes", arity := 1, rows := (Array.range 512).map (#[·]) }]
+
+-- Compiling *with* it still succeeds, and `agree` still holds, because both
+-- sides read the same `cfg.tables`. That is the tautology R5 identified; pinning
+-- it stops the project claiming otherwise.
+#guard match compileSource fatBytes addSrc with
+  | .ok m => agree fatBytes addSrc m
+  | .error _ => false
+
+-- And the module it produces really is weaker: the emitted `@Bytes` holds 300,
+-- which `Gadgets.ByteTable` does not contain. This is the soundness cost of
+-- `unsafeWithTables`, stated as a fact rather than left to a docstring.
+#guard match compileSource fatBytes addSrc with
+  | .ok m => (m.globals.find? (·.name == "Bytes")).any (·.values.contains 300)
+  | .error _ => false
+
+-- What changed is that this can no longer be written by accident. The only
+-- public way to put tables in a `Config` is `unsafeWithTables`, named so that
+-- `scripts/llzk/check-unsafe-config.sh` can forbid it outside `Test/`, and
+-- `Config.ofCertified` — which cannot express `fatBytes`, because
+-- `ExportTable.Certifies` is false for it and there is no proof to supply.
 
 /-! ## Canonicity
 

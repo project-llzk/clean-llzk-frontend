@@ -94,6 +94,43 @@ def ofExpression : Expression F → WExpr
   | .add a b => .add (ofExpression a) (ofExpression b)
   | .mul a b => .mul (ofExpression a) (ofExpression b)
 
+/-- Rewrite every variable reference through `f`. -/
+def rename (f : Nat → Nat) : WExpr → WExpr
+  | .cell i => .cell (f i)
+  | .const n => .const n
+  | .add a b => .add (rename f a) (rename f b)
+  | .mul a b => .mul (rename f a) (rename f b)
+  | .uintdiv a d => .uintdiv (rename f a) d
+  | .umod a d => .umod (rename f a) d
+
+/-- Evaluation depends on the assignment only pointwise. -/
+theorem eval_congr {σ τ : Nat → F} (h : ∀ i, σ i = τ i) (w : WExpr) :
+    eval σ w = eval τ w := by
+  induction w with
+  | cell i => exact h i
+  | const n => rfl
+  | add a b iha ihb => simp [eval, iha, ihb]
+  | mul a b iha ihb => simp [eval, iha, ihb]
+  | uintdiv a d ih => simp [eval, ih]
+  | umod a d ih => simp [eval, ih]
+
+/-- Renaming commutes with evaluation.
+
+With `eval_congr`, this is what makes canonicalising copies in
+`WitnessSet.ofSource` meaning-preserving: `canon` sends a variable only to one
+the witness program defines it *equal* to, so `σ ∘ canon` and `σ` agree on every
+assignment the circuit can produce, and the renamed reading evaluates to the
+same field element as the original. -/
+theorem eval_rename (σ : Nat → F) (f : Nat → Nat) (w : WExpr) :
+    eval σ (w.rename f) = eval (σ ∘ f) w := by
+  induction w with
+  | cell i => rfl
+  | const n => rfl
+  | add a b iha ihb => simp [eval, rename, iha, ihb]
+  | mul a b iha ihb => simp [eval, rename, iha, ihb]
+  | uintdiv a d ih => simp [eval, rename, ih]
+  | umod a d ih => simp [eval, rename, ih]
+
 /-- Read a field-sorted witness expression, or fail on anything outside the
 Stage-1 subset. -/
 def ofWitgen : Witgen.FExpr F → Option WExpr
@@ -173,23 +210,69 @@ private def ofProgram {m : Nat} : Witgen.WitgenIR F m → Option (List WExpr)
   | .ir [] (.lit es) => es.toList.mapM WExpr.ofWitgen
   | _ => none
 
+/-! ### Canonicalising copies
+
+A witness cell whose program is a bare variable — `witness x`, returning the
+input unchanged — is a *copy*: circuit variable `inputSize + k` and the variable
+it copies denote the same field element, always. The emitted module cannot tell
+them apart, because `FieldExpr.lower` returns the existing SSA value rather than
+emitting anything, so `struct.writem @w{k} = %v` writes the very value that
+already stood for the original.
+
+This is not a choice the comparison gets to make. `ofModule` reads the module and
+nothing else, and `witness x; return x` and `witness x; return that cell` emit
+*byte-identical* modules — the distinction is simply not present in the artifact.
+So any check that accepts one must accept the other, and both sides rewrite every
+copy to the variable it copies.
+
+Accepting both is sound because the module is a correct lowering of both: a copy
+cell is *defined* to hold the value it copies, so the two variables denote the
+same field element under every assignment the witness generator can produce.
+`eval_rename` and `eval_congr` above are the two halves of that argument; what
+they are applied to — that `canon` sends a variable only to one the program
+defines it equal to — is the three lines below, and is checked by inspection
+rather than proved. GAPS.md records it.
+
+R5c found the alternative the hard way: with the reader alone rebinding,
+`witness x; y === x; return x` — a proved `FormalCircuit` whose emitted module is
+correct — was refused and told to file a backend bug.
+
+Only *bare* copies collapse. A cell computing `x + 0` is a fresh value with its
+own SSA statement, and stays distinct. -/
+
 /-- Read the Clean circuit's witness programs and outputs. -/
 def ofSource (src : Source F) : Option WitnessSet := do
-  let mut cells : List WExpr := []
+  let mut raw : List WExpr := []
   for op in src.operations do
     if let .witness _ program := op then
-      cells := cells ++ (← ofProgram program)
-  return { inputs := src.inputSize, cells,
-           outputs := src.outputs.toList.map WExpr.ofExpression }
+      raw := raw ++ (← ofProgram program)
+  -- `canon` sends each circuit variable to the one it is a copy of, or to
+  -- itself. Built in order, so a cell's references are always already resolved.
+  let mut canon : Array Nat := Array.range src.inputSize
+  let mut cells : Array WExpr := #[]
+  for w in raw do
+    let w := w.rename fun i => canon[i]?.getD i
+    canon := canon.push (match w with | .cell j => j | _ => canon.size)
+    cells := cells.push w
+  return { inputs := src.inputSize, cells := cells.toList,
+           outputs := src.outputs.toList.map fun e =>
+             (WExpr.ofExpression e).rename fun i => canon[i]?.getD i }
 
 /-! ## Reading the emitted `@compute`
 
 `@compute`'s parameters are the inputs, with no `%self`; `struct.new` defines
-`%self` as the first statement. A write to `@w{k}` both records the cell's
-expression and rebinds the written SSA value to `cell (inputSize + k)`, because
-every later use of it denotes that cell — which is how the Clean side names it.
-Without the rebinding the emitted side would inline earlier cells and the two
-would never match. -/
+`%self` as the first statement. A write to `@w{k}` records the cell's expression
+and, in the ordinary case, rebinds the written SSA value to `cell (inputSize +
+k)`: every later use of it denotes that cell, which is how the Clean side names
+it. Without the rebinding the emitted side would inline earlier cells and the two
+would never match.
+
+The exception is a cell that is a bare copy — see "Canonicalising copies" above.
+There the written value is one the body did not compute, and rebinding it would
+rename the original for the rest of `@compute`. Because `FieldExpr.lower` returns
+an existing value only in its `.var` case, and every other case emits a statement
+whose slot is a `const`/`add`/`mul`/`uintdiv`/`umod`, *the slot already holding a
+bare `cell` is exactly the copy case*. That is the test used below. -/
 
 /-- What an SSA name in `@compute` can hold. -/
 private inductive Slot where
@@ -237,7 +320,8 @@ private def step (inputSize : Nat) (r : Reader) : Stmt → Option Reader
     let .self ← r.slots[self.index]? | none
     let w ← r.expr value
     if member = witnessMember r.cells.length then
-      let r ← r.rebind value (.cell (inputSize + r.cells.length))
+      let r ← if w matches .cell _ then some r
+              else r.rebind value (.cell (inputSize + r.cells.length))
       return { r with cells := r.cells ++ [w] }
     else if member = outputMember r.outputs.length then
       return { r with outputs := r.outputs ++ [w] }

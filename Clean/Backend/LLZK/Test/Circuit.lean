@@ -319,9 +319,9 @@ def divideByPrime : FormalCircuit (F pBabybear) field Parts where
   soundness := by circuit_proof_all
   completeness := by circuit_proof_all
 
-def mersenne : Config := { field := .mersenne31 }
+def mersenne : Config := .forField .mersenne31
 
-def withoutBytes : Config := { field := .babybear }
+def withoutBytes : Config := .forField .babybear
 
 /-! ### Hand-built sources
 
@@ -404,27 +404,26 @@ private def oneLookup : Source (F pBabybear) :=
   source 1 [.lookup { table := rawTable "Bytes" 1, entry := #v[.const 0] }]
 
 private def malformedTable : Config :=
-  { field := .babybear, tables := #[{ name := "not a symbol", arity := 2, rows := #[#[0]] }] }
+  .unsafeWithTables .babybear #[{ name := "not a symbol", arity := 2, rows := #[#[0]] }]
 
 /-- A table named `Main` collides with the component in the module's symbol
 table: `llzk-opt` reports "symbol @Main references a 'global.def' but expected a
 'struct.def'". R2 control S2. -/
 private def collidingTable : Config :=
-  { field := .babybear, tables := #[{ name := "Main", arity := 1, rows := #[#[0]] }] }
+  .unsafeWithTables .babybear #[{ name := "Main", arity := 1, rows := #[#[0]] }]
 
 /-- Row values at or above the prime are not canonical representatives; emitting
 them would make the lookup table a different set of rows. R2-02. -/
 private def unreducedTable : Config :=
-  { field := .babybear
-    tables := #[{ name := "Bytes", arity := 1, rows := #[#[0], #[2013265921]] }] }
+  .unsafeWithTables .babybear #[{ name := "Bytes", arity := 1, rows := #[#[0], #[2013265921]] }]
 
 private def emptyTable : Config :=
-  { field := .babybear, tables := #[{ name := "Bytes", arity := 1, rows := #[] }] }
+  .unsafeWithTables .babybear #[{ name := "Bytes", arity := 1, rows := #[] }]
 
 private def duplicateTables : Config :=
-  { field := .babybear
-    tables := #[{ name := "Bytes", arity := 1, rows := #[#[0]] },
-                { name := "Bytes", arity := 1, rows := #[#[1]] }] }
+  .unsafeWithTables .babybear
+    #[{ name := "Bytes", arity := 1, rows := #[#[0]] },
+      { name := "Bytes", arity := 1, rows := #[#[1]] }]
 
 /-! ### The diagnostics -/
 

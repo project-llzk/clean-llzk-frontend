@@ -49,7 +49,7 @@ def multiply : FormalCircuit (F pBabybear) Inputs field where
   soundness := by circuit_proof_all
   completeness := by circuit_proof_all
 
-def babybear : Config := { field := .babybear }
+def babybear : Config := .forField .babybear
 
 /-! ## The two recognized natural division/modulo shapes -/
 
@@ -82,6 +82,25 @@ component with no `{signal}` members and no witness cells at all (control S4). -
 /-- An output that is an input. Emits no witness cells. -/
 def passthrough : FormalCircuit (F pBabybear) field field where
   main x := pure x
+  Assumptions _ := True
+  Spec input out := out = input
+  soundness := by circuit_proof_all
+  completeness := by circuit_proof_all
+
+/-- A witness cell that is a bare copy of an input, with the input *also* used
+afterwards.
+
+R5c's counterexample, kept as a circuit rather than a hand-built `Source` because
+the point is that it is a proved `FormalCircuit` whose correct module the backend
+refused, blaming itself. `FieldExpr.lower` emits nothing for a bare variable, so
+`@compute` writes the parameter straight into `@w0` and then into `@out0`; the
+witness reader used to rename the parameter at the first write and misread the
+second. See "Canonicalising copies" in `WitnessCheck.lean`. -/
+def copyCell : FormalCircuit (F pBabybear) field field where
+  main x := do
+    let y ← witness x
+    y === x
+    return x
   Assumptions _ := True
   Spec input out := out = input
   soundness := by circuit_proof_all

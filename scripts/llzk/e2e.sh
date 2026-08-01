@@ -26,6 +26,10 @@ echo "== G11: harness error paths =="
 bash "${script_dir}/test-scripts.sh"
 echo
 
+echo "== G12: the unchecked table path is confined =="
+bash "${script_dir}/check-unsafe-config.sh"
+echo
+
 echo "== G0: state and pins =="
 bash "${script_dir}/check-pins.sh"
 echo
@@ -158,7 +162,7 @@ echo
 expected at least ${LLZK_EXPECTED_SMT_OK}. Something that used to be admissible no longer is. \
 Set LLZK_EXPECTED_SMT_OK if the corpus legitimately shrank."
 
-echo "PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11"
+echo "PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12"
 echo "  ${#artifacts[@]} circuit(s), ${vectors} input vector(s), both witgen backends."
 echo "  ${#fixtures[@]} renderer fixture(s), syntax only."
 echo "  G8 and G9 are carried inside G1 and G2: the rejection fixtures by"
