@@ -650,7 +650,7 @@ Two things this does not do:
 
 ## D021 — S20 is blocked on where the private boundary goes, not on effort
 
-**Status:** accepted — option (1), **enacted**; the theorem itself is in progress
+**Status:** accepted — option (1), enacted, and the theorem **proved**
 **Date:** 2026-08-01
 **Enacted by:** the S20 attempt
 
@@ -719,13 +719,15 @@ expected: `BuilderState`'s constructor is private too, so the theorem's
 …)` is expressible, but the frame lemma every sequencing case needs must mention
 `{ nextIndex := …, stmts := … }`, and cannot.
 
-So the work happens inside `IR.lean`, and it is now **started and committed**
-rather than stashed: the move is done, the reader is defined, and the three
-lemmas the inductive cases turn on are proved. What remains is the induction
-itself — two helper cases, one for the binary operations and one for the two
-division shapes. G0–G10 are green throughout, and nothing carries a `sorry`.
+So the work happens inside `IR.lean`, and it is **done**:
+`FieldExpr.lower_spec` proves that running the lowering from a fresh index and
+reading the emitted statements back recovers the expression's denotation at the
+value returned, together with the bookkeeping — the index only advances, every
+statement defines an index in the range consumed, and the returned value is in
+scope. Axioms: `propext`, `Classical.choice`, `Quot.sound`. No `sorry`.
 
-Three things established, recorded so they are not rediscovered:
+Four things established, recorded because they are what made it tractable and
+because the earlier framing predicted the opposite:
 
 - **The monadic machinery reduces definitionally.** `rfl` discharges
   `Builder.run start (FieldExpr.lower ctx ty env (.const c))`. No `simp`
@@ -738,8 +740,16 @@ Three things established, recorded so they are not rediscovered:
   survive a later one's emission.
 - **`Builder.run_bind` is the linchpin, and it holds.** Sequencing is *not* `rfl`
   — the match needs the scrutinee's shape — but it falls to one case split. With
-  it, every inductive case of the theorem is a rewrite rather than a monadic
-  unfolding, which is what makes the remaining induction ordinary work.
+  it, every inductive case is a rewrite rather than a monadic unfolding.
+- **`Builder.run_emitValue` is the other half**, and it *is* `rfl`: one emission
+  collapses to allocate-append-return in a single rewrite. Unfolding `fresh` and
+  `emit` separately instead sends `simp` into a loop against
+  `Array.push_eq_append`. Do not do that.
+
+The whole proof is about 180 lines and needed no simulation argument, no frame
+lemma stated by hand, and no reasoning about `StateT` beyond those two lemmas.
+D018's framing — "a simulation argument over the `BuilderM` state monad" — was
+the wrong shape, which is why it read as a much larger obstacle than it was.
 
 **Stating the reading claim conditionally on the expression having a denotation**
 is what makes `uintdiv`/`umod` free: they are witness-only, they denote nothing

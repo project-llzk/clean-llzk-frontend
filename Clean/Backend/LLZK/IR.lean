@@ -585,4 +585,205 @@ theorem Builder.run_bind {ε α β : Type} (f : ExceptT ε BuilderM α)
   rcases h : f s with ⟨r, s'⟩
   cases r <;> simp [ExceptT.run, ExceptT.mk, bind, StateT.bind, pure, StateT.pure, h]
 
+/-- One emission, run: allocate, append, return. Collapses the whole
+`fresh`/`emit` chain in a single rewrite, which is what the emission cases need. -/
+@[simp] theorem Builder.run_emitValue {ε : Type} (mk : Value → Stmt) (s : BuilderState) :
+    (liftM (Builder.emitValue mk) : ExceptT ε BuilderM Value).run s
+      = (.ok ⟨s.nextIndex⟩,
+         { nextIndex := s.nextIndex + 1, stmts := s.stmts.push (mk ⟨s.nextIndex⟩) }) := rfl
+
+/-- Lifting a builder action into the error layer: the companion to
+`Builder.run_bind`, and the other half of what makes the emission cases compute. -/
+theorem Builder.run_lift {ε α : Type} (m : BuilderM α) (s : BuilderState) :
+    (liftM m : ExceptT ε BuilderM α).run s = (.ok (m s).1, (m s).2) := rfl
+
+/-- **The expression lowering emits exactly what the reader reads back.**
+
+Running the lowering from a fresh index and then reading the statements it
+emitted recovers the expression's denotation at the value it returned. The
+bookkeeping travels with it: the index only advances, every statement defines an
+index in the range consumed, and the returned value is in scope.
+
+The reading claim is conditional on the expression *having* a denotation, which
+is what makes `uintdiv` and `umod` fall out — they are witness-only, they denote
+nothing in an `ExprAlgebra`, and the claim is vacuous for them. An unconditional
+statement would need a freshness side condition on the assignment. -/
+theorem FieldExpr.lower_spec {A : Type} (alg : ExprAlgebra A) (ctx : String) (ty : Ty)
+    (env : FieldExpr.Env) :
+    ∀ (e : FieldExpr) (start : Nat) (S : Array Stmt),
+      (∀ (i : Nat) (v : Value), env[i]? = some v → v.index < start) →
+      ∃ (out : Except Diagnostic Value) (next : Nat) (new : List Stmt),
+        (FieldExpr.lower ctx ty env e).run { nextIndex := start, stmts := S }
+            = (out, { nextIndex := next, stmts := S ++ new.toArray })
+        ∧ start ≤ next
+        ∧ (∀ s ∈ new, ∀ d ∈ s.dst?, start ≤ d ∧ d < next)
+        ∧ ∀ v, out = .ok v → v.index < next ∧
+            ∀ p : A, e.denote alg = some p →
+              ∀ σ : Assign A,
+                (∀ (i : Nat) (w : Value), env[i]? = some w → σ w.index = some (alg.var i)) →
+                readStmts alg σ new v.index = some p := by
+  intro e
+  induction e with
+  | var index =>
+    intro start S hbelow
+    cases hv : env[index]? with
+    | none =>
+      exact ⟨.error _, start, [], by simp only [FieldExpr.lower, hv]; rfl, Nat.le_refl _, by simp, by simp⟩
+    | some w =>
+      refine ⟨.ok w, start, [], by simp only [FieldExpr.lower, hv]; rfl, Nat.le_refl _, by simp, ?_⟩
+      rintro v hveq; cases hveq
+      refine ⟨hbelow _ _ hv, fun p hp σ henv => ?_⟩
+      simp only [denote, Option.some.injEq] at hp
+      simpa [readStmts, ← hp] using henv _ _ hv
+  | const c =>
+    intro start S hbelow
+    refine ⟨.ok ⟨start⟩, start + 1, [.feltConst ⟨start⟩ c ty], rfl, Nat.le_succ _, ?_, ?_⟩
+    · intro s hs d hd
+      simp only [List.mem_singleton] at hs; subst hs
+      simp only [Stmt.dst?, Option.mem_def, Option.some.injEq] at hd; omega
+    · rintro v hveq; cases hveq
+      refine ⟨Nat.lt_succ_self _, fun p hp σ _ => ?_⟩
+      simp only [denote, Option.some.injEq] at hp
+      simp [readStmts, readStmt, Assign.set, ← hp]
+  | add a b iha ihb =>
+    intro start S hbelow
+    obtain ⟨oa, na, la, hra, hlea, hda, hoka⟩ := iha start S hbelow
+    cases oa with
+    | error d =>
+      exact ⟨.error d, na, la, by simp only [FieldExpr.lower, Builder.run_bind, hra], hlea, hda, by simp⟩
+    | ok va =>
+      obtain ⟨hvalt, hreada⟩ := hoka va rfl
+      have hbelow' : ∀ (i : Nat) (w : Value), env[i]? = some w → w.index < na :=
+        fun i w h => Nat.lt_of_lt_of_le (hbelow i w h) hlea
+      obtain ⟨ob, nb, lb, hrb, hleb, hdb, hokb⟩ := ihb na (S ++ la.toArray) hbelow'
+      have hd2 : ∀ s ∈ la ++ lb, ∀ dd ∈ s.dst?, start ≤ dd ∧ dd < nb := by
+        intro s hs dd hd
+        rcases List.mem_append.1 hs with h | h
+        · exact ⟨(hda s h dd hd).1, Nat.lt_of_lt_of_le (hda s h dd hd).2 hleb⟩
+        · exact ⟨Nat.le_trans hlea (hdb s h dd hd).1, (hdb s h dd hd).2⟩
+      cases ob with
+      | error d =>
+        refine ⟨.error d, nb, la ++ lb,
+          by simp [FieldExpr.lower, Builder.run_bind, hra, hrb, Array.append_assoc],
+          Nat.le_trans hlea hleb, hd2, by simp⟩
+      | ok vb =>
+        obtain ⟨hvblt, hreadb⟩ := hokb vb rfl
+        have hsn : start ≤ nb := Nat.le_trans hlea hleb
+        refine ⟨.ok ⟨nb⟩, nb + 1, la ++ lb ++ [.feltBin ⟨nb⟩ .add va vb ty], ?_, Nat.le_succ_of_le hsn, ?_, ?_⟩
+        · simp [FieldExpr.lower, Builder.run_bind, hra, hrb, Builder.feltBin, Array.append_assoc]
+        · intro s hs dd hd
+          rcases List.mem_append.1 hs with h | h
+          · exact ⟨(hd2 s h dd hd).1, Nat.lt_succ_of_lt (hd2 s h dd hd).2⟩
+          · simp only [List.mem_singleton] at h; subst h
+            simp only [Stmt.dst?, Option.mem_def, Option.some.injEq] at hd
+            exact ⟨by omega, by omega⟩
+        · rintro v hveq; cases hveq
+          refine ⟨Nat.lt_succ_self _, fun p hp σ henv => ?_⟩
+          simp only [denote, Option.bind_eq_some_iff, Option.map_eq_some_iff] at hp
+          obtain ⟨pa, hpa, pb, hpb, rfl⟩ := hp
+          have henv1 : ∀ (i : Nat) (w : Value), env[i]? = some w →
+              readStmts alg σ la w.index = some (alg.var i) := by
+            intro i w h
+            rw [readStmts_ne alg σ la w.index
+              (fun s hs dd hdd => Nat.ne_of_lt (Nat.lt_of_lt_of_le (hbelow i w h) (hda s hs dd hdd).1))]
+            exact henv i w h
+          have hva : readStmts alg (readStmts alg σ la) lb va.index = some pa := by
+            rw [readStmts_ne alg _ lb va.index
+              (fun s hs dd hdd => Nat.ne_of_lt (Nat.lt_of_lt_of_le hvalt (hdb s hs dd hdd).1))]
+            exact hreada pa hpa σ henv
+          have hvb : readStmts alg (readStmts alg σ la) lb vb.index = some pb :=
+            hreadb pb hpb _ henv1
+          rw [readStmts_append, readStmts_append, readStmts]
+          simp [List.foldl_cons, List.foldl_nil, readStmt, hva, hvb, Assign.set]
+  | mul a b iha ihb =>
+    intro start S hbelow
+    obtain ⟨oa, na, la, hra, hlea, hda, hoka⟩ := iha start S hbelow
+    cases oa with
+    | error d =>
+      exact ⟨.error d, na, la, by simp only [FieldExpr.lower, Builder.run_bind, hra], hlea, hda, by simp⟩
+    | ok va =>
+      obtain ⟨hvalt, hreada⟩ := hoka va rfl
+      have hbelow' : ∀ (i : Nat) (w : Value), env[i]? = some w → w.index < na :=
+        fun i w h => Nat.lt_of_lt_of_le (hbelow i w h) hlea
+      obtain ⟨ob, nb, lb, hrb, hleb, hdb, hokb⟩ := ihb na (S ++ la.toArray) hbelow'
+      have hd2 : ∀ s ∈ la ++ lb, ∀ dd ∈ s.dst?, start ≤ dd ∧ dd < nb := by
+        intro s hs dd hd
+        rcases List.mem_append.1 hs with h | h
+        · exact ⟨(hda s h dd hd).1, Nat.lt_of_lt_of_le (hda s h dd hd).2 hleb⟩
+        · exact ⟨Nat.le_trans hlea (hdb s h dd hd).1, (hdb s h dd hd).2⟩
+      cases ob with
+      | error d =>
+        refine ⟨.error d, nb, la ++ lb,
+          by simp [FieldExpr.lower, Builder.run_bind, hra, hrb, Array.append_assoc],
+          Nat.le_trans hlea hleb, hd2, by simp⟩
+      | ok vb =>
+        obtain ⟨hvblt, hreadb⟩ := hokb vb rfl
+        have hsn : start ≤ nb := Nat.le_trans hlea hleb
+        refine ⟨.ok ⟨nb⟩, nb + 1, la ++ lb ++ [.feltBin ⟨nb⟩ .mul va vb ty], ?_, Nat.le_succ_of_le hsn, ?_, ?_⟩
+        · simp [FieldExpr.lower, Builder.run_bind, hra, hrb, Builder.feltBin, Array.append_assoc]
+        · intro s hs dd hd
+          rcases List.mem_append.1 hs with h | h
+          · exact ⟨(hd2 s h dd hd).1, Nat.lt_succ_of_lt (hd2 s h dd hd).2⟩
+          · simp only [List.mem_singleton] at h; subst h
+            simp only [Stmt.dst?, Option.mem_def, Option.some.injEq] at hd
+            exact ⟨by omega, by omega⟩
+        · rintro v hveq; cases hveq
+          refine ⟨Nat.lt_succ_self _, fun p hp σ henv => ?_⟩
+          simp only [denote, Option.bind_eq_some_iff, Option.map_eq_some_iff] at hp
+          obtain ⟨pa, hpa, pb, hpb, rfl⟩ := hp
+          have henv1 : ∀ (i : Nat) (w : Value), env[i]? = some w →
+              readStmts alg σ la w.index = some (alg.var i) := by
+            intro i w h
+            rw [readStmts_ne alg σ la w.index
+              (fun s hs dd hdd => Nat.ne_of_lt (Nat.lt_of_lt_of_le (hbelow i w h) (hda s hs dd hdd).1))]
+            exact henv i w h
+          have hva : readStmts alg (readStmts alg σ la) lb va.index = some pa := by
+            rw [readStmts_ne alg _ lb va.index
+              (fun s hs dd hdd => Nat.ne_of_lt (Nat.lt_of_lt_of_le hvalt (hdb s hs dd hdd).1))]
+            exact hreada pa hpa σ henv
+          have hvb : readStmts alg (readStmts alg σ la) lb vb.index = some pb :=
+            hreadb pb hpb _ henv1
+          rw [readStmts_append, readStmts_append, readStmts]
+          simp [List.foldl_cons, List.foldl_nil, readStmt, hva, hvb, Assign.set]
+  | uintdiv a k iha =>
+    intro start S hbelow
+    obtain ⟨oa, na, la, hra, hlea, hda, _⟩ := iha start S hbelow
+    cases oa with
+    | error d =>
+      exact ⟨.error d, na, la, by simp only [FieldExpr.lower, Builder.run_bind, hra], hlea, hda, by simp⟩
+    | ok va =>
+      refine ⟨.ok ⟨na + 1⟩, na + 2,
+        la ++ [.feltConst ⟨na⟩ k ty, .feltBin ⟨na + 1⟩ .uintdiv va ⟨na⟩ ty], ?_,
+        Nat.le_trans hlea (by omega), ?_, ?_⟩
+      · simp [FieldExpr.lower, Builder.run_bind, hra, Builder.feltBin, Builder.feltConst]
+      · intro s hs dd hd
+        rcases List.mem_append.1 hs with h | h
+        · exact ⟨(hda s h dd hd).1, by have := (hda s h dd hd).2; omega⟩
+        · simp only [List.mem_cons, List.not_mem_nil, or_false] at h
+          rcases h with rfl | rfl <;>
+            simp only [Stmt.dst?, Option.mem_def, Option.some.injEq] at hd <;>
+            exact ⟨by omega, by omega⟩
+      · rintro v hveq; cases hveq
+        exact ⟨Nat.lt_succ_self _, fun p hp _ _ => by simp [denote] at hp⟩
+  | umod a k iha =>
+    intro start S hbelow
+    obtain ⟨oa, na, la, hra, hlea, hda, _⟩ := iha start S hbelow
+    cases oa with
+    | error d =>
+      exact ⟨.error d, na, la, by simp only [FieldExpr.lower, Builder.run_bind, hra], hlea, hda, by simp⟩
+    | ok va =>
+      refine ⟨.ok ⟨na + 1⟩, na + 2,
+        la ++ [.feltConst ⟨na⟩ k ty, .feltBin ⟨na + 1⟩ .umod va ⟨na⟩ ty], ?_,
+        Nat.le_trans hlea (by omega), ?_, ?_⟩
+      · simp [FieldExpr.lower, Builder.run_bind, hra, Builder.feltBin, Builder.feltConst]
+      · intro s hs dd hd
+        rcases List.mem_append.1 hs with h | h
+        · exact ⟨(hda s h dd hd).1, by have := (hda s h dd hd).2; omega⟩
+        · simp only [List.mem_cons, List.not_mem_nil, or_false] at h
+          rcases h with rfl | rfl <;>
+            simp only [Stmt.dst?, Option.mem_def, Option.some.injEq] at hd <;>
+            exact ⟨by omega, by omega⟩
+      · rintro v hveq; cases hveq
+        exact ⟨Nat.lt_succ_self _, fun p hp _ _ => by simp [denote] at hp⟩
+
 end LLZK
