@@ -650,7 +650,7 @@ Two things this does not do:
 
 ## D021 — S20 is blocked on where the private boundary goes, not on effort
 
-**Status:** open, with the obstacle identified
+**Status:** accepted — option (1); the proof itself is scheduled, not open
 **Date:** 2026-08-01
 **Enacted by:** the S20 attempt
 
@@ -689,7 +689,29 @@ So S20 needs a decision before it needs a proof, and there are three shapes:
    plain structural induction with no state reasoning at all, and is probably the
    right answer; costs a rewrite of `IR.lean` and `Expression.lean`.
 
-(3) is the one to take, and it is a session of its own with its own review. Two
+**(1) is the one to take, and the first recommendation of (3) was wrong.**
+
+Purity does not remove the need for `Value`'s private constructor: a pure
+`FieldExpr → Array Stmt × Value × Nat` still has to *build* the `Value` it
+returns, so it still has to live in `IR.lean`. Routing around that with an
+intermediate plan type over bare `Nat` indices only moves the realization step,
+and buys a second instruction type to keep in step with `Stmt`. So (3) collapses
+into (1) for the one function that matters, and (1) is the honest way to say it.
+
+Concretely: move `FieldExpr`, `Env`, `LowerM` and `FieldExpr.lower` — about sixty
+lines, none of which depend on anything outside `IR.lean` — into `IR.lean`, and
+prove there. `Expression.lean` keeps `ofExpression`, the bridge from Clean's
+`Expression`, which is the part that genuinely belongs on the source side.
+`Circuit.lean`'s five call sites are unaffected because the signature does not
+change.
+
+The cost is module cohesion: `IR.lean` becomes "the emitter IR, the closed
+expression language it emits, and the proof that the two agree" rather than just
+the first. D009 calls `FieldExpr` "a closed language containing only what the
+backend can emit", which is a description of part of the emitter, so this is
+arguably where it belonged.
+
+This is a session of its own with its own review. Two
 partial artefacts from the attempt are *not* kept, deliberately: a `readStmt`/
 `readStmts` pair and their two lemmas compiled cleanly, but a lemma with no
 theorem above it is the speculative generality R2-08 removed elsewhere, and it

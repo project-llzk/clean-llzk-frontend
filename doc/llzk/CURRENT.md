@@ -143,11 +143,11 @@ needs SMT-LIB that no pass in the pinned `llzk-opt` produces.
 
 ## Next session
 
-- **S20 — the lowering as a theorem.** Replace D018/D020's translation validation
-  with a preservation theorem about `lower`: the `BuilderM` simulation argument.
-  `Constraints.lean` and `WitnessCheck.lean` already fix the statements it has to
-  prove, and it would close three of the four residual risks above by making the
-  cross-check unnecessary rather than merely broader.
+- **S20 — the lowering as a theorem**, per D021 option (1): move `FieldExpr` and
+  its lowering into `IR.lean`, then prove that emitting an expression and reading
+  the statements back yields its polynomial. `Constraints.lean` and
+  `WitnessCheck.lean` already fix the statements to prove; the obstacle is
+  identified and the shape is chosen, so this is implementation, not design.
 - **A Clean-side change for D012.** The certificate cannot be enforced while
   `Table.toRaw` erases the `Table`. Carrying it into `Lookup` is a change to
   Clean's core, with its own review.
