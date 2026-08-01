@@ -196,3 +196,42 @@ Every other `NExpr` shape stays rejected. The general treatment — `NExpr.val` 
 `cast.toindex`, natural arithmetic on `index`, `FExpr.ofNat` to `cast.tofelt` —
 needs an index bounds policy and LLZK interpreter support that do not exist yet,
 and is deliberately not an implicit backlog item.
+
+## D012 — Table rows are trusted registry input, for now
+
+**Status:** accepted, with a recorded follow-up
+**Date:** 2026-08-01
+**Enacted by:** S06
+
+`Table.toRaw` discards a `StaticTable`'s `length` and `row`, so concrete rows
+cannot be recovered by walking a circuit. `Config.tables` supplies them.
+
+The backend checks what it can — the name resolves, the name is a legal MLIR
+symbol, the arity matches the circuit's lookup, rows all have that width, the
+table is non-empty, names are unique — and refuses any lookup it cannot resolve.
+It cannot check that the supplied rows are *the table's* rows, because
+`RawTable.Contains` is a `Prop`, not something the compiler can evaluate. That is
+a genuine trust assumption and is stated on `ExportTable`.
+
+`ExportTable.ofStatic` is the mitigation: where a `StaticTable` is still in
+scope, the rows are computed from its own `row` function and cannot disagree
+with it.
+
+**Follow-up, not done here.** `Gadgets.ByteTable` inlines its `StaticTable` into
+`Table.fromStatic`, so the byte rows must be written out by hand rather than
+derived. Naming that `StaticTable` was attempted during S06 and reverted: it
+breaks every proof that unfolds `ByteTable` with `simp` — `Addition8FullCarry`,
+`U32`, `U64` — because unfolding then stops at the named constant. Making those
+proofs unfold both is a change to shared Clean gadget proofs, which belongs to a
+Clean-side session with its own review, not to a backend increment.
+
+## D013 — Single-column tables only, for now
+
+**Status:** accepted
+**Date:** 2026-08-01
+**Enacted by:** S06
+
+A wider table needs an `array.new` query and a multi-dimensional `constrain.in`,
+neither of which the emitter IR has. Rather than guess at that encoding, arity
+other than 1 is refused with a diagnostic that says what it would take. Clean's
+`ByteTable` — the Stage-1 target — is single-column.

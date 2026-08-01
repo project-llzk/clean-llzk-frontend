@@ -1,0 +1,33 @@
+# S06 acceptance gates
+
+Base integration commit: c0b8eed2 (S05 accepted)
+Date (UTC): 2026-08-01T04:03:34Z
+
+## G1
+$ python3 scripts/check-consecutive-empty-lines.py   PASS
+$ lake build --wfail Clean                           PASS (1819 jobs)
+$ lake build CleanTests                              PASS (1717 jobs)
+
+## G2 — the Stage-1 target circuit compiles
+
+`Gadgets.Addition8FullCarry.circuit` now compiles end to end. The golden in
+Test/Circuit.lean pins the whole module: a 256-element `global.def const
+@Bytes`, two witness cells lowered to felt.umod / felt.uintdiv, a
+`constrain.in` against the table, the boolean-carry and sum assertions, and
+the two public outputs.
+
+`ExportTable.ofStatic` is pinned by three `#guard`s over a StaticTable
+fixture, so the derivation is exercised even though ByteTable cannot use it.
+
+## G8 — fail closed
+
+  unregistered table   -> refused, diagnostic names Config.tables and ofStatic
+  illegal symbol name  -> refused
+  arity != 1           -> refused (D013)
+  row width mismatch   -> refused, per row
+  (all three reported together for one malformed entry)
+
+## Gates NOT claimed
+
+G3, G4, G5, G6, G7. This is now the complete Stage-1 artifact and has still
+never been shown to llzk-opt or llzk-witgen.

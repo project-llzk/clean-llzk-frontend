@@ -74,6 +74,29 @@ def ofPrime? (p : Nat) : Option FieldSpec :=
 
 end FieldSpec
 
+/-- A lookup table materialized as concrete rows.
+
+Clean's `RawTable` keeps a name, an arity and logical predicates, but
+`Table.toRaw` discards a `StaticTable`'s `length` and `row` function. Concrete
+rows therefore cannot be recovered by walking a circuit's operations, and the
+caller must supply them.
+
+**This is trusted input.** The backend checks the name, the arity, the row
+widths, and that names are unique and are legal MLIR symbols, and it refuses a
+lookup it cannot resolve. It cannot check that these rows are *the table's* rows
+— `RawTable.Contains` is a `Prop`, not something the compiler can evaluate. Where
+a `StaticTable` is still in scope, use `ExportTable.ofStatic`, which derives the
+rows instead of asserting them.
+
+Values are canonical representatives in `[0, p)`. -/
+structure ExportTable where
+  /-- Must equal the `RawTable.name` of the lookups it resolves. -/
+  name : String
+  arity : Nat
+  /-- One entry per row, each of length `arity`. -/
+  rows : Array (Array Nat)
+deriving Repr
+
 /-- What the backend needs beyond the circuit itself.
 
 Kept small on purpose. Anything that changes the *meaning* of the output belongs
@@ -84,6 +107,9 @@ structure Config where
   `field.prime`, so a wrong choice here is a compile error, not silently wrong
   arithmetic. -/
   field : FieldSpec
+  /-- Concrete rows for the lookup tables the circuit uses. A lookup with no
+  matching entry is a compile error, never a silently dropped constraint. -/
+  tables : Array ExportTable := #[]
 deriving Repr
 
 end LLZK

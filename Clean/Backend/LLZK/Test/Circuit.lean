@@ -201,14 +201,137 @@ field: configured field 'mersenne31' has prime 2147483647, but the circuit's fie
 #guard_msgs in
 #eval IO.print (emit mersenne "Multiply" multiply)
 
--- `Addition8FullCarry` is the Stage-1 target circuit. Its two witness cells are
--- now recognized; the remaining gap is the lookup table registry.
+/-! ## Lookup tables (gate G6 target)
+
+`ExportTable.ofStatic` derives rows from a `StaticTable`, so they cannot disagree
+with the table's own `row` function. Clean's `ByteTable` inlines its
+`StaticTable` into `Table.fromStatic`, which discards it, so the byte rows here
+are written out instead — see the note on `byteTable`. -/
+
+/-- A `StaticTable` whose rows `ofStatic` derives. `Spec` is stated as
+containment so that `contains_iff` is `Iff.rfl`: this fixture exists to test the
+derivation, not to say anything about the table. -/
+private def tinyStatic : StaticTable (F pBabybear) field where
+  name := "Tiny"
+  length := 4
+  row i := (i.val : F pBabybear)
+  index x := x.val
+  Spec t := ∃ i : Fin 4, t = (i.val : F pBabybear)
+  contains_iff _ := Iff.rfl
+
+#guard (ExportTable.ofStatic tinyStatic).name == "Tiny"
+#guard (ExportTable.ofStatic tinyStatic).arity == 1
+#guard (ExportTable.ofStatic tinyStatic).rows == #[#[0], #[1], #[2], #[3]]
+
+/-- The byte table, as the registry sees it.
+
+Written out rather than derived with `ExportTable.ofStatic`, because
+`Gadgets.ByteTable` inlines its `StaticTable` into `Table.fromStatic` and there
+is no named value to derive from. Naming that `StaticTable` in `ByteLookup.lean`
+would let this be derived, but it breaks every proof that unfolds `ByteTable`
+with `simp` (`Addition8FullCarry`, `U32`, `U64`), so it is a change for a Clean
+session, not this one. Recorded as D012.
+
+The rows are `0 .. 255` because `Gadgets.fromByte i = natToField i.val`, whose
+canonical representative is `i.val`. -/
+private def byteTable : ExportTable where
+  name := "Bytes"
+  arity := 1
+  rows := (Array.range 256).map (#[·])
+
+private def withBytes : Config := { field := .babybear, tables := #[byteTable] }
+
+/--
+info: module attributes {llzk.lang, llzk.main = !struct.type<@Addition8FullCarry>} {
+  global.def const @Bytes : !array.type<256 x !felt.type<"babybear">> = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255]
+
+  struct.def @Addition8FullCarry {
+    struct.member @w0 : !felt.type<"babybear"> {signal}
+    struct.member @w1 : !felt.type<"babybear"> {signal}
+    struct.member @out0 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @out1 : !felt.type<"babybear"> {llzk.pub}
+
+    function.def @compute(
+      %v0: !felt.type<"babybear"> {function.arg_name = "arg0"},
+      %v1: !felt.type<"babybear"> {function.arg_name = "arg1"},
+      %v2: !felt.type<"babybear"> {function.arg_name = "arg2"}
+    ) -> !struct.type<@Addition8FullCarry> attributes {function.allow_non_native_field_ops} {
+      %v3 = struct.new : !struct.type<@Addition8FullCarry>
+      %v4 = felt.add %v0, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v5 = felt.add %v4, %v2 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v6 = felt.const 256 : !felt.type<"babybear">
+      %v7 = felt.umod %v5, %v6 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v3[@w0] = %v7 : !struct.type<@Addition8FullCarry>, !felt.type<"babybear">
+      %v8 = felt.add %v0, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v9 = felt.add %v8, %v2 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v10 = felt.const 256 : !felt.type<"babybear">
+      %v11 = felt.uintdiv %v9, %v10 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v3[@w1] = %v11 : !struct.type<@Addition8FullCarry>, !felt.type<"babybear">
+      struct.writem %v3[@out0] = %v7 : !struct.type<@Addition8FullCarry>, !felt.type<"babybear">
+      struct.writem %v3[@out1] = %v11 : !struct.type<@Addition8FullCarry>, !felt.type<"babybear">
+      function.return %v3 : !struct.type<@Addition8FullCarry>
+    }
+
+    function.def @constrain(
+      %v0: !struct.type<@Addition8FullCarry>,
+      %v1: !felt.type<"babybear"> {function.arg_name = "arg0"},
+      %v2: !felt.type<"babybear"> {function.arg_name = "arg1"},
+      %v3: !felt.type<"babybear"> {function.arg_name = "arg2"}
+    ) {
+      %v4 = struct.readm %v0[@w0] : !struct.type<@Addition8FullCarry>, !felt.type<"babybear">
+      %v5 = struct.readm %v0[@w1] : !struct.type<@Addition8FullCarry>, !felt.type<"babybear">
+      %v6 = global.read @Bytes : !array.type<256 x !felt.type<"babybear">>
+      constrain.in %v6, %v4 : !array.type<256 x !felt.type<"babybear">>, !felt.type<"babybear">
+      %v7 = felt.const 0 : !felt.type<"babybear">
+      %v8 = felt.const 2013265920 : !felt.type<"babybear">
+      %v9 = felt.const 1 : !felt.type<"babybear">
+      %v10 = felt.mul %v8, %v9 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v11 = felt.add %v5, %v10 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v12 = felt.mul %v5, %v11 : !felt.type<"babybear">, !felt.type<"babybear">
+      constrain.eq %v12, %v7 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v13 = felt.add %v1, %v2 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v14 = felt.add %v13, %v3 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v15 = felt.const 2013265920 : !felt.type<"babybear">
+      %v16 = felt.mul %v15, %v4 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v17 = felt.add %v14, %v16 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v18 = felt.const 2013265920 : !felt.type<"babybear">
+      %v19 = felt.const 256 : !felt.type<"babybear">
+      %v20 = felt.mul %v5, %v19 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v21 = felt.mul %v18, %v20 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v22 = felt.add %v17, %v21 : !felt.type<"babybear">, !felt.type<"babybear">
+      constrain.eq %v22, %v7 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v23 = struct.readm %v0[@out0] : !struct.type<@Addition8FullCarry>, !felt.type<"babybear">
+      constrain.eq %v23, %v4 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v24 = struct.readm %v0[@out1] : !struct.type<@Addition8FullCarry>, !felt.type<"babybear">
+      constrain.eq %v24, %v5 : !felt.type<"babybear">, !felt.type<"babybear">
+      function.return
+    }
+  }
+}
+-/
+#guard_msgs in
+#eval IO.print (emit withBytes "Addition8FullCarry" (Gadgets.Addition8FullCarry.circuit (p := pBabybear)))
+
+-- An unregistered table is refused, and the diagnostic says how to register it.
 /--
 info: compilation failed:
-operation 1 (lookup): lookup into table 'Bytes'; lookups need the table export registry, which is a later increment
+operation 1 (lookup): lookup into table 'Bytes', which is not in the export registry; add its rows to `Config.tables` (`ExportTable.ofStatic` derives them from a `StaticTable`)
 -/
 #guard_msgs in
 #eval IO.print (emit babybear "Addition8FullCarry" (Gadgets.Addition8FullCarry.circuit (p := pBabybear)))
+
+-- A registry entry the renderer could not emit is refused before any lowering,
+-- and every problem with it is reported at once.
+/--
+info: compilation failed:
+table 'not a symbol': name is not a legal MLIR symbol; it must start with a letter or underscore and contain only letters, digits and underscores
+table 'not a symbol': arity is 2; only single-column tables are supported, because a wider one needs an `array.new` query and a multi-dimensional `constrain.in`
+table 'not a symbol': row 0 has 1 value(s) but the arity is 2
+-/
+#guard_msgs in
+#eval IO.print (emit
+  { field := .babybear, tables := #[{ name := "not a symbol", arity := 2, rows := #[#[0]] }] }
+  "Multiply" multiply)
 
 -- A witness built from a conditional is refused by name, not by a generic
 -- "unsupported" message.

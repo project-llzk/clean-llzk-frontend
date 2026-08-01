@@ -22,6 +22,7 @@ meaningful.
 | input field element `i` | `@compute`/`@constrain` parameter `arg{i}` |
 | witness cell `k` | member `@w{k}`, `{signal}` |
 | output field element `j` | member `@out{j}`, `{llzk.pub}` |
+| lookup table `T` | `global.def const @T`, queried by `constrain.in` |
 
 Circuit variables `0 .. inputSize - 1` are the inputs and witness cell `k` is
 circuit variable `inputSize + k`, because Clean allocates witness offsets
@@ -89,12 +90,21 @@ one per output.
 
 Clean's `assert e` means `e = 0`, so each assertion becomes `constrain.eq %e,
 %zero`. The zero constant is emitted only when there is at least one assertion,
-so a constraint-free component does not carry a dead value. -/
+so a constraint-free component does not carry a dead value.
+
+Each lookup reads its table's global rather than sharing one read across lookups
+of the same table. Sharing would need an index from a lookup back into the
+emitted globals, and a lookup into that index is a failure case the types cannot
+rule out; a repeated `global.read` is pure and MLIR's CSE folds it. -/
 private def lowerConstrain (structTy fieldTy : Ty) (r : Recognized) : Except Diagnostic Func :=
   Builder.constrainFunction structTy (inputSpecs r fieldTy) fun self inputs => do
     let mut env : FieldExpr.Env := inputs
     for k in Array.range r.witnesses.size do
       env := env.push (← Builder.readMember self structTy (witnessMember k) fieldTy)
+    for lookup in r.lookups do
+      let table ← Builder.globalRead lookup.tableName (Ty.array lookup.tableRows fieldTy)
+      let value ← FieldExpr.lower s!"lookup into '{lookup.tableName}'" fieldTy env lookup.entry
+      Builder.constrainIn table (Ty.array lookup.tableRows fieldTy) value fieldTy
     unless r.asserts.isEmpty do
       let zero ← Builder.feltConst 0 fieldTy
       for (expr, i) in r.asserts.zipIdx do
@@ -105,13 +115,20 @@ private def lowerConstrain (structTy fieldTy : Ty) (r : Recognized) : Except Dia
       let value ← FieldExpr.lower s!"output {j}" fieldTy env expr
       Builder.constrainEq declared value fieldTy
 
-/-- Lower a recognized circuit to a one-component module. -/
+/-- Lower a recognized circuit to a one-component module.
+
+Each used table becomes one `global.def const`. Only single-column tables reach
+here — `ExportTable.diagnose` rejects wider ones — so flattening the rows is the
+identity on their shape and the emitted array length is the row count. -/
 def lower (cfg : Config) (name : String) (r : Recognized) : Except Diagnostic Module := do
   let fieldTy := Ty.felt cfg.field.name
   let structTy := Ty.struct name
   return {
     main := name
-    globals := #[]
+    globals := r.tables.map fun table => {
+      name := table.name
+      elemTy := fieldTy
+      values := table.rows.flatMap id }
     structs := #[{
       name
       members := members r fieldTy
