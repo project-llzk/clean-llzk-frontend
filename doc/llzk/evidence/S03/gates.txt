@@ -1,0 +1,43 @@
+# S03 acceptance gates
+
+Base integration commit: 003874ac
+Date (UTC): 2026-08-01T03:36:45Z
+
+## G1 — the three checks .github/workflows/ci.yml runs
+
+$ python3 scripts/check-consecutive-empty-lines.py
+✓ No consecutive empty lines found.
+exit status: 0
+
+$ lake build --wfail Clean
+Build completed successfully (1813 jobs).
+exit status: 0
+
+$ lake build CleanTests
+Build completed successfully (1707 jobs).
+exit status: 0
+Only the pre-existing TestCircuitProofStart `sorry` warnings; none added.
+
+## G2 — renderer golden
+
+$ lake build Clean.Backend.LLZK.Test.Print
+Build completed successfully (4 jobs).
+exit status: 0
+
+The golden is the `#guard_msgs` docstring in
+Clean/Backend/LLZK/Test/Print.lean. It covers every constructor of Ty,
+FeltBinOp, Stmt, Visibility and FuncAttr, both Func parameter shapes
+(named/unnamed, empty/non-empty), both Func result shapes, and a struct
+with no members.
+
+## Gates NOT claimed
+
+G3, G4, G5, G6, G7. No LLZK tool has seen this output; S01 is unprovisioned.
+The emitted syntax was derived by reading test fixtures in the pinned LLZK
+revision 5db6f8f9baaa40787a1a40625796497445f2da36:
+  test/Witgen/basic.llzk                 module/struct/member/compute/constrain, arg_name
+  test/Witgen/felt_div_mod_pow.llzk      felt.uintdiv, felt.umod, allow_non_native_field_ops
+  test/Witgen/array_and_assert.llzk      !array.type
+  test/Dialect/Felt/felt_arith_pass.llzk felt.const/add/sub with an explicit field
+  test/Dialect/Constrain/emit_pass.llzk  constrain.eq, constrain.in
+  test/Dialect/Global/globals_pass.llzk  global.def const with an array initializer
