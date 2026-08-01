@@ -4,7 +4,7 @@ Updated: 2026-08-01
 Active milestone: P0 — tool and contract spike  
 Last accepted session: S00 — bootstrap the control plane  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: pending — filled in by the commit that follows S00's content commit  
+Integration commit: `a70739408adbdadce38a39affc4fed537efd1ee2`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
