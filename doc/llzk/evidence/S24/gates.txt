@@ -1,7 +1,9 @@
 # S24 — Stage 1 finished: the lock is a gate, X1 is closed
 
 Date (UTC): 2026-08-02T00:48:42Z
-Commit: ccfddd8d92042d5823ac5a9181ce619a542b6836  (S24 D2: execute S23 — the certificate reaches the compiler)
+Commit: f3bf2789167f79d38dc9709988b241dad6dc54d0  (S24 D3: reproduce Stage 1 from a fresh checkout)
+Note: the gate runs recorded here were made at ccfddd8d (D2) and at the tree that
+became this commit; the D3 documentation repairs touch no Lean code.
 Worktree: clean, and held by this session for the whole run
   (worktree held by session S24 — S24 finish Stage 1, since 2026-08-02T00:33:06Z)
 
