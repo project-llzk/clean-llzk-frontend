@@ -119,10 +119,65 @@ writing the stronger one.
 
 ## Handoff
 
-- Changes made:
-- Decisions made:
-- Deviations:
-- Authorization requested / granted:
-- Clean-checkout findings:
-- Resulting commit:
-- Exact next action:
+Status: **executed**. Deliverables 1–3 are done; 4 is blocked on authorization
+that was requested and not given, and is recorded as unrun rather than relabelled.
+
+**Changes made.**
+
+- *D1* (`a64bb4ba`) — `e2e.sh` requires the worktree lock before G11. G11 gained
+  ten lock branches, 20 error paths → 30. CI's `llzk-e2e` job claims the lock.
+- *D2* (`ccfddd8d`) — `CertifiedConfig F` at all seven public entry points;
+  `Config.ofCertified` retired; new `Certificate.lean`; `GAPS.md` §1 first half
+  closed.
+- *D3* — `evidence/S24/clean-checkout.md`, plus the two documentation repairs it
+  justified: `CURRENT.md`'s reproduce block and `check-pins.sh`'s diagnostic.
+
+**Decisions made.** D023, recording three: that `e2e.sh` is the right place for
+`require`; that CI claims rather than being exempted; and that `reclaim` is split
+out of `claim`.
+
+**Deviations.** Two, both enlargements of D1 rather than departures from it, and
+both forced by the same discovery — that the lock did not work for agent
+sessions. The packet called D1 "one line". It is one line plus a repair to the
+thing that line was about to start enforcing; wiring in a check that is broken
+for the sessions it protects would have been worse than leaving it unwired. D2
+also grew a file split (`Certificate.lean`) that S23 did not anticipate, for the
+layering reason recorded in D022.
+
+**Authorization requested / granted.** Requested for D4; **not granted** — no
+answer was given. Nothing was pushed. The `llzk-harness` and `llzk-e2e` jobs have
+still never run on GitHub, and `CURRENT.md` now says so where it previously
+implied they ran on every pull request.
+
+A fact the packet did not have, which changes what D4 is worth: `ci.yml` triggers
+on `push` to `main`, `pull_request` and `workflow_dispatch`. **Pushing
+`clean-to-llzk/integration` would run nothing.** The jobs need a pull request. So
+the choice is not "push or not" but "open a PR on the fork, or accept that the CI
+configuration stays untested".
+
+**Clean-checkout findings.** Four; the file has them in full.
+
+1. `lake exe cache get` is documented nowhere, so the documented path builds
+   mathlib from source. Invisible from both places it would have been caught —
+   the dev worktree has had a `.lake` since S00, and CI does the step implicitly
+   through `lean-action`. **Fixed.**
+2. `git remote add upstream` is required by G0 and documented only as a URL; the
+   diagnostic said what was wrong, not what to do. **Fixed.**
+3. `CURRENT.md` exports a bare `/nix/store` path before pointing at `PINS.md`.
+   Recorded, not fixed.
+4. `ByteDecomposition/Theorems.lean:62` is a `bv_decide`, so G1 can go red under
+   machine load with the tree correct. Observed, then succeeded on retry with
+   nothing changed. Recorded, not fixed — pinning a solver budget is a change to
+   Clean.
+
+The headline is that **nothing in the tree had to change** for a fresh checkout
+to reach the same `PASS`. All four findings are about the instructions.
+
+**Resulting commit.** See `evidence/S24/gates.txt`.
+
+**Exact next action.** Decide D4. If a PR is authorized, open it from
+`clean-to-llzk/integration` on the fork and report what the two jobs do —
+expecting the claim step to be the first thing either has ever exercised outside
+this machine. If it is not, the next packet is `GAPS.md` §1's second half (the
+Clean-core change carrying `Table` into `Lookup`), which is the largest remaining
+soundness gap and is upstream of this backend.

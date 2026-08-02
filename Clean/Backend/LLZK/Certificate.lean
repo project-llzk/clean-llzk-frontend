@@ -126,9 +126,13 @@ structure CertifiedTable (F : Type) [FiniteField F] where
 
 /-- A configuration whose tables carry their certificates.
 
-This is what every public entry point in `WitnessCheck.lean` takes. There is no
-public function from a `Config` to one of these: the only way to obtain one is to
-supply the proofs, which is the point. -/
+This is what every public entry point in `WitnessCheck.lean` takes. The
+constructor is public and `⟨spec, #[]⟩` is free — a configuration with no lookup
+tables has nothing to certify, which is the honest reading. What does not exist
+is any way for a *table* to get in without its proof: the field is an
+`Array (CertifiedTable F)`, and there is no public function from a `Config` to
+one of these. That is the whole of what the type buys, and `GAPS.md` item 1's
+second half is what it does not. -/
 structure CertifiedConfig (F : Type) [FiniteField F] where
   field : FieldSpec
   tables : Array (CertifiedTable F)

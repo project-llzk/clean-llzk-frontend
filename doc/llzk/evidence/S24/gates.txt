@@ -1,0 +1,48 @@
+# S24 — Stage 1 finished: the lock is a gate, X1 is closed
+
+Date (UTC): 2026-08-02T00:48:42Z
+Commit: ccfddd8d92042d5823ac5a9181ce619a542b6836  (S24 D2: execute S23 — the certificate reaches the compiler)
+Worktree: clean, and held by this session for the whole run
+  (worktree held by session S24 — S24 finish Stage 1, since 2026-08-02T00:33:06Z)
+
+## Gates, on this worktree
+
+$ LLZK_SESSION=S24 bash scripts/llzk/e2e.sh
+PASS: 30 error paths exercised
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+   G10b: out of scope — the module declares no felt type, so the pass cannot deduce a prime field
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  11 circuit(s), 30 input vector(s), both witgen backends.
+  G10a: all 11 + 2 module(s) admitted by --llzk-product-program.
+  G10b: 9 module(s) lowered to SMT, 4 out of scope for a declared reason.
+exit status: 0
+
+## Re-run after the D3 documentation repairs
+
+Date (UTC): 2026-08-02T02:46:29Z
+$ LLZK_SESSION=S24 bash scripts/llzk/e2e.sh
+PASS: 30 error paths exercised
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  11 circuit(s), 30 input vector(s), both witgen backends.
+  2 renderer fixture(s), syntax only.
+  G10a: all 11 + 2 module(s) admitted by --llzk-product-program.
+  G10b: 9 module(s) lowered to SMT, 4 out of scope for a declared reason.
+exit status: 0
+
+## The same gates, from a fresh checkout
+
+See clean-checkout.md. Cloned at ccfddd8d with no .lake, no warm Nix
+store and no upstream remote; reached the identical PASS line:
+
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+    11 circuit(s), 30 input vector(s), both witgen backends.
+    2 renderer fixture(s), syntax only.
+    G10a: all 11 + 2 module(s) admitted by --llzk-product-program.
+    G10b: 9 module(s) lowered to SMT, 4 out of scope for a declared reason.
+  exit status: 0
+
+Never done before S24, though R2's exit criterion required it. Nothing in
+the tree had to change to make it pass; the four findings are all about
+the instructions.

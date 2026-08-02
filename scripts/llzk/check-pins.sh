@@ -13,7 +13,11 @@ expected_toolchain="leanprover/lean4:v4.30.0"
 cd "${repo_root}"
 
 actual_upstream="$(git remote get-url upstream 2>/dev/null)" \
-  || llzk_fail "no git remote named 'upstream'; this worktree is not the project home (D002)"
+  || llzk_fail "no git remote named 'upstream'; this worktree is not the project home (D002).
+A fresh clone has only 'origin'. If this is a checkout of the project, add it:
+  git remote add upstream ${expected_upstream}
+S24 found this said what was wrong and not what to do; see
+doc/llzk/evidence/S24/clean-checkout.md."
 if [[ "${actual_upstream}" != "${expected_upstream}" ]]; then
   echo "error: upstream is ${actual_upstream}, expected ${expected_upstream}" >&2
   exit 1
