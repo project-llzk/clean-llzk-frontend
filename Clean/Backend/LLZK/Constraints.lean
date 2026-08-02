@@ -123,8 +123,9 @@ structure ConstraintSet (F : Type) where
 
   What it does establish is that the emitter did not drop, rename or reorder a
   table relative to the operations that look into it. Tying the rows to the Clean
-  table is `ExportTable.Certifies`, demanded by `Config.ofCertified` and confined
-  by G12. -/
+  table is `ExportTable.Certifies`, demanded by `CertifiedConfig` — which the
+  public entry points take, so the proof reaches the compiler rather than being
+  erased at a wrapper (S24) — and confined by G12. -/
   globals : List (String × Array Nat)
 deriving Repr
 
@@ -162,8 +163,9 @@ def ofSource (cfg : Config) (src : Source F) : ConstraintSet F where
   -- failure mode, and the whole of what it establishes.
   --
   -- Tying the rows to the Clean table is `ExportTable.Certifies`
-  -- (`TableCert.lean`), discharged at the call site by `Config.ofCertified`;
-  -- G12 keeps every other supplier out of non-test code.
+  -- (`Certificate.lean`), which `CertifiedConfig` demands of every table that
+  -- reaches a public entry point; G12 keeps every other supplier out of
+  -- non-test code.
   globals :=
     (cfg.tables.filter fun table =>
       (FlatOperation.lookups src.operations).any (·.table.name = table.name)).toList.map

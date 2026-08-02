@@ -33,32 +33,36 @@ a protection.
 
 What exists instead: `ExportTable.Certifies`, a proof obligation tying an export
 table to a Clean `Table`, discharged for `Gadgets.ByteTable` and demanded by
-`Config.ofCertified`. `Config`'s constructor is private and
+`CertifiedConfig`. `Config`'s constructor is private and
 `Config.unsafeWithTables` is the only other way in, confined by G12.
 
-**But `Config.ofCertified` erases what it demands.** It is
-`Config.unsafeWithTables spec (tables.map (·.exported))` — it drops the `Table`
-and the certificate and returns a plain `Config`, so by the time `compile` runs
-there is no certificate to see. The obligation is demanded at one wrapper and
-discarded there; what reaches the compiler is a convention plus a grep. An
-earlier version of this entry said the obligation was "carried and visible",
-which is exactly the kind of claim R5 exists to catch, and it survived four
-commits here after being written.
+This entry used to be **two** gaps, and only one of them was upstream. S24
+closed the first:
 
-So this entry is **two** gaps, and only one of them is upstream:
-
-1. **The erasure** — backend-only, and specified in
-   `sessions/S23-x1-closure.md`: a `CertifiedConfig F` that carries the proofs to
-   the public entry points, which stop accepting a plain `Config`. No change to
-   Clean's core. Recording this as blocked on upstream is how a closable gap goes
-   unpicked-up.
-2. **The tie to the circuit's own table** — even with the certificate carried,
+1. **The erasure — closed by S24.** `Config.ofCertified` took `CertifiedTable`s
+   and returned a plain `Config`, dropping the `Table` and the certificate, so by
+   the time `compile` ran there was no certificate to see: the obligation was
+   demanded at one wrapper and discarded there, and what reached the compiler was
+   a convention plus a grep. An earlier version of this entry said the obligation
+   was "carried and visible", which is exactly the kind of claim R5 exists to
+   catch, and it survived four commits here after being written. The seven public
+   entry points now take a `CertifiedConfig F`, which holds `CertifiedTable`s;
+   `ofCertified` is retired and there is no public function from a `Config` to a
+   `CertifiedConfig`. `Test/Constraints.lean` records what this means for
+   `fatBytes`: not a `#guard`, because the point is that there is no term to
+   write down.
+2. **The tie to the circuit's own table — open, and upstream.** Even with the
+   certificate carried,
    the caller picks *both* sides of `Certifies`, so it can certify a table the
    circuit does not look into. Closing that needs the `Table` to survive into
    `Lookup` instead of being erased to a `RawTable`, which *is* a change to
    Clean's core.
 
-S23 closes (1) and leaves (2) exactly where it is.
+S24 executed S23, which closed (1) and left (2) exactly where it is. The
+remaining gap is the one that matters most for soundness: a caller can still
+certify a table the circuit does not look into, and `Gadgets.ByteTable`'s
+certificate is the reason to believe the corpus is not doing that, not a proof
+that no caller could.
 
 ## 2. Nothing says the renderer is faithful
 

@@ -67,10 +67,10 @@ otherwise drop out of the gate silently. -/
 /-! ## The gate can go red -/
 
 /-- Compile `built`, then compare the module against `reference`'s constraints. -/
-private def cross (cfg : Config) (built reference : Source Bab) : Bool :=
-  match compileSource cfg built with
+private def cross (cfg : CertifiedConfig Bab) (built reference : Source Bab) : Bool :=
+  match compileSource cfg.toConfig built with
   | .error _ => false
-  | .ok m => agree cfg reference m
+  | .ok m => agree cfg.toConfig reference m
 
 /-- Remove every assertion. -/
 private def noAsserts (s : Source Bab) : Source Bab :=
@@ -165,7 +165,7 @@ private def twoCellSrc : Source Bab :=
     outputs := #[.var ⟨1⟩] }
 
 #guard match crossedWires.toOption.getD none with
-  | some root => !(agree (F := Bab) babybear twoCellSrc { globals := #[], root })
+  | some root => !(agree (F := Bab) babybear.toConfig twoCellSrc { globals := #[], root })
   | none => false
 
 -- The lookup table's *contents*. Before this the comparison recorded which table
@@ -175,7 +175,7 @@ private def oneRowBytes : Config :=
   .unsafeWithTables .babybear #[{ name := "Bytes", arity := 1, rows := #[#[0]] }]
 
 #guard cross withBytes addSrc addSrc
-#guard match compileSource withBytes addSrc with
+#guard match compileSource withBytes.toConfig addSrc with
   | .ok m => !(agree oneRowBytes addSrc m)
   | .error _ => false
 
@@ -205,11 +205,23 @@ private def fatBytes : Config :=
   | .ok m => (m.globals.find? (·.name == "Bytes")).any (·.values.contains 300)
   | .error _ => false
 
--- What changed is that this can no longer be written by accident. The only
+-- What changed in S22 is that this can no longer be written by accident: the only
 -- public way to put tables in a `Config` is `unsafeWithTables`, named so that
--- `scripts/llzk/check-confinement.sh` can forbid it outside `Test/`, and
--- `Config.ofCertified` — which cannot express `fatBytes`, because
--- `ExportTable.Certifies` is false for it and there is no proof to supply.
+-- `scripts/llzk/check-confinement.sh` can forbid it outside `Test/`.
+--
+-- What changed in S24 is that it can no longer reach the compiler at all. Every
+-- guard above goes through `compileSource`, which still takes a `Config`; the
+-- supported entry points -- `compile`, `emit`, `emitSource`,
+-- `compileSourceVerified`, `verify` -- take a `CertifiedConfig`, and
+--
+--     #guard match compile (⟨.babybear, #[⟨fatBytes', Gadgets.ByteTable, ?_⟩]⟩) add with ...
+--
+-- cannot be written, because `?_` would have to prove
+-- `ExportTable.Certifies ⟨"Bytes", 1, 512 rows⟩ (Gadgets.ByteTable)` and that is
+-- false: `ByteTable.Contains` fails at 300. This is stated as a comment naming
+-- the missing proof rather than as a `#guard`, because it is a compile-time
+-- *absence* — there is no term to write down, so there is nothing to evaluate.
+-- S23's acceptance gate.
 
 /-! ## Canonicity
 
@@ -242,8 +254,8 @@ rather than a silent one. `Addition8FullCarry` has four equalities — the boole
 constraint on the carry, the linear byte relation, and one per output — and one
 lookup, which is exactly what the gadget writes. -/
 
-private def shape (cfg : Config) (src : Source Bab) : Option (Nat × Nat) :=
-  match compileSource cfg src with
+private def shape (cfg : CertifiedConfig Bab) (src : Source Bab) : Option (Nat × Nat) :=
+  match compileSource cfg.toConfig src with
   | .error _ => none
   | .ok m => (ofModule (F := Bab) m).map fun c => (c.eqs.length, c.lookups.length)
 

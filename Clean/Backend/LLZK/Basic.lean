@@ -122,8 +122,10 @@ def Config.forField (field : FieldSpec) : Config := ⟨field, #[]⟩
 
 The constructor is private and this is the only public way to put tables into a
 `Config`, so every place that supplies unproved rows says so by name and `grep`
-finds all of them. `Config.ofCertified` is the wrapper to use instead: it takes
-`CertifiedTable`s, which carry the proof that the rows are the Clean table's.
+finds all of them. `CertifiedConfig` is what to use instead: it holds
+`CertifiedTable`s, which carry the proof that the rows are the Clean table's, and
+since S24 it is what every public entry point takes — so the proof is a
+precondition of emission rather than something a wrapper demanded and dropped.
 
 Why this exists at all. The rows cannot be checked by the compiler — that is
 D012 — and the negative fixtures must be able to build malformed registries on

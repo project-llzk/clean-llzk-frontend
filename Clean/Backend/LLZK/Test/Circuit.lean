@@ -345,9 +345,9 @@ def divideByPrime : FormalCircuit (F pBabybear) field Parts where
   soundness := by circuit_proof_all
   completeness := by circuit_proof_all
 
-def mersenne : Config := .forField .mersenne31
+def mersenne : CertifiedConfig (F pBabybear) := .forField .mersenne31
 
-def withoutBytes : Config := .forField .babybear
+def withoutBytes : CertifiedConfig (F pBabybear) := .forField .babybear
 
 /-! ### Hand-built sources
 
@@ -428,6 +428,19 @@ private def arityMismatch : Source (F pBabybear) :=
 before any lowering. -/
 private def oneLookup : Source (F pBabybear) :=
   source 1 [.lookup { table := rawTable "Bytes" 1, entry := #v[.const 0] }]
+
+/-! ### The registry diagnostics, which need an *uncertified* configuration
+
+Since S24 the supported entry points take a `CertifiedConfig`, and none of the
+registries below can be written as one: `CertifiedTable` demands an
+`ExportTable.Certifies` proof, and these tables are malformed on purpose. That is
+the closure working, so these fixtures drop to `compileSource` — public,
+G12-confined to `Test/` and the four backend modules, and *before* the point
+where a certificate would be relevant. The diagnostics under test are `recognize`'s,
+which run identically on both paths; what is skipped is G9, which has nothing to
+say about a compilation that fails. -/
+private def emitUncertified (cfg : Config) (src : Source (F pBabybear)) : String :=
+  renderResult (compileSource cfg src)
 
 private def malformedTable : Config :=
   .unsafeWithTables .babybear #[{ name := "not a symbol", arity := 2, rows := #[#[0]] }]
@@ -571,42 +584,42 @@ table 'not a symbol': arity is 2; only single-column tables are supported, becau
 table 'not a symbol': row 0 has 1 value(s) but the arity is 2
 -/
 #guard_msgs in
-#eval IO.print (emitSource malformedTable oneLookup)
+#eval IO.print (emitUncertified malformedTable oneLookup)
 
 /--
 info: compilation failed:
 table 'Main': has the same name as the component; the module's symbol table cannot hold a `global.def` and a `struct.def` called 'Main'
 -/
 #guard_msgs in
-#eval IO.print (emitSource collidingTable oneLookup)
+#eval IO.print (emitUncertified collidingTable oneLookup)
 
 /--
 info: compilation failed:
 table 'Bytes': row value 2013265921 is not below the field prime 2013265921; it is not a canonical representative and `felt.const` would reduce it, so the emitted table would be a different set of rows
 -/
 #guard_msgs in
-#eval IO.print (emitSource unreducedTable oneLookup)
+#eval IO.print (emitUncertified unreducedTable oneLookup)
 
 /--
 info: compilation failed:
 table 'Bytes': has no rows; an empty table makes every lookup unsatisfiable, which is never intended
 -/
 #guard_msgs in
-#eval IO.print (emitSource emptyTable oneLookup)
+#eval IO.print (emitUncertified emptyTable oneLookup)
 
 /--
 info: compilation failed:
 table 'Bytes': is registered more than once; a lookup could not be resolved unambiguously
 -/
 #guard_msgs in
-#eval IO.print (emitSource duplicateTables oneLookup)
+#eval IO.print (emitUncertified duplicateTables oneLookup)
 
 /--
 info: compilation failed:
 field: configured field 'babybear-ish' with prime 2013265921 is not an entry of `FieldSpec.registry`; LLZK owns the prime for a field name, so a pair it does not know would be emitted as `!felt.type<"babybear-ish">` and interpreted in whatever field LLZK has under that name
 -/
 #guard_msgs in
-#eval IO.print (emit unregisteredField multiply)
+#eval IO.print (emitUncertified unregisteredField (Compilable.source multiply))
 
 /-! ## D011's side conditions hold of every lowering, not just recognized ones
 

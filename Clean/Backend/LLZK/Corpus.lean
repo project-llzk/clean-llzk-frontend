@@ -58,12 +58,16 @@ structure Entry where
 
 /-- Build an entry from a flattened circuit. -/
 def Entry.ofSource {F : Type} [FiniteField F] [CanonicalRepr F] [DecidableEq F]
-    (cfg : Config) (name : String) (src : Source F) (inputs : Array (Array Nat)) : Entry where
+    (cfg : CertifiedConfig F) (name : String) (src : Source F) (inputs : Array (Array Nat)) :
+    Entry where
   name := name
   module := compileSourceVerified cfg src
   vectors := inputs.map fun values => (values, LLZK.witness src values)
-  constraintsAgree := some (ConstraintSet.agreeCompiled cfg src)
-  witnessAgree := some (match compileSource cfg src with
+  -- `.toConfig` twice, because these two report on the halves of G9 *separately*
+  -- and neither is the supported entry point; the module above is the one that
+  -- goes through both, and it takes the certificates.
+  constraintsAgree := some (ConstraintSet.agreeCompiled cfg.toConfig src)
+  witnessAgree := some (match compileSource cfg.toConfig src with
     | .error _ => false
     | .ok m => WitnessSet.agree src m)
 

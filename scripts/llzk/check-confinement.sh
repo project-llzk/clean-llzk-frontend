@@ -12,7 +12,8 @@
 #    Addition8FullCarry into a module admitting `w0 = 300`, which Clean's
 #    `ByteTable` rejects, with every gate green. The rows cannot be checked by
 #    the compiler -- that is D012 -- so the path stays, behind a name that says
-#    so and a certificate-taking wrapper (`Config.ofCertified`) that does not.
+#    so, while the supported entry points take a `CertifiedConfig`, which cannot
+#    be built without the certificates (S24).
 #
 # 2. `compileSource`, `compileSource'` and `lowerRecognized` return a module
 #    without running both halves of G9. R5b, R5a, R5c and R5d each found one of
@@ -64,8 +65,8 @@ confine() {
 echo "confinement:"
 
 confine 'Config.unsafeWithTables' 'unsafeWithTables' \
-  '^(Clean/Backend/LLZK/Basic\.lean|Clean/Backend/LLZK/TableCert\.lean|Clean/Backend/LLZK/Test/.*\.lean)$' \
-  'supply tables through Config.ofCertified, which requires an ExportTable.Certifies proof (TableCert.lean). If a table genuinely cannot be certified, that is a decision to record, not a call site to add.'
+  '^(Clean/Backend/LLZK/Basic\.lean|Clean/Backend/LLZK/Certificate\.lean|Clean/Backend/LLZK/Test/.*\.lean)$' \
+  'supply tables through a CertifiedConfig, which requires an ExportTable.Certifies proof per table (Certificate.lean) and is what the public entry points take. If a table genuinely cannot be certified, that is a decision to record, not a call site to add.'
 
 # `Witness.lean` names `lowerRecognized` in prose only; the grep cannot tell, and
 # a file that mentions it in a docstring is not a call site worth blocking.

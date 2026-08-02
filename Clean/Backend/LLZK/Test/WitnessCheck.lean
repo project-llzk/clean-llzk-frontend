@@ -39,8 +39,8 @@ private def source (inputSize : Nat) (operations : List (FlatOperation Bab))
 
 /-- Compile `built`, then compare its `@compute` against `reference`'s witness
 programs. -/
-private def cross (cfg : Config) (built reference : Source Bab) : Bool :=
-  match compileSource cfg built with
+private def cross (cfg : CertifiedConfig Bab) (built reference : Source Bab) : Bool :=
+  match compileSource cfg.toConfig built with
   | .error _ => false
   | .ok m => WitnessSet.agree reference m
 
@@ -172,8 +172,8 @@ module" an untested claim about the one path that matters. `verify` takes the
 module as an argument, so a test can hand it one circuit's module and another
 circuit's source. -/
 
-private def moduleOf (cfg : Config) (src : Source Bab) : Option Module :=
-  (compileSource cfg src).toOption
+private def moduleOf (cfg : CertifiedConfig Bab) (src : Source Bab) : Option Module :=
+  (compileSource cfg.toConfig src).toOption
 
 -- Its own module is accepted…
 #guard match moduleOf babybear mulSrc with
@@ -194,7 +194,7 @@ private def moduleOf (cfg : Config) (src : Source Bab) : Option Module :=
 -- shows the two halves are independent, and that the witness half catches a
 -- wrong `@compute` the constraint half cannot see.
 #guard match moduleOf babybear dbl with
-  | some m => ConstraintSet.agree babybear sq m && !WitnessSet.agree sq m
+  | some m => ConstraintSet.agree babybear.toConfig sq m && !WitnessSet.agree sq m
   | none => false
 
 #guard match moduleOf babybear dbl with

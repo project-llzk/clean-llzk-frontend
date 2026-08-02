@@ -1,70 +1,26 @@
-import Clean.Backend.LLZK.Table
+import Clean.Backend.LLZK.Certificate
 import Clean.Gadgets.ByteLookup
 
 /-!
-# D012, discharged: the exported rows are the table's rows
+# D012, discharged for the tables the corpus uses
 
-`Table.toRaw` discards a `StaticTable`'s `length` and `row`, so the backend
-cannot recover a table's rows by walking a circuit and the caller supplies them
-through `Config.tables`. D012 recorded the consequence as a trust assumption:
-*we cannot check that these rows are the table's rows.*
+`Clean/Backend/LLZK/Certificate.lean` states the obligation
+(`ExportTable.Certifies`) and says what discharging it buys
+(`certified_membership`). This module discharges it, which is why it — and not
+that one — imports the gadgets the tables belong to:
 
-That is true of the compiler, and it stops mattering once the obligation is
-written down and proved. `ExportTable.Certifies` below is the obligation, stated
-over `rows.flatten` because that is exactly the value list `Circuit.lower`
-puts into the emitted `global.def const`. Two theorems discharge it for every
-table the corpus uses:
-
-* `ofStatic_certifies` — for any single-column `StaticTable`, the values
-  `ExportTable.ofStatic` derives are exactly the ones the table contains. This
-  covers every table a caller can derive rather than assert.
-* `byteTable_certifies` — for `Gadgets.ByteTable`, which *cannot* use `ofStatic`
-  because it inlines its `StaticTable` into `Table.fromStatic`, and naming that
-  `StaticTable` breaks every proof that unfolds `ByteTable` with `simp`. This is
-  the exact case D012's follow-up left open.
-
-`certified_membership` is the payoff: for a certified table whose values are
-canonical — which `ExportTable.diagnose` checks since S08 — Clean's `Contains`
-holds of a value exactly when that value is one of the field elements the emitted
-array holds, which is what the emitted `constrain.in` asserts.
-
-What remains assumed is a different and much smaller thing than D012 was: that
-`constrain.in %table, %value` means membership. That is part of D017 and nothing
-in Lean can settle it without a formal model of LLZK.
+* `ofStatic_certifies`, there, covers every table a caller can *derive* rather
+  than assert: for any single-column `StaticTable`, the values
+  `ExportTable.ofStatic` produces are exactly the ones the table contains.
+* `byteTable_certifies`, here, covers `Gadgets.ByteTable`, which *cannot* use
+  `ofStatic` because it inlines its `StaticTable` into `Table.fromStatic`, and
+  naming that `StaticTable` breaks every proof that unfolds `ByteTable` with
+  `simp`. This is the exact case D012's follow-up left open.
 -/
 
 namespace LLZK
 
 variable {F : Type} [FiniteField F]
-
-/-- The obligation D012 records: `e`'s values are exactly the canonical
-representatives of the elements the single-column Clean table `table` contains.
-
-Quantified over the `Array` argument of `Contains` because a Clean table's
-containment may in general depend on a concrete instantiation; every table
-Stage 1 accepts is one for which it does not. -/
-def ExportTable.Certifies (e : ExportTable) (table : Table F field) : Prop :=
-  ∀ (t : Array F) (x : F), table.Contains t x ↔ FiniteField.val x ∈ e.values
-
-/-- `ofStatic` exports exactly the canonical representatives of the table's rows. -/
-theorem mem_ofStatic_values (st : StaticTable F field) (n : Nat) :
-    n ∈ (ExportTable.ofStatic st).values ↔ ∃ i : Fin st.length, n = FiniteField.val (st.row i) := by
-  simp [ExportTable.values, ExportTable.ofStatic, explicit_provable_type]
-
-/-- Values derived from a `StaticTable` are the table's values.
-
-`ofStatic` computes them from the table's own `row` function, so the only content
-is that passing through `FiniteField.val` loses nothing — `val_injective`. -/
-theorem ofStatic_certifies (st : StaticTable F field) :
-    (ExportTable.ofStatic st).Certifies (Table.fromStatic st) := by
-  intro t x
-  rw [mem_ofStatic_values]
-  show (∃ i, x = st.row i) ↔ _
-  constructor
-  · rintro ⟨i, rfl⟩
-    exact ⟨i, rfl⟩
-  · rintro ⟨i, hi⟩
-    exact ⟨i, FiniteField.val_injective hi⟩
 
 /-! ## `Gadgets.ByteTable`
 
@@ -102,76 +58,6 @@ theorem byteTable_certifies :
     simp [Gadgets.fromByte, FieldUtils.natToField_of_val_eq_iff]
 
 end ByteTable
-
-/-! ## What a certificate buys
-
-`Certifies` is about canonical representatives; the emitted global holds field
-elements. This is the bridge, and it is where the range check `diagnose` has
-performed since S08 (R2-02) does its work: without it `fromNat` would not invert
-`val` on the declared values, and the emitted table would be a different set. -/
-
-/-- For a certified table with canonical values, Clean's `Contains` holds of `x`
-exactly when `x` is one of the field elements the emitted array holds.
-
-The right-hand side is the meaning of the emitted `constrain.in %table, %x`, so
-this says the emitted lookup constraint *is* Clean's lookup constraint. -/
-theorem certified_membership {e : ExportTable} {table : Table F field}
-    (hcert : e.Certifies table)
-    (hcanonical : ∀ n ∈ e.values, n < FiniteField.size F)
-    (t : Array F) (x : F) :
-    table.Contains t x ↔ ∃ n ∈ e.values, FiniteField.fromNat n = x := by
-  rw [hcert t x]
-  constructor
-  · intro hmem
-    exact ⟨FiniteField.val x, hmem,
-      FiniteField.val_injective (FiniteField.val_fromNat _ (FiniteField.val_lt x))⟩
-  · rintro ⟨n, hn, rfl⟩
-    rwa [FiniteField.val_fromNat n (hcanonical n hn)]
-
-/-! ## Carrying the certificate — and what that is *not*
-
-`Config.ofCertified` below takes tables paired with their proofs, and
-`Examples.withBytes` uses it, so the corpus's only lookup table carries its
-certificate next to the rows rather than in a docstring. Changing the rows breaks
-the build.
-
-**It is not a guarantee, and an earlier version of this comment said it was.**
-R4a-2 broke that claim: `CertifiedTable` lets the caller choose *both* the export
-table and the Clean table, and nothing ties the latter to the table the circuit's
-`.lookup` operations name — that is a `RawTable`, resolved by *name* in
-`recognizeLookup`, and `Table.toRaw` has already erased which `Table` it came
-from. So one can define `selfTable e` with `Contains _ x := val x ∈ e.values`,
-prove `e.Certifies (selfTable e)` by `Iff.rfl`, and certify any rows at all.
-`Config.mk` is public too.
-
-What this buys is therefore documentation with a proof obligation attached, not
-an enforced invariant. Closing it properly needs the `Table` to survive into
-`Lookup`, which is a change to Clean's core, not to this backend. Until then D012
-records exactly this: the obligation is stated and proved for the tables in use,
-and the compiler cannot demand it.
--/
-
-/-- An export table together with the proof that its values are the Clean
-table's. -/
-structure CertifiedTable (F : Type) [FiniteField F] where
-  exported : ExportTable
-  table : Table F field
-  certificate : exported.Certifies table
-
-/-- Build a configuration from tables that carry their certificates.
-
-Since R5's X1 this is the only way to supply tables without naming
-`Config.unsafeWithTables`, which `scripts/llzk/check-confinement.sh` forbids
-outside `Test/`.
-
-Two things it does **not** do, both in `GAPS.md` item 1. It is not a guarantee
-about the circuit's table — the caller picks both sides of `Certifies`; see the
-section comment above. And it **erases the proof it demands**: the `map` below
-keeps only `exported`, so `compile` never sees a certificate and the obligation
-survives as a convention rather than as data. `sessions/S23-x1-closure.md`
-closes the second of those without touching Clean's core. -/
-def Config.ofCertified (spec : FieldSpec) (tables : Array (CertifiedTable F)) : Config :=
-  Config.unsafeWithTables spec (tables.map (·.exported))
 
 /-! ## The obligation, discharged end to end for the table the corpus uses
 

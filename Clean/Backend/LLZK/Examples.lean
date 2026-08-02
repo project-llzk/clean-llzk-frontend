@@ -49,7 +49,7 @@ def multiply : FormalCircuit (F pBabybear) Inputs field where
   soundness := by circuit_proof_all
   completeness := by circuit_proof_all
 
-def babybear : Config := .forField .babybear
+def babybear : CertifiedConfig (F pBabybear) := .forField .babybear
 
 /-! ## The two recognized natural division/modulo shapes -/
 
@@ -152,10 +152,12 @@ theorem byteTable_certified :
 
 /-- The configuration `Addition8FullCarry` is compiled under.
 
-Built through `Config.ofCertified`, so it cannot be written down without
-`byteTable_certified`. That is what makes D012's obligation a requirement of the
-supported path rather than a fact recorded next to it. -/
-def withBytes : Config :=
-  Config.ofCertified .babybear #[⟨byteTable, Gadgets.ByteTable, byteTable_certified⟩]
+A `CertifiedConfig`, so it cannot be written down without `byteTable_certified`.
+Since S24 that proof is no longer erased on the way in: `compile` takes this
+type, so D012's obligation is a *precondition of emission* rather than a fact
+recorded next to one. What it still does not establish is `GAPS.md` item 1's
+second half — the caller picks both sides of `Certifies`. -/
+def withBytes : CertifiedConfig (F pBabybear) :=
+  ⟨.babybear, #[⟨byteTable, Gadgets.ByteTable, byteTable_certified⟩]⟩
 
 end LLZK.Examples

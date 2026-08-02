@@ -312,9 +312,11 @@ holds of `x` exactly when `x` is one of the field elements the emitted array
 holds — which is what the emitted `constrain.in` asserts.
 
 **The certificate is carried, not enforced — and an earlier version of this
-entry said otherwise.** `Config.ofCertified` takes `CertifiedTable`s, and
-`Examples.withBytes` uses it, so the corpus's only lookup table has its proof
-next to its rows and changing the rows breaks the build. But R4a-2 broke the
+entry said otherwise.** `CertifiedConfig` holds `CertifiedTable`s and is what
+the public entry points take (S24; it was `Config.ofCertified`, which erased
+them, when this was written), and `Examples.withBytes` is one, so the corpus's
+only lookup table has its proof next to its rows and changing the rows breaks
+the build. But R4a-2 broke the
 "cannot be called without a proof" reading: the caller chooses *both* the export
 table and the Clean table, and nothing ties the latter to the table the circuit's
 `.lookup` names — that is a `RawTable`, resolved by name, and `Table.toRaw` has
@@ -821,3 +823,74 @@ Alternatives rejected:
 What is still true and unchanged: nothing ties an `ExportTable` to the `Table` a
 `RawTable` erased except a proof someone writes. The change is that the proof is
 now the path of least resistance and its absence is greppable and gated.
+
+**Superseded in part by S24, which executed `sessions/S23-x1-closure.md`.** The
+sentence above — "greppable and gated" — was the honest description of a
+convention, and S23 said why that is not closure: `Config.ofCertified` demanded
+the certificates and then *erased* them, so what reached `compile` was a plain
+`Config`. The seven public entry points in `WitnessCheck.lean` now take a
+`CertifiedConfig F`; `ofCertified` is retired; there is no public function from a
+`Config` to a `CertifiedConfig`. `Config` and `unsafeWithTables` both stay, and
+both stay confined by G12, because the negative fixtures must be able to build
+malformed registries and `Analyze`/`Circuit`/`Constraints` need a plain `Config`
+internally — what changed is that nothing *public* accepts one.
+
+Two consequences worth naming. The type is indexed by `F`, which `Config` was
+not, because a `CertifiedTable F` mentions a Clean `Table F field`; that is why
+`Examples.babybear` is now a `CertifiedConfig (F pBabybear)` rather than a
+field-agnostic value. And the generic half of `TableCert.lean` moved to
+`Certificate.lean`, so that `WitnessCheck.lean` can name `CertifiedConfig`
+without the compiler's public surface transitively importing
+`Clean.Gadgets.ByteLookup`.
+
+`GAPS.md` item 1's second half — tying an `ExportTable` to the circuit's own
+`Table` — is untouched and still needs a change to Clean's core.
+
+## D023 — The worktree lock is a gate, CI claims it, and stale locks are not taken silently
+
+**Status:** accepted
+**Date:** 2026-08-02
+**Enacted by:** S24
+
+`scripts/llzk/e2e.sh` calls `worktree-lock.sh require` before G11. Three
+questions had to be answered to make that safe, and this records all three.
+
+**Why `e2e.sh` and not a lighter check.** It is not read-only: G2 deletes and
+rebuilds `.lake/llzk`, and a run's evidence is attributable to a commit only if
+one session owned the tree while it ran. S22's evidence file carries a caveat
+saying its `PASS` could not be attributed to its own commit; that is the cost
+this removes.
+
+**Why CI claims rather than being exempted.** The alternative was for `require`
+to treat a non-interactive environment as exempt. Every predicate available for
+"no contention here" — no tty, non-interactive, `CI=true` — is also true of the
+agent sessions on the development machine, which are the writers that collided
+three times on 2026-08-01. A mis-set exemption is invisible, because the gate
+still passes. The `llzk-e2e` job gets a claim step and a job-level
+`LLZK_SESSION`, which on a fresh ephemeral checkout always succeeds: two lines,
+no new failure mode, and CI exercises the developer's path rather than a bypass
+around it. `llzk-harness` needs nothing; none of its three scripts write to the
+worktree.
+
+**Why `reclaim` is now separate from `claim`.** Wiring the lock in exposed that
+it did not protect the sessions it was written for. Identity defaulted to the
+POSIX session id, which under an agent harness is the *command*: S24 claimed the
+lock and the very next command was told it did not hold it, with `status`
+reporting the fresh claim as stale and reclaimable. `claim` used to take a stale
+lock silently, so a second agent session would have been told the tree was free —
+the S22 collision unchanged, but now with a lock file to point at afterwards.
+So ownership no longer transfers without someone saying it should, and
+`LLZK_SESSION` is the documented identity for agent sessions, named in
+`require`'s own refusal rather than only in prose.
+
+Alternatives rejected:
+
+- *Infer a stable identity by walking the process ancestry.* Every rule that
+  makes an agent session stable also merges distinct terminal panes under a
+  shared `tmux` server, or breaks on a wrapper process. A lock whose identity
+  rule needs a paragraph of caveats is worse than an explicit variable.
+- *Keep the silent reclaim and rely on discipline.* Discipline is what failed
+  three times.
+
+Consequence: a lock left behind by a dead session now needs one deliberate
+command, `reclaim`, instead of resolving itself. That is the intended trade.

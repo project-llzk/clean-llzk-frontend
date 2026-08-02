@@ -1,4 +1,5 @@
 import Clean.Backend.LLZK.Constraints
+import Clean.Backend.LLZK.Certificate
 
 /-!
 # The witness side of G9: does the emitted `@compute` compute what Clean does?
@@ -405,22 +406,22 @@ halves now. `compileSourceVerified` reaches it through `compileSource'`, which
 has already checked the constraint half, so that half runs twice on the compile
 path; it is a pure comparison of two normal forms, and paying for it is better
 than a public function that means less than its name. -/
-def verify [CanonicalRepr F] (cfg : Config) (src : Source F) (m : Module) :
+def verify [CanonicalRepr F] (cfg : CertifiedConfig F) (src : Source F) (m : Module) :
     Except (Array Diagnostic) Module :=
-  if !ConstraintSet.agree cfg src m then .error #[ConstraintSet.mismatch]
+  if !ConstraintSet.agree cfg.toConfig src m then .error #[ConstraintSet.mismatch]
   else if !WitnessSet.agree src m then .error #[witnessMismatch]
   else .ok m
 
 /-- Compile a flattened circuit and verify **both** halves of G9 before returning
 it. -/
-def compileSourceVerified [CanonicalRepr F] (cfg : Config) (src : Source F) :
+def compileSourceVerified [CanonicalRepr F] (cfg : CertifiedConfig F) (src : Source F) :
     Except (Array Diagnostic) Module :=
-  match ConstraintSet.compileSource' cfg src with
+  match ConstraintSet.compileSource' cfg.toConfig src with
   | .error diagnostics => .error diagnostics
   | .ok m => verify cfg src m
 
 /-- **Every module this backend emits computes the circuit's witnesses.** -/
-theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
+theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : CertifiedConfig F}
     {src : Source F} {m : Module}
     (h : compileSourceVerified cfg src = .ok m) : WitnessSet.agree src m = true := by
   unfold compileSourceVerified verify at h
@@ -437,9 +438,10 @@ theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
 
 /-- **…and carries its constraint system.** The other half, lifted through the
 same entry point. -/
-theorem constraintsAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Config}
+theorem constraintsAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : CertifiedConfig F}
     {src : Source F} {m : Module}
-    (h : compileSourceVerified cfg src = .ok m) : ConstraintSet.agree cfg src m = true := by
+    (h : compileSourceVerified cfg src = .ok m) :
+    ConstraintSet.agree cfg.toConfig src m = true := by
   unfold compileSourceVerified verify at h
   split at h
   · exact absurd h (by simp)
@@ -454,8 +456,14 @@ theorem constraintsAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : Confi
 /-- Compile a circuit to an LLZK module, or report every reason it cannot be.
 
 Verified on both sides — see the two theorems above. There is no name to pass:
-the component is always `@Main` (D015). -/
-def compile {C : Type} [CanonicalRepr F] [Compilable C F] (cfg : Config) (c : C) :
+the component is always `@Main` (D015).
+
+The configuration is a `CertifiedConfig`, so a lookup table cannot reach this
+function without the proof that its rows are the Clean table's (S24, closing
+R5's X1). What that is *not* is in `Certificate.lean` and `GAPS.md` item 1: the
+caller still picks both sides of `Certifies`, because `Table.toRaw` has already
+erased which `Table` a lookup names. -/
+def compile {C : Type} [CanonicalRepr F] [Compilable C F] (cfg : CertifiedConfig F) (c : C) :
     Except (Array Diagnostic) Module :=
   compileSourceVerified cfg (Compilable.source (F := F) c)
 
@@ -463,11 +471,12 @@ def compile {C : Type} [CanonicalRepr F] [Compilable C F] (cfg : Config) (c : C)
 
 The interactive form: `#eval IO.print (LLZK.emit cfg circuit)`. The artifact form
 is `Clean/Backend/LLZK/EmitMain.lean`. -/
-def emit {C : Type} [CanonicalRepr F] [Compilable C F] (cfg : Config) (c : C) : String :=
+def emit {C : Type} [CanonicalRepr F] [Compilable C F] (cfg : CertifiedConfig F) (c : C) :
+    String :=
   renderResult (compile cfg c)
 
 /-- The same, for a circuit already reduced to a `Source`. -/
-def emitSource [CanonicalRepr F] (cfg : Config) (src : Source F) : String :=
+def emitSource [CanonicalRepr F] (cfg : CertifiedConfig F) (src : Source F) : String :=
   renderResult (compileSourceVerified cfg src)
 
 end LLZK
