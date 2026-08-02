@@ -190,13 +190,22 @@ needs SMT-LIB that no pass in the pinned `llzk-opt` produces.
 
 ## Next session
 
-- **S20 — the lowering as a theorem**, per D021 option (1): move `FieldExpr` and
-  its lowering into `IR.lean`, then prove that emitting an expression and reading
-  the statements back yields its polynomial. `Constraints.lean` and
-  `WitnessCheck.lean` already fix the statements to prove; the obstacle is
-  identified and the shape is chosen, so this is implementation, not design.
-- **A Clean-side change for D012.** The certificate cannot be enforced while
-  `Table.toRaw` erases the `Table`. Carrying it into `Lookup` is a change to
-  Clean's core, with its own review.
+- **Packet: `doc/llzk/sessions/S24-finish-stage1.md`.** Four ordered deliverables,
+  each making the next safer: wire the worktree lock into `e2e.sh`; execute S23
+  to close X1 on the supported path; reproduce the gates from a clean checkout,
+  which has never been done; and CI, which has never run on GitHub and needs
+  authorization to push.
+- **Claim the worktree first** — `bash scripts/llzk/worktree-lock.sh claim "..."`.
+  Three sessions collided on 2026-08-01; `doc/llzk/CONCURRENCY.md` records what
+  it cost. S21 checked for a free tree the informal way and was wrong.
+
+Beyond S24, and not part of it:
+
+- **A Clean-side change for D012.** The certificate cannot be tied to the
+  circuit's own table while `Table.toRaw` erases the `Table`. Carrying it into
+  `Lookup` is a change to Clean's core, with its own review. This is `GAPS.md`
+  §1's second half and S24 explicitly does not close it.
+- **The rest of `GAPS.md`.** §2 the renderer, §3 the chain to a gadget's `Spec`,
+  §7 D017's reading of LLZK. Stage 1 closing does not close these.
 - **Stage 2.** Subcircuits as named components alongside `@Main`, which is the
   shape D015 was chosen to be compatible with.
