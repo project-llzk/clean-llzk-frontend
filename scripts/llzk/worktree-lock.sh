@@ -21,6 +21,7 @@
 # got in S22.
 #
 #   claim [LABEL]   take the lock, or fail naming the current holder
+#   reclaim [LABEL] take a lock whose owner is provably gone (a deliberate act)
 #   release         give it up (only the holder may)
 #   status          who holds it, if anyone
 #   require         succeed only if this process holds it
@@ -33,13 +34,21 @@ lock="${repo_root}/.llzk-worktree-owner"
 # shellcheck source=scripts/llzk/lib.sh
 source "${script_dir}/lib.sh"
 
-# Identity is the POSIX *session id*, not $$ or $PPID: a session invokes this
-# from many short-lived subshells, and any per-invocation PID would make a
-# session fail to recognise its own lock. The session leader is also a usable
-# liveness probe, so a crashed session leaves a stale lock that is reclaimable
-# rather than wedging the worktree forever.
+# Identity is LLZK_SESSION when set, and otherwise the POSIX *session id* — not
+# $$ or $PPID, because a session invokes this from many short-lived subshells and
+# any per-invocation PID would make a session fail to recognise its own lock.
 #
-# LLZK_SESSION overrides it, which is what lets this script be tested.
+# **Set LLZK_SESSION if you are an agent harness.** The POSIX session is the
+# right identity for a person at a terminal, where every command shares one
+# session for as long as the terminal lives. It is the wrong one under a harness
+# that runs each command with `setsid`: there the session leader is the
+# *command*, so the identity dies when the command returns. Claiming the lock
+# then leaves a record whose owner is already gone — `require` stops recognising
+# it on the very next command, and, before `reclaim` was split out below, the
+# next session silently took the tree. That is the S22 collision exactly, from a
+# session that did consult the lock. See doc/llzk/CONCURRENCY.md.
+#
+# LLZK_SESSION is also what lets this script be tested.
 me() { echo "${LLZK_SESSION:-$(ps -o sid= -p $$ | tr -d ' ')}"; }
 owner_id() { [[ -f "${lock}" ]] && sed -n '1p' "${lock}" || true; }
 owner_label() { [[ -f "${lock}" ]] && sed -n '2p' "${lock}" || true; }
@@ -62,20 +71,48 @@ lock_is_live() {
   kill -0 "${id}" 2>/dev/null
 }
 
+take_it() {
+  printf '%s\n%s\n%s\n' "$(me)" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${lock}"
+  echo "worktree claimed by session $(me) — $1"
+}
+
 case "${1:-status}" in
   claim)
     label="${2:-unlabelled session}"
-    if lock_is_live && [[ "$(owner_id)" != "$(me)" ]]; then
-      llzk_fail "the worktree is held by session $(owner_id) — $(owner_label), since $(owner_since).
+    if [[ -f "${lock}" ]] && [[ "$(owner_id)" != "$(me)" ]]; then
+      if lock_is_live; then
+        llzk_fail "the worktree is held by session $(owner_id) — $(owner_label), since $(owner_since).
 Do not write here. Either wait for it to release, or take your own worktree:
   git worktree add -b <branch> ../<dir> \$(git rev-parse HEAD)
 and integrate through commits, per ORCHESTRATION.md §7."
+      fi
+      # A stale lock is *reported*, never taken silently. Taking it silently is
+      # how the lock failed to protect the sessions it was written for: an agent
+      # harness that runs each command in its own POSIX session leaves a record
+      # whose owner is dead on arrival, so the next session saw a free tree and
+      # wrote -- the S22 collision exactly, this time with a lock file to point
+      # at afterwards. `reclaim` is the deliberate act, in the same spirit as
+      # deleting the file.
+      llzk_fail "a stale lock is recorded for session $(owner_id) — $(owner_label), since $(owner_since).
+Its owner cannot be found, but 'finished' and 'invisible from here' are the same
+observation, so it is not taken for you. If that session is really done, say so:
+  bash scripts/llzk/worktree-lock.sh reclaim '<what you are doing>'
+If it is your own lock from an earlier command, you are not setting
+LLZK_SESSION -- see the note at the top of this script."
     fi
-    if [[ -f "${lock}" ]] && ! lock_is_live; then
+    take_it "${label}"
+    ;;
+  reclaim)
+    label="${2:-unlabelled session}"
+    if [[ -f "${lock}" ]] && lock_is_live && [[ "$(owner_id)" != "$(me)" ]]; then
+      llzk_fail "session $(owner_id) — $(owner_label) is live; reclaim is only for a lock whose owner is gone"
+    fi
+    # `[[ ... ]] && echo` would exit 1 here under `set -e` when there is no lock
+    # to reclaim, so reclaiming a free tree would fail after writing the file.
+    if [[ -f "${lock}" ]]; then
       echo "note: reclaiming a stale lock from session $(owner_id) — $(owner_label)"
     fi
-    printf '%s\n%s\n%s\n' "$(me)" "${label}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${lock}"
-    echo "worktree claimed by session $(me) — ${label}"
+    take_it "${label}"
     ;;
   release)
     if [[ ! -f "${lock}" ]]; then echo "no lock held"; exit 0; fi
@@ -94,8 +131,14 @@ and integrate through commits, per ORCHESTRATION.md §7."
     ;;
   require)
     lock_is_live && [[ "$(owner_id)" == "$(me)" ]] \
-      || llzk_fail "this process does not hold the worktree lock; run: bash scripts/llzk/worktree-lock.sh claim '<what you are doing>'"
+      || llzk_fail "this process does not hold the worktree lock (it is $(
+             [[ -f "${lock}" ]] && echo "held by $(owner_id) — $(owner_label)" || echo "free")).
+Run:
+  bash scripts/llzk/worktree-lock.sh claim '<what you are doing>'
+If you did claim it, in an earlier command, then your identity is not stable
+across commands: export LLZK_SESSION to the same value in both, or pass it
+inline. This process is '$(me)'."
     echo "worktree lock: held"
     ;;
-  *) llzk_fail "usage: $0 {claim [LABEL]|release|status|require}" ;;
+  *) llzk_fail "usage: $0 {claim [LABEL]|reclaim [LABEL]|release|status|require}" ;;
 esac

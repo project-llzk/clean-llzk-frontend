@@ -149,6 +149,53 @@ expect "confinement happy path" 0 "every gate-skipping entry point is confined" 
   -- bash "${clone}/scripts/llzk/check-confinement.sh"
 
 echo
+echo "== worktree-lock.sh =="
+
+# `e2e.sh` now refuses to run without the lock, so its refusal is a gate branch
+# like any other and belongs here. Each case runs against a throwaway clone, so
+# the lock file under test is that clone's and this machine's real one is never
+# touched. LLZK_SESSION supplies the identity, which is also how a session under
+# an agent harness must supply it -- see the note at the top of the script.
+lock_of() { echo "$1/scripts/llzk/worktree-lock.sh"; }
+
+clone="$(make_clone lock-unheld)"
+expect "require with no lock" 1 "does not hold the worktree lock" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" require
+
+clone="$(make_clone lock-held-by-other)"
+env LLZK_SESSION=owner bash "$(lock_of "${clone}")" claim "the owner" >/dev/null
+expect "require while another session holds it" 1 "held by owner" \
+  -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" require
+expect "claim while another session holds it" 1 "the worktree is held by session owner" \
+  -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" claim "the intruder"
+expect "reclaim while the holder is live" 1 "is live; reclaim is only for" \
+  -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" reclaim "the intruder"
+expect "require as the holder" 0 "worktree lock: held" \
+  -- env LLZK_SESSION=owner bash "$(lock_of "${clone}")" require
+
+# The defect that motivated splitting `reclaim` out of `claim`. A lock whose
+# recorded owner is a numeric session id that no longer exists used to be taken
+# silently, which is precisely how a session that *did* consult the lock could
+# still walk into an occupied tree: under a harness that runs each command in its
+# own POSIX session, every claim is stale by the next command.
+clone="$(make_clone lock-stale)"
+printf '999999\na session that is gone\n2026-01-01T00:00:00Z\n' \
+  > "${clone}/.llzk-worktree-owner"
+expect "claim does not silently take a stale lock" 1 "reclaim '<what you are doing>'" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" claim "the next session"
+expect "status reports a stale lock as reclaimable" 0 "reclaimable" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" status
+expect "reclaim takes a stale lock, and says so" 0 "reclaiming a stale lock" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" reclaim "the next session"
+
+clone="$(make_clone lock-release)"
+env LLZK_SESSION=owner bash "$(lock_of "${clone}")" claim "the owner" >/dev/null
+expect "only the holder may release" 1 "only the holder may release it" \
+  -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" release
+expect "the holder may release" 0 "worktree released" \
+  -- env LLZK_SESSION=owner bash "$(lock_of "${clone}")" release
+
+echo
 echo "== lib.sh tool checks =="
 
 # Each helper is called in a subshell so its `exit 1` is observable.

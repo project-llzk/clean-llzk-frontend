@@ -17,6 +17,17 @@ fail() { llzk_fail "$@"; }
 
 cd "${repo_root}"
 
+# Before anything else, because everything below writes into the worktree --
+# .lake/llzk is rebuilt from scratch at G2 -- and because the evidence a run
+# produces is only attributable to a commit if one session owned the tree while
+# it ran. S22's evidence file had to carry a caveat saying its PASS could not be
+# attributed to its own commit. See doc/llzk/CONCURRENCY.md.
+#
+# Under an agent harness, set LLZK_SESSION; the POSIX session id this defaults to
+# is per-command there, so a claim made in an earlier command is not recognised.
+bash "${script_dir}/worktree-lock.sh" require
+echo
+
 # Runs first, though it is numbered last: every gate below is enforced by these
 # scripts, so a broken check here would silently weaken all of them. Until this
 # existed, only their happy paths ever ran -- which is how a repair to

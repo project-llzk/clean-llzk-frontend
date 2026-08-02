@@ -54,12 +54,29 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
 
+    # `e2e.sh` requires the worktree lock. CI claims it rather than being
+    # exempted from it: an exemption needs a predicate for "no contention here",
+    # and every predicate available — no tty, non-interactive, CI=true — is also
+    # true of the agent sessions on the development machine that collided three
+    # times in one day, so a mis-set exemption would be invisible and green. A
+    # claim step has no predicate, runs the same code a developer runs, and on a
+    # fresh ephemeral checkout always succeeds. doc/llzk/CONCURRENCY.md.
+    #
+    # The identity has to be set explicitly because each `run:` block is a fresh
+    # shell, and therefore a fresh POSIX session, so the default identity would
+    # not survive from the claim step to the gate step. Job-level env reaches
+    # both.
+    env:
+      LLZK_SESSION: ci-${{ github.run_id }}-${{ github.run_attempt }}
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Declare the upstream remote
         run: git remote add upstream git@github.com:Verified-zkEVM/clean.git
+      - name: Claim the worktree
+        run: bash scripts/llzk/worktree-lock.sh claim "CI llzk-e2e"
       - uses: cachix/install-nix-action@v27
         with:
           extra_nix_config: |

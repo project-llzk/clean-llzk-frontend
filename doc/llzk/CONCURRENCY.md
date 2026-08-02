@@ -32,15 +32,53 @@ stale between reading it and acting on it.
 bash scripts/llzk/worktree-lock.sh status                 # who owns it
 bash scripts/llzk/worktree-lock.sh claim "S23 X1 closure" # take it, or find out who has it
 bash scripts/llzk/worktree-lock.sh require                # assert before writing
+bash scripts/llzk/worktree-lock.sh reclaim "S24"          # take one whose owner is gone
 bash scripts/llzk/worktree-lock.sh release                # give it back
 ```
 
-Identity is the POSIX session id, so a session recognises its own lock from any
-subshell. Liveness **fails closed**: a lock is reclaimed only when its owner is a
-numeric session leader that is provably gone. An owner that cannot be checked
-counts as live, because treating "cannot tell" as "dead" is the failure this
-guards against. A genuinely stuck lock is cleared by deleting
+Identity is `LLZK_SESSION` when set, and otherwise the POSIX session id, so a
+session recognises its own lock from any subshell. Liveness **fails closed**: an
+owner that cannot be checked counts as live, because treating "cannot tell" as
+"dead" is the failure this guards against. A stale lock — a numeric session
+leader that is provably gone — is *reported* and taken only by `reclaim`, never
+by `claim`. A genuinely stuck lock is cleared by deleting
 `.llzk-worktree-owner`, which is a deliberate act and gitignored.
+
+## Set `LLZK_SESSION` if you are an agent session
+
+The POSIX session id is the right identity for a person at a terminal, where
+every command shares one session for as long as the terminal lives. It is the
+wrong one under a harness that runs each command with `setsid`: there the session
+leader *is* the command, so the identity dies when the command returns.
+
+S24 found this by running the two lines the packet told it to run, in that order:
+
+```
+$ bash scripts/llzk/worktree-lock.sh claim "S24 finish Stage 1"
+worktree claimed by session 1405618 — S24 finish Stage 1
+$ bash scripts/llzk/worktree-lock.sh require
+error: this process does not hold the worktree lock
+$ bash scripts/llzk/worktree-lock.sh status
+stale lock from session 1405618 — S24 finish Stage 1; reclaimable
+```
+
+So the lock did not work for the kind of session it was written for. Worse than
+failing `require`: `claim` used to take a stale lock silently, so a second agent
+session would have been told the tree was free — the S22 collision, unchanged,
+now with a lock file to point at afterwards. Two things follow, and both are in
+the script:
+
+- `reclaim` is split out of `claim`, so ownership never transfers without
+  someone saying it should;
+- every agent session sets `LLZK_SESSION` to a stable label, inline on each
+  command, because the harness does not carry exports between them:
+
+```bash
+LLZK_SESSION=S24 bash scripts/llzk/e2e.sh
+```
+
+This is discoverable rather than remembered: `require`'s refusal names
+`LLZK_SESSION` and prints the identity it computed for the current process.
 
 It is advisory. It cannot stop a determined writer and does not try. It makes
 ownership visible and checkable, which is the same treatment
@@ -60,10 +98,35 @@ and integrate through commits. The one real cost is that a fresh worktree has no
 `cp -al` gets the dependency oleans for free and leaves only Clean's own modules
 to rebuild. Weigh that against a fourth collision.
 
-## Not yet wired into a gate
+## Wired into the gate, as of S24
 
-Deliberately. Wiring `require` into `e2e.sh` would fail the gate run of any
-session that has not claimed the lock — including, at the time this was written,
-one that was mid-repair and had claimed nothing. Wiring it is a one-line change
-to `e2e.sh` and belongs to the first session that owns the tree uncontested.
-Until then this is a tool sessions call, not a gate that fails them.
+`e2e.sh` calls `require` before G11 and refuses to run without the lock. It was
+deliberately left unwired when written, because doing so would have failed the
+gate run of a session that was mid-repair and had claimed nothing; that session
+finished, so S24 wired it.
+
+`e2e.sh` is the right place. It is not a read-only check: G2 deletes and rebuilds
+`.lake/llzk`, and the evidence a run produces is only attributable to a commit if
+one session owned the tree while it ran. S22's evidence file had to carry a
+caveat saying its `PASS` could not be attributed to its own commit.
+
+The consequence, accepted knowingly: **every** gate run must claim first,
+including CI.
+
+### CI claims the lock; it is not exempted
+
+The alternative was to have `require` treat a non-interactive environment as
+exempt. Rejected. An exemption needs a predicate for "no contention here", and
+every predicate available — no tty, non-interactive, `CI=true` — is also true of
+the agent sessions on the development machine, which are exactly the writers that
+collided three times in one day. A mis-set exemption is invisible: the gate
+passes.
+
+The `llzk-e2e` job therefore has a claim step, and a job-level
+`LLZK_SESSION: ci-${{ github.run_id }}-${{ github.run_attempt }}` because each
+`run:` block is a fresh POSIX session. On a fresh ephemeral checkout the claim
+always succeeds, so this is two lines and no new failure mode; it also means CI
+exercises the same path a developer does rather than a bypass around it.
+
+`llzk-harness` needs nothing: it runs `check-pins.sh`, `test-scripts.sh` and
+`check-confinement.sh` directly, none of which write to the worktree.
