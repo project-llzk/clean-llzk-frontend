@@ -12,3 +12,4 @@ import Clean.Backend.LLZK.Test.Circuit
 import Clean.Backend.LLZK.Test.Constraints
 import Clean.Backend.LLZK.Test.WitnessCheck
 import Clean.Backend.LLZK.Test.Lookups
+import Clean.Backend.LLZK.Test.Soundness

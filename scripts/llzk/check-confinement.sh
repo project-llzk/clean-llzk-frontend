@@ -44,12 +44,21 @@ cd "${repo_root}"
 status=0
 
 # confine NAME PATTERN ALLOWED_REGEX WHY
+#
+# Matches against the file with its **comments blanked** (A2). Greping the raw
+# source made a docstring that says "use `compile`, not `compileSource'`" into a
+# call site, and the fix each time was to add the file to the allowlist -- three
+# times in one session, at which point the list no longer meant what its name
+# says. Reading code instead makes the gate stricter, not looser: the three
+# entries that were there for prose are gone.
 confine() {
   local name="$1" pattern="$2" allowed="$3" why="$4"
   local offenders=()
   local file
   while IFS= read -r file; do
-    [[ "${file}" =~ ${allowed} ]] || offenders+=("${file}")
+    [[ "${file}" =~ ${allowed} ]] && continue
+    python3 "${script_dir}/strip-lean-comments.py" "${file}" \
+      | grep -qE -- "${pattern}" && offenders+=("${file}")
   done < <(grep -rlE --include='*.lean' -- "${pattern}" Clean/ || true)
 
   if (( ${#offenders[@]} > 0 )); then
@@ -68,12 +77,12 @@ confine 'Config.unsafeWithTables' 'unsafeWithTables' \
   '^(Clean/Backend/LLZK/Basic\.lean|Clean/Backend/LLZK/Certificate\.lean|Clean/Backend/LLZK/Test/.*\.lean)$' \
   'supply tables through a CertifiedConfig, which requires an ExportTable.Certifies proof per table (Certificate.lean) and is what the public entry points take. If a table genuinely cannot be certified, that is a decision to record, not a call site to add.'
 
-# `Witness.lean` and `Lookups.lean` name these in prose only — the first
-# `lowerRecognized`, the second `lookups_perm_of_compileSource'`, which it says
-# its own theorem composes with. The grep cannot tell a docstring from a call
-# site, and a docstring is not one worth blocking.
+# `Witness.lean`, `Lookups.lean` and `Soundness.lean` used to be on this list for
+# prose alone. They are not any more: the check reads code (A2), so a docstring
+# naming an entry point is not a call site and the allowlist is back to the
+# modules that genuinely call one.
 confine 'the G9-skipping entry points' "compileSource'?\\b|lowerRecognized" \
-  '^Clean/Backend/LLZK/(Circuit|Constraints|WitnessCheck|Witness|Lookups|Corpus)\.lean$|^Clean/Backend/LLZK/Test/.*\.lean$' \
+  '^Clean/Backend/LLZK/(Circuit|Constraints|WitnessCheck|Corpus)\.lean$|^Clean/Backend/LLZK/Test/.*\.lean$' \
   'use LLZK.compile or LLZK.emit, which run both halves of G9 (Constraints.lean, WitnessCheck.lean). These three return a module without that comparison; Corpus.lean is allowed because the registry-conformance entries have no Clean circuit to compare against.'
 
 if (( status != 0 )); then

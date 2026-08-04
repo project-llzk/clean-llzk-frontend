@@ -1,13 +1,12 @@
 # Clean → LLZK current state
 
 Updated: 2026-08-04  
-Active milestone: **Stage 1 finished, reviewed, and `GAPS.md` §4 closed** — all
-gates G0–G12 green against the pinned tools  
-Last accepted session: A1 — the lookup half of `ConstraintsHoldFlat`, with its
-hypotheses discharged from the compiler's own checks and instantiated at
-`Addition8FullCarry`  
+Active milestone: **Stage 1 finished and reviewed; `GAPS.md` §3 and §4 closed** —
+all gates G0–G12 green against the pinned tools  
+Last accepted session: A2 — the chain from the emitted module's constraints to
+the gadget's `Spec`, instantiated at `Addition8FullCarry`  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: `doc/llzk/evidence/A1/gates.txt`  
+Integration commit: `doc/llzk/evidence/A2/gates.txt`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
@@ -135,6 +134,17 @@ and records the answer in its handoff.
     refactors of `recognize` were needed first — an overlapping `match` that
     generated no equation lemmas, and a `for` loop that hid the field check
     inside `forIn`. No new axioms.
+  - **A2**, closing `GAPS.md` §3 — the statement R5e said a user most likely
+    assumes the project has. `Soundness.spec_of_compile`: if the emitted module's
+    `@constrain` is satisfied at an assignment and the gadget's `Assumptions`
+    hold there, the gadget's own `Spec` holds. Three of its four links are
+    Clean's own; the one that did not exist was A1's lookup theorem, and
+    `Operations.FullGuarantees` turned out to be *free* because it quantifies
+    over channel interactions, which `Analyze` refuses by name. Instantiated at
+    `Addition8FullCarry`, with everything about the circuit discharged by proof.
+    G12 also became a code-reading check rather than a grep over comments, after
+    three files in one session had been added to its allowlist for prose alone —
+    the allowlist shrank instead.
   - `Gadgets.Addition8FullCarry` compiles to LLZK, `llzk-opt` accepts,
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
@@ -159,7 +169,8 @@ Evidence under `doc/llzk/evidence/`.
 | G8 fail closed | PASS — 25 negative fixtures, plus tool-version rejection. Not "one per rejection path": R5 found three reachable paths with none, including the field-registry branch that was R4b-1's own repair. Those three now have fixtures; the claim is not reinstated as a general one |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 14 |
-| G11 the harness's own error paths | PASS — 39 exercised, including the worktree lock's opaque-owner branches, which R6 found were the ones that mattered and the ones nothing covered |
+| G11 the harness's own error paths | PASS — 42 exercised, including the worktree lock's opaque-owner branches, which R6 found were the ones that mattered and the ones nothing covered |
+| G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G12 every gate-skipping entry point is confined | PASS |
 | G10b SMT lowering | PASS — 10 lowered, 4 out of scope for a declared reason |
 
@@ -298,15 +309,13 @@ order they are written in there.
    `registryOk_of_recognize`, `size_eq_of_recognize`. One hypothesis remains and
    is named: "the compiler accepted this circuit", a `#guard` rather than a `rfl`
    because `recognize` on a real gadget does not reduce in the kernel.
-2. **§3 — the chain from the emitted module to a gadget's `Spec`.** *Now the top
-   of this list.* The statement a user assumes the project has.
-   `eqs_iff_of_compileSource'` stops at `ConstraintsHoldFlat`; a `FormalCircuit`'s
-   `soundness` is stated over `ConstraintsHold.Soundness`. A1 removed the first of
-   the three prerequisites; what is left is `Operations.FullGuarantees` and the
-   offset correspondence between the flattened and unflattened operation lists.
-   Start from `Clean/Circuit/Subcircuit.lean`'s `constraintsHoldFlat_iff`, which
-   is the same bridge for Clean's own two representations.
-   **Highest value per unit of work, and entirely inside this repo.**
+2. **§3 — done (A2).** `Soundness.lean` and `Test/Soundness.lean`:
+   `spec_of_compile` is "the emitted module's constraints hold ⇒ the gadget's
+   `Spec` holds", and `add8_spec_of_compile` is it for `Addition8FullCarry`.
+   `Operations.FullGuarantees` turned out to be free — it quantifies over channel
+   interactions, which `Analyze` refuses — so the chain is A1's lookup theorem
+   plus three of Clean's own steps. Soundness direction only; D017 and §2 still
+   stand between it and the text.
 3. **§1's second half — tie a certificate to the circuit's own table.** The
    largest open *soundness* gap: the caller picks both sides of `Certifies`, so
    it can certify a table the circuit does not look into. Closing it needs the
@@ -375,10 +384,11 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1 is done.** Next: **A2 (§3, the `Spec` chain), then B, then A4.** A2 is the
-claim users care about and the work is in-repo, and A1 cleared its first
-prerequisite; B is a decision that costs nothing to make and currently
-invalidates the word "CI"; A4 is cheap and removes a gap whose protection lives
-in the wrong file. A3 is more important than any of them but is a Clean-core
-session, so it should be *scheduled* rather than slipped into a backend increment
-— and G0 now enforces that.
+**A1 and A2 are done — §4 and §3 are closed.** Next: **B, then A4, then A5.**
+B is a decision that costs nothing to make and currently invalidates the word
+"CI" (the branch is published; what is missing is a pull request on the fork).
+A4 is cheap and removes a gap whose protection lives in the wrong file. A5, the
+renderer, is now the largest thing standing between `spec_of_compile` and the
+emitted *text*, which is what A2 makes it worth doing. A3 is more important than
+any of them but is a Clean-core session, so it should be *scheduled* rather than
+slipped into a backend increment — and G0 now enforces that.

@@ -65,7 +65,7 @@ make_clone() {
   local name="$1" dir="${workdir}/$1"
   git clone --quiet --shared --no-checkout "${repo_root}" "${dir}" 2>/dev/null
   git -C "${dir}" checkout --quiet "$(git -C "${repo_root}" rev-parse HEAD)" 2>/dev/null
-  cp "${script_dir}"/*.sh "${dir}/scripts/llzk/"
+  cp "${script_dir}"/*.sh "${script_dir}"/*.py "${dir}/scripts/llzk/"
   echo "${dir}"
 }
 
@@ -152,6 +152,29 @@ clone="$(make_clone confine-verified)"
 printf 'import Clean.Backend.LLZK.WitnessCheck\ndef fine := compileSourceVerified\n' \
   > "${clone}/Clean/Gadgets/Fine.lean"
 expect "compileSourceVerified is not confined" 0 "every gate-skipping entry point is confined" \
+  -- bash "${clone}/scripts/llzk/check-confinement.sh"
+
+# A2. The gate reads code, so a docstring naming an entry point is not a call
+# site -- which is the whole reason the allowlist could shrink. Pinned in both
+# directions, because "ignores comments" is one edit away from "ignores
+# everything": the second file has the name in a comment *and* in code.
+clone="$(make_clone confine-prose)"
+printf 'import Clean.Backend.LLZK.Circuit\n/-- Use `compile`, not `compileSource`. -/\ndef fine := 1\n' \
+  > "${clone}/Clean/Gadgets/Prose.lean"
+expect "a docstring mention is not a call site" 0 "every gate-skipping entry point is confined" \
+  -- bash "${clone}/scripts/llzk/check-confinement.sh"
+
+clone="$(make_clone confine-prose-and-code)"
+printf 'import Clean.Backend.LLZK.Circuit\n-- see `compileSource`\ndef sneaky := compileSource\n' \
+  > "${clone}/Clean/Gadgets/Both.lean"
+expect "a comment does not hide a call site below it" 1 "G9-skipping entry points outside" \
+  -- bash "${clone}/scripts/llzk/check-confinement.sh"
+
+# The stripper must not blank code that merely follows a `--` inside a string.
+clone="$(make_clone confine-string)"
+printf 'import Clean.Backend.LLZK.Circuit\ndef msg := "a -- b"\ndef sneaky := compileSource\n' \
+  > "${clone}/Clean/Gadgets/Str.lean"
+expect "a -- inside a string does not blank the rest of the file" 1 "G9-skipping entry points outside" \
   -- bash "${clone}/scripts/llzk/check-confinement.sh"
 
 clone="$(make_clone confine-happy)"

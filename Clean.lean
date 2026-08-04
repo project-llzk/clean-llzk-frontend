@@ -5,6 +5,7 @@ import Clean.Utils.SourceSinkPath
 import Clean.Utils.OfflineMemory
 import Clean.Backend.LLZK.Corpus
 import Clean.Backend.LLZK.Lookups
+import Clean.Backend.LLZK.Soundness
 import Clean.Circomlib.AliasCheck
 import Clean.Circomlib.BinSum
 import Clean.Circomlib.BinSub

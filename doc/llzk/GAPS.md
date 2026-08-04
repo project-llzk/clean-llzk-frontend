@@ -105,28 +105,38 @@ a hazard the toolchain demonstrably does not catch, rather than one it does.
 hazard is unequal modules rendering to equal text, or text LLZK reads differently
 from how the `Module` meant it.
 
-## 3. There is no chain from the emitted constraints to a gadget's `Spec`
+## 3. The chain from the emitted constraints to a gadget's `Spec` — **closed by A2**
 
-`eqs_iff_of_compileSource'` relates the emitted `constrain.eq`s to
-`ConstraintsHoldFlat`. That is **not** `ConstraintsHold.Soundness`, which is what
-a `FormalCircuit`'s `soundness` field is stated over.
+It used to read: `eqs_iff_of_compileSource'` relates the emitted `constrain.eq`s
+to `ConstraintsHoldFlat`, which is **not** `ConstraintsHold.Soundness`, so "the
+emitted module's constraints hold ⇒ the gadget's `Spec` holds" is proved nowhere.
+R5e called it the statement a user most likely assumes the project has.
 
-So "the emitted module's constraints hold ⇒ the gadget's `Spec` holds" is not
-proved anywhere. Found by R5e. This is the statement a user most likely assumes
-the project has, and it is now the largest gap that is *entirely inside this
-repository*.
+`Soundness.spec_of_compile` is that statement, and
+`Test/Soundness.add8_spec_of_compile` is it for `Addition8FullCarry`:
 
-**A1 removed the first of its three prerequisites.** Bridging needed the lookup
-half of `ConstraintsHoldFlat`, `Operations.FullGuarantees`, and the offset
-correspondence between the flattened and unflattened operation lists. The lookup
-half is item 4, and it is done: with `ofSource_eqs_iff` and
-`Lookups.ofSource_lookups_iff`, both conjuncts of
-`constraintsHoldFlat_iff_forall_mem` now have a semantic theorem on the emitted
-side. What remains is the two structural steps from `ConstraintsHoldFlat` up to
-`ConstraintsHold.Soundness` — and `Clean/Circuit/Subcircuit.lean`'s
-`constraintsHoldFlat_iff` (`ConstraintsHoldFlat env ops.toFlat ↔
-ops.ConstraintsHold env`) is where to start, because it is the same bridge stated
-for Clean's own two representations.
+> take any assignment of the emitted component's cells — `env` for the circuit
+> variables, `outs` for the `@out{j}` members D008 adds — that satisfies every
+> polynomial the reader extracts from `@constrain` and every lookup it extracts;
+> assume the gadget's own `Assumptions` of the input; then the gadget's own
+> `Spec` holds of that input and the corresponding output.
+
+Four links, three of them Clean's own: the two conjuncts of
+`constraintsHoldFlat_iff_forall_mem` (item 4, closed by A1 — this chain could not
+be built before it), then `Circuit.constraintsHold_toFlat_iff`, then
+`Circuit.can_replace_soundness`, then the gadget's `soundness` field.
+
+`can_replace_soundness` needs `Operations.FullGuarantees`, which is
+`∀ i ∈ ops.interactions, i.Guarantees env` — vacuous for anything this backend
+accepts, because `Analyze.recognizeOperation` refuses `.interact` by name. That
+is the one place Stage 1's narrowness pays rather than costs.
+
+**What it is not.** It is the *soundness* direction only: nothing here says the
+module has a satisfying assignment. It is stated over the `ConstraintSet` the
+reader extracts, so D017 (item 7) and the renderer (item 2) still stand between
+it and the emitted text. And the three hypotheses of the form "this compile run
+succeeded" are `#guard`ed rather than proved, because `recognize` on a real
+gadget does not reduce in the kernel.
 
 ## 4. The lookup half of `ConstraintsHoldFlat` — **closed by A1**
 
