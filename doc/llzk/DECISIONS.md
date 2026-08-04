@@ -946,3 +946,57 @@ provably-live case now records this shell's own POSIX session id.
 The general lesson is D005's and D019's again, in a third place: a claim about
 what a mechanism guarantees has to be checked against the case the mechanism was
 built for, not against the case that was easiest to write a test for.
+
+## D025 — Align with upstream Clean before any capability increment
+
+**Status:** accepted
+**Date:** 2026-08-04
+**Enacted by:** S25, S26, S27 (proposed)
+
+Two capability increments were about to be built at Clean `1e563b9c`: a recognizer
+for the bit-decomposition shape `ofNat (mod (div (val x) (const 2^i)) (const 2))`,
+and then bitwise `land`/`lor`/`lxor`. **Both would have been discarded on the next
+bump**, and not because they were early — because they target an IR upstream has
+replaced.
+
+Measured against `upstream/main` = `0e53b9f2` (Lean 4.32.2, merged 2026-08-04,
+70 commits ahead of our base; `Clean/Circuit/` +878/−194 across 15 files):
+
+- **`Witgen.NExpr` is deleted.** It is replaced by `U64Expr` — bounded, and
+  documented as *"All operations wrap modulo `2^64`."* `land`/`lor`/`lxor` live
+  there now, so an increment written against `NExpr` targets a type that no longer
+  exists.
+- **`VExpr.bitsOf {n} (x : FExpr F)` exists**, with `BExpr.bit x i` beside it. Bit
+  decomposition is a *constructor* upstream, so the recognizer would have been a
+  workaround for something already fixed.
+- `FExpr` also lost `envGet`, renamed `ofNat` to `ofU64`, and gained `lor`;
+  conditions became a sort of their own (`BExpr`); `Step.letN` became `letU`.
+
+So the order is: bump (S25), then rewrite the witness recognizer structurally
+against `U64Expr` (S26), then port gadgets onto a current base (S27). Doing the
+increments first means doing the toolchain move twice and throwing away the work
+in between.
+
+**What this does to D011, precisely.** D011's argument is *"`NExpr` denotes
+unbounded `ℕ`, so lowering piecewise is wrong; therefore match two whole shapes."*
+Against a fixed-width sort that argument lapses and structural lowering becomes
+available. But D011's *problem* is replaced rather than removed: a `u64` does not
+fit in a babybear felt. `p_babybear ≈ 2^31`, and wrapping modulo `2^64` is not
+reduction modulo `p`; only bn254 and grumpkin hold a `u64` outright. So S26 owes a
+width or bound analysis, and it owes it as a theorem or a refusal — D011's own
+history is the warning, since R2-05 found its central side condition unstated for
+four sessions and closing it took a whole class (D019).
+
+**One thing this does not settle, and should be re-checked rather than assumed.**
+D001 justified the textual-MLIR seam partly by *"Clean's Lean 4.30 toolchain
+[versus] the project VeIR fork on 4.31-rc2 or upstream VeIR on 4.32.2"*. If Clean
+is now on 4.32.2 that half of the argument lapses, and in-process interop becomes
+a live question again. It is a smaller shift than it sounds: VeIR's missing
+dialects — Struct, Array, `constrain.in`, `function.call` — are the binding
+constraint, not the toolchain, and D003 rests on those. Re-measure both before
+reopening D003.
+
+**Why this entry exists at all.** The finding came from checking upstream instead
+of planning against a local pin — the same lesson the CI paragraph in `CURRENT.md`
+records at the cost of two days. A version pin is a claim about the world, and it
+goes stale silently.

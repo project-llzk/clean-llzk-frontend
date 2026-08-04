@@ -5,6 +5,7 @@ Active milestone: **Stage 1 finished and reviewed; `GAPS.md` §3, §4 and §6
 closed** — all gates G0–G12 green against the pinned tools, and green in CI  
 Last accepted session: A4 — G9 reads types; and B, which found that CI had been
 green on this branch for two days while three sessions said it had never run  
+Next session: **S25** — `sessions/S25-align-upstream.md`. Bootstrapped, not started  
 Integration branch: `clean-to-llzk/integration`  
 Integration commit: `doc/llzk/evidence/A4/gates.txt`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
@@ -18,6 +19,14 @@ Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 - upstream VeIR: `a4e6194d5810a02d74f0094ff6014cda6db6d617`
 
 See `PINS.md` for how to obtain the tools, including the cache-key requirement.
+
+**The Clean pin is stale, deliberately and with a plan.** Upstream `main` is
+`0e53b9f2` on Lean **4.32.2**, 70 commits ahead, merged 2026-08-04. It **deletes
+`Witgen.NExpr`** — the sort D011's whole argument is about — in favour of a
+bounded `U64Expr`, and makes bit decomposition a constructor (`VExpr.bitsOf`).
+D025 records why that means aligning comes *before* any new capability, and
+`sessions/S25-align-upstream.md` is the packet. Do not add witness-IR capability
+at this pin; it targets types that no longer exist upstream.
 
 ## Reproduce everything
 
@@ -342,6 +351,23 @@ your next command. `e2e.sh` refuses without it. If the tree already carries a
 finished session's lock, `status` will say whether `reclaim` needs `--from`
 (D024). Three sessions collided on 2026-08-01; `CONCURRENCY.md` records the cost.
 
+## The next three sessions are written
+
+Bootstrapped 2026-08-04 and not started. Read them in order; each is unexecutable
+before the one above it.
+
+| packet | does | why in this order |
+|---|---|---|
+| `sessions/S25-align-upstream.md` | bump to upstream `0e53b9f2` / Lean 4.32.2, gates unchanged | the witness IR was rebuilt; everything below targets the new one |
+| `sessions/S26-witness-u64.md` | lower `U64Expr` structurally; `bitsOf`, `land`/`lor`/`lxor` | retires D011's whole-shape matching. Unlocks Xor32, And8, BLAKE3.G, Keccak256.Theta — measured, see the coverage table in `ROADMAP.md` |
+| `sessions/S27-fork-gadgets.md` | port `~/zkgolf/submission_gf2` onto fork `main`, advance `clean_base` | a zkGolf gadget is bitwise, so before S26 the backend still refuses it |
+
+S25 keeps the accepted subset exactly the size it is now, so its gates say one
+thing only: the bump did or did not break the backend. S26 is where capability
+grows, and it owes a width analysis as a theorem or a refusal — a `u64` does not
+fit in a babybear felt, and D025 says why that is a replacement for D011's problem
+rather than a removal of it.
+
 ## Roadmap after R6
 
 Stage 1 is finished, reproduced, and reviewed twice by sessions that did not
@@ -451,13 +477,18 @@ can close, because closing it means formalising LLZK.
 ### Recommended order
 
 **A1, A2, A4 and B are done — §3, §4 and §6 are closed and CI is green on a
-runner.** Next: **A5, the renderer.** It is now the largest thing standing between
-`spec_of_compile` and the emitted *text*, which is exactly what A2 makes it worth
-doing, and R6 narrowed it to the three `Stmt` forms that appear only in
-`@constrain`. After that A6 (the preservation theorem, D021) and A7 (the
-copy-canonicalisation premise). A3 is more important than any of them but is a
-Clean-core session, so it should be *scheduled* rather than slipped into a
-backend increment — and G0 now enforces that.
+runner.** But the next thing is **not** in this track: it is S25, the upstream
+alignment, because the Clean pin is a month stale and the witness IR underneath us
+has been rebuilt (D025).
+
+After S25–S27, the assurance track resumes at **A5, the renderer** — now the
+largest thing standing between `spec_of_compile` and the emitted *text*, which is
+exactly what A2 makes it worth doing, and R6 narrowed it to the three `Stmt` forms
+that appear only in `@constrain`. Then A6 (the preservation theorem, D021) and A7
+(the copy-canonicalisation premise). A3 is more important than any of them but is
+a Clean-core session, so it should be *scheduled* rather than slipped into a
+backend increment — and G0 now enforces that. S27 is the first session that
+exercises that discipline for real.
 
 One process item, from B: **check the world, not the document.** Track B was on
 this list at all because three sessions in a row read a paragraph saying CI had
