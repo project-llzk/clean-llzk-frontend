@@ -74,6 +74,50 @@ Reject before rendering:
   registered twice, is empty, or carries a value at or above the prime (D012);
 - any constructor not covered by the selected backend contract.
 
+## Measured coverage of Clean's gadget library
+
+Stage 1's capability list above says what the *analyzer* accepts. It does not say
+how much of Clean's actual library that is, and nobody had checked — the corpus is
+five fixtures plus `Addition8FullCarry`, which invites the assumption that the
+answer is "almost nothing".
+
+It is not. Measured by calling `LLZK.compile` on the real gadgets (so both halves
+of G9 ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen
+them):
+
+| gadget | verdict |
+|---|---|
+| `Addition8FullCarry` | compiles |
+| `ByteDecomposition` | compiles |
+| `Addition32` | compiles |
+| `Addition32Full` | compiles |
+| `Rotation32` | compiles |
+| `Rotation64` | compiles |
+| `Not.Not64` | compiles |
+| `Xor.Xor32` | refused — `lxor` (5 diagnostics) |
+| `And.And8` | refused — `land` (2) |
+| `BLAKE3.G` | refused — `lxor` (20) |
+| `Keccak256.Theta` | refused — `lxor` (450) |
+| `IsZero` | refused — `ite` |
+| `SHA256.SHA256Round` | n/a — needs `Fact (p > 2^33)`, so a larger field than babybear |
+
+**The whole arithmetic half of the library already compiles**, subcircuits and
+lookups included: `Addition32Full` and `Rotation64` are compositions several
+gadgets deep.
+
+**The whole bitwise half is blocked by exactly two witness-IR constructors** —
+`land`/`lor`/`lxor`, and `ite`. That is one increment, not an architecture
+problem, and it is what stands between this backend and BLAKE3, Keccak, SHA256,
+Xor and And. It reorders Stage 2: bitwise operations come *before* subcircuits as
+named components, because the second is a scaling concern and the first is the
+difference between "a demo" and "the library".
+
+Two smaller observations worth keeping. `Keccak256.Theta` produced **450**
+diagnostics rather than stopping at the first, which is D009's non-cascading
+property working at a scale nothing had tested it at. And `SHA256Round` is not a
+frontend limitation at all: it needs a prime above `2^33`, so it is a
+`goldilocks`/`bn254` circuit, and the field registry already has both.
+
 ## Critical path
 
 The planned order was:

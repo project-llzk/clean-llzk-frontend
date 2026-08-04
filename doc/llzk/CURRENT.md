@@ -411,8 +411,18 @@ In dependency order, each an increment of the shape D009 describes (one
 `FieldExpr` constructor, one recognizer case, one `lower` case, one positive and
 one negative fixture):
 
+- **Bitwise operations first** — `land`/`lor`/`lxor`, then `ite` (`scf.if`).
+  Measured, not guessed: `ROADMAP.md`'s coverage table shows the whole arithmetic
+  half of Clean's gadget library *already compiles* (`Addition32Full`,
+  `Rotation64`, `Not64`, `ByteDecomposition`, subcircuits and lookups included),
+  and the whole bitwise half is blocked by exactly these two constructors —
+  `Xor32`, `And8`, `BLAKE3.G` and `Keccak256.Theta` all refuse for that one
+  reason. This is the difference between a demo and the library, and it comes
+  before everything else in this track.
 - **Subcircuits as named components** alongside `@Main`. This is the shape D015
   was chosen to be compatible with, and the reason the root name is a constant.
+  A scaling concern rather than a capability one, which is why it now comes
+  second.
 - **Multi-column tables** (D013): needs `array.new` and a multi-dimensional
   `constrain.in` in the emitter IR.
 - **The rest of the witness IR**: `inv` → `felt.inv`, `ite` → `scf.if`,
