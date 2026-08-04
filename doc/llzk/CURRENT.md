@@ -1,12 +1,12 @@
 # Clean → LLZK current state
 
 Updated: 2026-08-04  
-Active milestone: **Stage 1 finished and reviewed; `GAPS.md` §3 and §4 closed** —
-all gates G0–G12 green against the pinned tools  
-Last accepted session: A2 — the chain from the emitted module's constraints to
-the gadget's `Spec`, instantiated at `Addition8FullCarry`  
+Active milestone: **Stage 1 finished and reviewed; `GAPS.md` §3, §4 and §6
+closed** — all gates G0–G12 green against the pinned tools, and green in CI  
+Last accepted session: A4 — G9 reads types; and B, which found that CI had been
+green on this branch for two days while three sessions said it had never run  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: `doc/llzk/evidence/A2/gates.txt`  
+Integration commit: `doc/llzk/evidence/A4/gates.txt`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
@@ -64,13 +64,33 @@ CI is *configured* to run G0, G11 and G12 on every pull request, and G1–G10 in
 the `llzk-e2e` job, which builds the pinned LLZK from the same flake reference
 `PINS.md` records. Until R5 none of the LLZK gates were in CI at all.
 
-**None of it has ever run.** `262c9684` said so and it is still true: the branch
-has not been published, and `ci.yml` triggers only on `push` to `main`,
-`pull_request` and `workflow_dispatch` — so pushing `clean-to-llzk/integration`
-would not by itself run anything either; it needs a pull request. Until then
-these jobs are untested code and every green gate in this document is green on
-one machine. §11 reserves publishing a branch for an explicit decision; S24 asked
-and records the answer in its handoff.
+**It has run, and it was green.** This paragraph said "None of it has ever run"
+from `262c9684` until 2026-08-04, and it was false for two of those days.
+
+The facts, from `gh run list --branch clean-to-llzk/integration`:
+
+- `alexanderlhicks/clean` **PR #1** was opened 2026-08-02T03:18:55Z — three
+  minutes after S24 took the worktree lock.
+- CI ran on it at `4e15d3ad` three seconds later and **all four jobs passed**:
+  `build`, `llzk-harness`, `llzk-e2e` and `plonky3-backend`.
+- So `llzk-e2e` works on a GitHub runner, including
+  `nix build …#llzk` — the risk this document and R6 both flagged as the likely
+  first failure did not materialise.
+
+**How this survived.** S24's handoff recorded "S24 asked and got no answer, so
+nothing was pushed and the jobs stay marked unrun". The push and the PR happened
+anyway, minutes later, and no session updated the paragraph. R6 then *read* it,
+repeated it in its roadmap as "CI has never run / untested code", and did not
+check — while auditing this project for exactly that. A1 and A2 carried it
+forward again. One `gh run list` would have falsified it at any point.
+
+It is the same lesson as R6-2 and R6-3, in the place hardest to see: **a claim
+about the world outside the repository has to be checked against the world, and
+the control plane is not evidence about itself.**
+
+What is still true: every gate in the table below is green on one machine *and*
+on a runner, but only G0–G12 are gated in CI; §11 still reserves publishing for
+an explicit decision, which was given.
 
 ## State
 
@@ -145,6 +165,18 @@ and records the answer in its handoff.
     G12 also became a code-reading check rather than a grep over comments, after
     three files in one session had been added to its allowlist for prose alone —
     the allowlist shrank instead.
+  - **A4**, closing `GAPS.md` §6. Both G9 readers now take the expected `Ty` and
+    check it at every operand, parameter, `struct.member` and `global.def`;
+    array types are checked exactly against the global being read, length
+    included. `Test/Constraints.lean` pins R5e's own counterexample — reading a
+    babybear module as `bn254` — going red on both readers. Turning the check on
+    immediately found a defect in the tests it was meant to protect: a `#guard`
+    compared every corpus module against a hard-coded babybear, wrong for five of
+    the six `Square_*` entries, so `Corpus.Entry` now carries its `FieldSpec`.
+  - **B**, publishing — and the finding that it had already happened. See
+    "Reproduce everything" above: PR #1 has been open since 2026-08-02 with CI
+    green on all four jobs, while this document said none of it had ever run and
+    R6 repeated that in its roadmap without checking.
   - `Gadgets.Addition8FullCarry` compiles to LLZK, `llzk-opt` accepts,
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
@@ -171,6 +203,7 @@ Evidence under `doc/llzk/evidence/`.
 | G10a LLZK analysis pipeline admits the module | PASS — all 14 |
 | G11 the harness's own error paths | PASS — 42 exercised, including the worktree lock's opaque-owner branches, which R6 found were the ones that mattered and the ones nothing covered |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
+| G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |
 | G10b SMT lowering | PASS — 10 lowered, 4 out of scope for a declared reason |
 
@@ -323,9 +356,12 @@ order they are written in there.
    is a change to Clean's core, which since R6 is a **gate** — so it is a
    Clean-side session with its own review, reserved by ORCHESTRATION §11, not an
    increment here.
-4. **§6 — make G9 compare types.** Cheap and mechanical: neither reader looks at
-   a `Ty`, so a babybear circuit emitted entirely as `bn254` passes both `agree`
-   checks and is caught only by `Analyze.checkField`, elsewhere. An afternoon.
+4. **§6 — done (A4).** Both readers take the expected `Ty` and check it at every
+   operand, parameter, member and global; array types are checked exactly against
+   the global being read. `Test/Constraints.lean` pins R5e's own counterexample
+   going red. It shook out one real defect in the tests: a `#guard` checked every
+   corpus module against a hard-coded babybear, which is wrong for five of the six
+   `Square_*` entries — `Corpus.Entry` now carries its `FieldSpec`.
 5. **§2 — the renderer.** R6 narrowed it: `readMember`, `constrainEq` and
    `constrainIn` are the three `Stmt` forms emitted only into `@constrain`, so
    they are the only ones no gate covers, and both verified mutations are in
@@ -339,15 +375,16 @@ order they are written in there.
 7. **§8 — the copy-canonicalisation premise**, currently three lines checked by
    inspection under two theorems that are proved. Small.
 
-### B. Make CI real — a decision, not work
+### B. CI — **done, and it was already done**
 
-**S24's D4, still unanswered.** `llzk-harness` and `llzk-e2e` have never run.
-`ci.yml` triggers on `push` to `main`, `pull_request` and `workflow_dispatch`, so
-pushing `clean-to-llzk/integration` runs *nothing* — the jobs need a pull request
-on the fork, and ORCHESTRATION §11 reserves publishing for an explicit decision.
-Until then every green gate in this document is green on one machine, and the
-workflow itself is untested code. The known risk is `llzk-e2e`'s
-`nix build …#llzk` on a GitHub runner with no substituter for it.
+`alexanderlhicks/clean` PR #1, open since 2026-08-02, and CI green on it at
+`4e15d3ad`: `build`, `llzk-harness`, `llzk-e2e`, `plonky3-backend`. The workflow
+is not untested code and `nix build …#llzk` does work on a runner. See
+"Reproduce everything" above for how this document managed to say otherwise for
+two days, and what R6 should have done about it.
+
+What remains is upkeep rather than a decision: keep the PR current, and treat a
+red run as a gate like any other.
 
 ### C. Stage 2 — capability
 
@@ -384,11 +421,17 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1 and A2 are done — §4 and §3 are closed.** Next: **B, then A4, then A5.**
-B is a decision that costs nothing to make and currently invalidates the word
-"CI" (the branch is published; what is missing is a pull request on the fork).
-A4 is cheap and removes a gap whose protection lives in the wrong file. A5, the
-renderer, is now the largest thing standing between `spec_of_compile` and the
-emitted *text*, which is what A2 makes it worth doing. A3 is more important than
-any of them but is a Clean-core session, so it should be *scheduled* rather than
-slipped into a backend increment — and G0 now enforces that.
+**A1, A2, A4 and B are done — §3, §4 and §6 are closed and CI is green on a
+runner.** Next: **A5, the renderer.** It is now the largest thing standing between
+`spec_of_compile` and the emitted *text*, which is exactly what A2 makes it worth
+doing, and R6 narrowed it to the three `Stmt` forms that appear only in
+`@constrain`. After that A6 (the preservation theorem, D021) and A7 (the
+copy-canonicalisation premise). A3 is more important than any of them but is a
+Clean-core session, so it should be *scheduled* rather than slipped into a
+backend increment — and G0 now enforces that.
+
+One process item, from B: **check the world, not the document.** Track B was on
+this list at all because three sessions in a row read a paragraph saying CI had
+never run, and none of them ran `gh run list`. Any claim here about GitHub, the
+LLZK toolchain, or anything else outside the worktree should be re-checked
+against the thing itself before it is planned around.

@@ -133,6 +133,46 @@ private def renameTable (s : Source Bab) : Source Bab :=
       | o => o }
 #guard !cross withBytes addSrc (renameTable addSrc)
 
+/-! ### The field, which G9 used to ignore entirely (A4)
+
+`GAPS.md` §6: neither reader looked at a `Ty`, so *"a babybear circuit emitted
+entirely as `!felt.type<\"bn254\">` passes both `agree` checks"*. What caught it was
+`Analyze.checkField`'s registry membership — a different mechanism in a different
+file — while G9's summary reported both halves green. The gap was in what G9
+itself licensed, and these pin that it no longer licenses it. -/
+
+private def mulModule : Option Module := (compileSource babybear.toConfig mulSrc).toOption
+
+-- The baseline: read in its own field, the module is the circuit's.
+#guard match mulModule with
+  | some m => agree (F := Bab) babybear.toConfig mulSrc m
+  | none => false
+
+-- Read as any other registry field, it is not a module this reader accepts at
+-- all -- which is the strongest available answer, since a `none` cannot be
+-- mistaken for an agreement.
+#guard match mulModule with
+  | some m => (ofModule (F := Bab) (Ty.felt "bn254") m).isNone
+  | none => false
+#guard match mulModule with
+  | some m => (ofModule (F := Bab) (Ty.felt "mersenne31") m).isNone
+  | none => false
+#guard match mulModule with
+  | some m => (WitnessSet.ofModule (Ty.felt "bn254") m).isNone
+  | none => false
+
+-- The same for the circuit that has a `global.read`, so the array path is
+-- covered as well as the felt one: `constrain.in`'s array type is checked
+-- against the global's own element type *and* length.
+private def addModule : Option Module := (compileSource withBytes.toConfig addSrc).toOption
+
+#guard match addModule with
+  | some m => agree (F := Bab) withBytes.toConfig addSrc m
+  | none => false
+#guard match addModule with
+  | some m => (ofModule (F := Bab) (Ty.felt "bn254") m).isNone
+  | none => false
+
 /-! ### The two R4 named as residual risks, and which are real
 
 R4's reviewers listed four risks inside G9. Two are covered by other gates and
@@ -257,7 +297,7 @@ lookup, which is exactly what the gadget writes. -/
 private def shape (cfg : CertifiedConfig Bab) (src : Source Bab) : Option (Nat × Nat) :=
   match compileSource cfg.toConfig src with
   | .error _ => none
-  | .ok m => (ofModule (F := Bab) m).map fun c => (c.eqs.length, c.lookups.length)
+  | .ok m => (ofModule (F := Bab) (Ty.felt babybear.field.name) m).map fun c => (c.eqs.length, c.lookups.length)
 
 #guard shape babybear mulSrc == some (2, 0)
 #guard shape babybear decSrc == some (2, 0)

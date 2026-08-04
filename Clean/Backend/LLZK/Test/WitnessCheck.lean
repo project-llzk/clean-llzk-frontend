@@ -42,7 +42,7 @@ programs. -/
 private def cross (cfg : CertifiedConfig Bab) (built reference : Source Bab) : Bool :=
   match compileSource cfg.toConfig built with
   | .error _ => false
-  | .ok m => WitnessSet.agree reference m
+  | .ok m => WitnessSet.agree (Ty.felt cfg.field.name) reference m
 
 /-! ## The corpus agrees -/
 
@@ -161,8 +161,11 @@ the compute function". Nothing in the corpus reaches those branches, so this
 pins the one property that stands in for them: the reader accepts exactly the
 modules whose `@compute` is in the modelled subset, and every corpus module is. -/
 
-#guard (Corpus.corpus.filterMap (fun e => e.module.toOption)).all
-  fun m => (WitnessSet.ofModule m).isSome
+-- Each against *its own* field: the six `Square_*` entries are in six different
+-- ones, and since A4 the reader checks that (`GAPS.md` §6).
+#guard Corpus.corpus.all fun e => match e.module.toOption with
+  | some m => (WitnessSet.ofModule (Ty.felt e.field.name) m).isSome
+  | none => true
 
 /-! ## The refusal is reachable, and reached
 
@@ -194,7 +197,8 @@ private def moduleOf (cfg : CertifiedConfig Bab) (src : Source Bab) : Option Mod
 -- shows the two halves are independent, and that the witness half catches a
 -- wrong `@compute` the constraint half cannot see.
 #guard match moduleOf babybear dbl with
-  | some m => ConstraintSet.agree babybear.toConfig sq m && !WitnessSet.agree sq m
+  | some m => ConstraintSet.agree babybear.toConfig sq m
+      && !WitnessSet.agree (Ty.felt babybear.field.name) sq m
   | none => false
 
 #guard match moduleOf babybear dbl with

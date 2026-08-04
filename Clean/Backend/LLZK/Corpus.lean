@@ -36,6 +36,11 @@ structure Entry where
   /-- The artifact's file name. Not the component name — that is always `@Main`
   (D015) — so this is where the circuit's identity survives. -/
   name : String
+  /-- The registry field this entry is emitted in. Carried since A4: with G9
+  reading types, "the reader accepts this module" is a question about a *field*,
+  and the six `Square_*` entries are in six different ones. A `#guard` that
+  hard-codes babybear answers it wrongly for five of them. -/
+  field : FieldSpec
   module : Except (Array Diagnostic) Module
   /-- Each input vector, paired with Clean's own witness for it. Input values are
   canonical representatives, one per input field element. Chosen to cover
@@ -61,6 +66,7 @@ def Entry.ofSource {F : Type} [FiniteField F] [CanonicalRepr F] [DecidableEq F]
     (cfg : CertifiedConfig F) (name : String) (src : Source F) (inputs : Array (Array Nat)) :
     Entry where
   name := name
+  field := cfg.field
   module := compileSourceVerified cfg src
   vectors := inputs.map fun values => (values, LLZK.witness src values)
   -- `.toConfig` twice, because these two report on the halves of G9 *separately*
@@ -69,7 +75,7 @@ def Entry.ofSource {F : Type} [FiniteField F] [CanonicalRepr F] [DecidableEq F]
   constraintsAgree := some (ConstraintSet.agreeCompiled cfg.toConfig src)
   witnessAgree := some (match compileSource cfg.toConfig src with
     | .error _ => false
-    | .ok m => WitnessSet.agree src m)
+    | .ok m => WitnessSet.agree (Ty.felt cfg.field.name) src m)
 
 /-! ## Registry conformance
 
@@ -108,6 +114,7 @@ def registryEntry (spec : FieldSpec) : Entry :=
     outputs := #[.mul (.var 0) (.var 0)] }
   let x := spec.prime - 1
   { name := "Square_" ++ spec.name
+    field := spec
     module := lowerRecognized (.forField spec) square
     vectors := #[(#[x], .ok { inputs := #[x], cells := #[], outputs := #[x * x % spec.prime] })]
     -- No Clean circuit behind these, so there is nothing independent to compare

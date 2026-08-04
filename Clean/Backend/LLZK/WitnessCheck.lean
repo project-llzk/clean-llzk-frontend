@@ -299,11 +299,18 @@ private def Reader.rebind (r : Reader) (v : Value) (w : WExpr) : Option Reader :
   if h : v.index < r.slots.size then some { r with slots := r.slots.set v.index (.expr w) h }
   else none
 
-/-- Interpret one statement of `@compute`. -/
-private def step (inputSize : Nat) (r : Reader) : Stmt → Option Reader
+/-- Interpret one statement of `@compute`.
+
+Every type is checked against `fieldTy` (A4, `GAPS.md` §6): before that neither
+half of G9 read a `Ty`, so a module emitted entirely in the wrong field passed
+both, and the only thing that caught it lived in `Analyze`. -/
+private def step (fieldTy : Ty) (inputSize : Nat) (r : Reader) : Stmt → Option Reader
   | .structNew dst => r.define dst .self
-  | .feltConst dst value _ => r.define dst (.expr (.const value))
-  | .feltBin dst op lhs rhs _ => do
+  | .feltConst dst value ty => do
+    guard (ty = fieldTy)
+    r.define dst (.expr (.const value))
+  | .feltBin dst op lhs rhs ty => do
+    guard (ty = fieldTy)
     let a ← r.expr lhs
     let b ← r.expr rhs
     match op with
@@ -317,7 +324,8 @@ private def step (inputSize : Nat) (r : Reader) : Stmt → Option Reader
     | .umod => match b with
       | .const d => r.define dst (.expr (.umod a d))
       | _ => none
-  | .writeMember self member value _ => do
+  | .writeMember self member value memberTy => do
+    guard (memberTy = fieldTy)
     let .self ← r.slots[self.index]? | none
     let w ← r.expr value
     if member = witnessMember r.cells.length then
@@ -337,15 +345,16 @@ private def step (inputSize : Nat) (r : Reader) : Stmt → Option Reader
 The input count comes from the parameter list, and the cell and output counts
 from the order the writes appear in — so a module whose layout disagrees with
 Clean's is a mismatch rather than a blind spot shared by both sides. -/
-def ofModule (m : Module) : Option WitnessSet := do
+def ofModule (fieldTy : Ty) (m : Module) : Option WitnessSet := do
   let params := m.root.compute.params
   guard (params.zipIdx.all fun (p, i) => p.value.index = i)
-  guard (params.all fun p => match p.ty with | .felt _ => true | _ => false)
+  guard (params.all fun p => p.ty = fieldTy)
+  guard (m.root.members.all fun mem => mem.ty = fieldTy)
   let mut reader : Reader :=
     { slots := (Array.range params.size).map fun i => Slot.expr (.cell i)
       cells := [], outputs := [] }
   for stmt in m.root.compute.body do
-    let some next := step params.size reader stmt | none
+    let some next := step fieldTy params.size reader stmt | none
     reader := next
   return { inputs := params.size, cells := reader.cells, outputs := reader.outputs }
 
@@ -353,8 +362,8 @@ def ofModule (m : Module) : Option WitnessSet := do
 
 Order matters here, unlike the constraint side: cell `k` is circuit variable
 `inputSize + k`, so a permutation would be a different circuit. -/
-def agree (src : Source F) (m : Module) : Bool :=
-  match ofModule m, ofSource src with
+def agree (fieldTy : Ty) (src : Source F) (m : Module) : Bool :=
+  match ofModule fieldTy m, ofSource src with
   | some emitted, some clean => emitted == clean
   | _, _ => false
 
@@ -409,7 +418,7 @@ than a public function that means less than its name. -/
 def verify [CanonicalRepr F] (cfg : CertifiedConfig F) (src : Source F) (m : Module) :
     Except (Array Diagnostic) Module :=
   if !ConstraintSet.agree cfg.toConfig src m then .error #[ConstraintSet.mismatch]
-  else if !WitnessSet.agree src m then .error #[witnessMismatch]
+  else if !WitnessSet.agree (Ty.felt cfg.field.name) src m then .error #[witnessMismatch]
   else .ok m
 
 /-- Compile a flattened circuit and verify **both** halves of G9 before returning
@@ -423,7 +432,8 @@ def compileSourceVerified [CanonicalRepr F] (cfg : CertifiedConfig F) (src : Sou
 /-- **Every module this backend emits computes the circuit's witnesses.** -/
 theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : CertifiedConfig F}
     {src : Source F} {m : Module}
-    (h : compileSourceVerified cfg src = .ok m) : WitnessSet.agree src m = true := by
+    (h : compileSourceVerified cfg src = .ok m) :
+    WitnessSet.agree (Ty.felt cfg.field.name) src m = true := by
   unfold compileSourceVerified verify at h
   split at h
   · exact absurd h (by simp)

@@ -200,15 +200,36 @@ restated first, not the current one lifted.
 Nothing outside `IR.lean` uses it. `ConstraintSet.agree` still does the work at
 every compile.
 
-## 6. G9 compares no types
+## 6. G9 compares no types — **closed by A4**
 
-Neither `ConstraintSet.ofModule` nor `WitnessSet.ofModule` reads a `Ty`. A
-babybear circuit emitted entirely as `!felt.type<"bn254">` passes both `agree`
-checks. What catches it is `Analyze.checkField`'s registry membership, which is a
-different mechanism in a different file — and G9's summary output, which reports
-both halves green, obscures that the protection is elsewhere. Found by R5e.
-`llzk-opt` also type-checks every operand (G3), so a module that reached a
-verifier would not pass it; the gap is in what G9 itself licenses.
+It used to read: neither `ConstraintSet.ofModule` nor `WitnessSet.ofModule` reads
+a `Ty`, so a babybear circuit emitted entirely as `!felt.type<"bn254">` passes
+both `agree` checks, and what catches it is `Analyze.checkField`'s registry
+membership — a different mechanism in a different file, while G9's summary
+reports both halves green. Found by R5e.
+
+Both readers now take the expected `Ty` and check it everywhere: every
+`felt.const`, `felt.add`/`mul`, `struct.readm`/`writem`, `constrain.eq` and
+`constrain.in` operand type, every parameter, every `struct.member`, and every
+`global.def`'s element type. `agree` passes `Ty.felt cfg.field.name`, so the
+field the module is read in is the field the *configuration* names rather than
+one the module asserts about itself.
+
+Array types are checked **exactly**, against the global being read: element type
+and length both, so `global.read @Bytes : !array.type<255 x …>` is a mismatch
+here rather than something only `llzk-opt` notices.
+
+`Test/Constraints.lean` pins that it can go red — R5e's own counterexample, both
+readers, on `Multiply` and on `Addition8FullCarry` (which exercises the array
+path). Reading either module as `bn254` or `mersenne31` gives `none`, which is a
+stronger answer than a failed comparison because a `none` cannot be mistaken for
+an agreement.
+
+One thing this shook out: `Corpus.Entry` now carries its `FieldSpec`. A `#guard`
+in `Test/WitnessCheck.lean` checked that the reader accepts every corpus module
+against a hard-coded babybear, which was wrong for five of the six `Square_*`
+entries the moment the reader started looking. "Does the reader accept this
+module" is a question about a field.
 
 ## 7. D017 — the reading of LLZK — has no formal basis
 

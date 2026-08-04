@@ -52,10 +52,13 @@ That last clause is an assumption, and it is deliberately a small and inspectabl
 one: `felt.add` is `+`, `felt.mul` is `*`, `felt.const n` is `fromNat n`,
 `struct.readm` reads the cell of that name, `constrain.eq a, b` is `a = b`, and
 `constrain.in t, v` is membership. It is the same *kind* of assumption as D011,
-and it is recorded as D017. Two things narrow it further: `ofModule` is
-fail-closed on every statement form it does not model, and it re-derives the
+and it is recorded as D017. Three things narrow it further: `ofModule` is
+fail-closed on every statement form it does not model; it re-derives the
 component's shape (input count, witness count, output count) from the module
-alone, so a layout disagreement is a mismatch rather than a shared blind spot.
+alone, so a layout disagreement is a mismatch rather than a shared blind spot;
+and since A4 it checks every `Ty` against the configured field, so a module
+emitted in the wrong field is a mismatch here rather than only in
+`Analyze.checkField` (`GAPS.md` §6).
 
 **Lookups.** The comparison checks that each `constrain.in` names the table
 Clean's `.lookup` named and queries the same polynomial. That the *rows* are the
@@ -256,13 +259,27 @@ private def Reader.define (r : Reader F) (v : Value) (s : Slot F) : Option (Read
 
 /-- Interpret one statement of `@constrain`.
 
-`globals` is the set of names the module actually defines, so that a
-`global.read` of a name no `global.def` provides is a mismatch here and not only
-in `llzk-opt`. -/
-private def step (inputSize numWitnesses numOutputs : Nat) (declared globals : Array String)
+`globals` is the module's own `global.def`s, so that a `global.read` of a name no
+`global.def` provides is a mismatch here and not only in `llzk-opt`.
+
+**Every type is checked against `fieldTy`** (A4, `GAPS.md` §6). Until then neither
+reader looked at a `Ty` at all, so a babybear circuit emitted entirely as
+`!felt.type<"bn254">` passed both halves of G9; what caught it was
+`Analyze.checkField`'s registry membership, which is a different mechanism in a
+different file, while G9's own summary reported both halves green. `llzk-opt`
+would also reject such a module, but the gap was in what G9 itself licensed.
+
+An array type is checked *exactly*, against the global it reads: element type and
+length both, so a `global.read @Bytes : !array.type<255 x …>` is a mismatch rather
+than something only the verifier notices. -/
+private def step (fieldTy : Ty) (inputSize numWitnesses numOutputs : Nat)
+    (declared : Array String) (globals : Array ConstArray)
     (r : Reader F) : Stmt → Option (Reader F)
-  | .feltConst dst value _ => r.define dst (.poly (Poly.const (FiniteField.fromNat value)))
-  | .feltBin dst op lhs rhs _ => do
+  | .feltConst dst value ty => do
+    guard (ty = fieldTy)
+    r.define dst (.poly (Poly.const (FiniteField.fromNat value)))
+  | .feltBin dst op lhs rhs ty => do
+    guard (ty = fieldTy)
     let a ← r.poly lhs
     let b ← r.poly rhs
     let combined ← match op with
@@ -270,19 +287,25 @@ private def step (inputSize numWitnesses numOutputs : Nat) (declared globals : A
       | .mul => some (Poly.mul a b)
       | .uintdiv | .umod => none
     r.define dst (.poly combined)
-  | .readMember dst self member _ => do
+  | .readMember dst self member memberTy => do
+    guard (memberTy = fieldTy)
     let .self ← r.get self | none
     let cell ← memberVar inputSize numWitnesses numOutputs declared member
     r.define dst (.poly (Poly.var cell))
-  | .globalRead dst name _ => do
-    guard (globals.contains name)
+  | .globalRead dst name ty => do
+    let some g := globals.find? (·.name = name) | none
+    guard (ty = Ty.array g.values.size fieldTy)
     r.define dst (.table name)
-  | .constrainEq lhs rhs _ => do
+  | .constrainEq lhs rhs ty => do
+    guard (ty = fieldTy)
     let a ← r.poly lhs
     let b ← r.poly rhs
     return { r with eqs := r.eqs ++ [Poly.sub a b] }
-  | .constrainIn array _ element _ => do
+  | .constrainIn array arrayTy element elementTy => do
+    guard (elementTy = fieldTy)
     let .table name ← r.get array | none
+    let some g := globals.find? (·.name = name) | none
+    guard (arrayTy = Ty.array g.values.size fieldTy)
     let value ← r.poly element
     return { r with lookups := r.lookups ++ [(name, value)] }
   -- `struct.new` and `struct.writem` belong to `@compute`. Reaching one here
@@ -295,7 +318,7 @@ The component's shape is re-derived from the module — the parameter count, the
 `{signal}` members and the `{llzk.pub}` members — rather than taken from the
 circuit, so a layout that disagrees with Clean's is a mismatch rather than a
 blind spot shared by both sides (D014's known weakness, avoided here). -/
-def ofModule (m : Module) : Option (ConstraintSet F) := do
+def ofModule (fieldTy : Ty) (m : Module) : Option (ConstraintSet F) := do
   let numWitnesses := (m.root.members.filter (·.visibility = .signal)).size
   let numOutputs := (m.root.members.filter (·.visibility = .pub)).size
   let params := m.root.constrain.params
@@ -306,16 +329,18 @@ def ofModule (m : Module) : Option (ConstraintSet F) := do
     #[Slot.self] ++ (Array.range inputSize).map fun i => Slot.poly (Poly.var (.circuit i))
   -- The parameters must be `%self` and then one felt each, numbered `%v0`
   -- upwards in order, or the indices the body reads do not mean what this reader
-  -- assumes about them.
+  -- assumes about them. Since A4 the felt is *the* felt, not any felt.
   guard (params.zipIdx.all fun (p, i) => p.value.index = i)
-  guard ((params.extract 1 params.size).all fun p => match p.ty with
-    | .felt _ => true
-    | _ => false)
-  let globals := m.globals.map (·.name)
+  guard ((params.extract 1 params.size).all fun p => p.ty = fieldTy)
+  -- The component's state and its constant arrays, likewise. A member or a
+  -- global in another field is a mismatch here rather than only in `llzk-opt`.
+  guard (m.root.members.all fun mem => mem.ty = fieldTy)
+  guard (m.globals.all fun g => g.elemTy = fieldTy)
   let declared := m.root.members.map (·.name)
   let mut reader : Reader F := { slots, eqs := [], lookups := [] }
   for stmt in m.root.constrain.body do
-    let some next := step inputSize numWitnesses numOutputs declared globals reader stmt | none
+    let some next := step fieldTy inputSize numWitnesses numOutputs declared m.globals reader stmt
+      | none
     reader := next
   return { inputs := inputSize, eqs := reader.eqs, lookups := reader.lookups
            globals := (m.globals.map fun g => (g.name, g.values)).toList }
@@ -329,7 +354,7 @@ Order is deliberately not compared: constraints are a conjunction, and the
 emitter groups them lookups-first (A6). Multiplicity *is* compared — `isPerm`,
 not set equality — so a dropped or duplicated constraint is a mismatch. -/
 def agree (cfg : Config) (src : Source F) (m : Module) : Bool :=
-  match ofModule (F := F) m with
+  match ofModule (F := F) (Ty.felt cfg.field.name) m with
   | none => false
   | some emitted =>
     let clean := ofSource cfg src
@@ -408,7 +433,8 @@ Order is irrelevant on both sides because the constraints are a conjunction, and
 that is why a permutation suffices. -/
 theorem eqs_iff_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F} {m : Module}
     {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
-    (hm : ofModule (F := F) m = some C) (env : Environment F) (outs : Nat → F) :
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
+    (env : Environment F) (outs : Nat → F) :
     (∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
       ↔ (∀ e ∈ FlatOperation.constraints src.operations, e.eval env = 0)
         ∧ (∀ e j, (e, j) ∈ src.outputs.toList.zipIdx → outs j = e.eval env) := by
@@ -427,7 +453,7 @@ membership in the emitted array is Clean's `Contains` — is
 `TableCert.certified_membership`, and needs the table certified. -/
 theorem lookups_perm_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F}
     {m : Module} {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
-    (hm : ofModule (F := F) m = some C) :
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C) :
     C.lookups.Perm (ofSource cfg src).lookups := by
   have ha := agree_of_compileSource' h
   simp only [agree, hm, Bool.and_eq_true] at ha

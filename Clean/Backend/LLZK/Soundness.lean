@@ -64,7 +64,7 @@ Factored out because `compile` goes through `compileSourceVerified`, whose
 guarantee is `constraintsAgree_of_compileSourceVerified` — an `agree`, not a
 `compileSource'`. Same proof. -/
 theorem ConstraintSet.eqs_iff_of_agree {cfg : Config} {src : Source F} {m : Module}
-    {C : ConstraintSet F} (ha : agree cfg src m = true) (hm : ofModule (F := F) m = some C)
+    {C : ConstraintSet F} (ha : agree cfg src m = true) (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
     (env : Environment F) (outs : Nat → F) :
     (∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
       ↔ (∀ e ∈ FlatOperation.constraints src.operations, e.eval env = 0)
@@ -81,7 +81,8 @@ The assertion half comes from the polynomial comparison, the lookup half from A1
 Together they are exactly `constraintsHoldFlat_iff_forall_mem`'s right-hand side. -/
 theorem constraintsHoldFlat_of_emitted [CanonicalRepr F] {cfg : CertifiedConfig F}
     {src : Source F} {m : Module} {C : ConstraintSet F} {r : Recognized}
-    (ha : agree cfg.toConfig src m = true) (hm : ofModule (F := F) m = some C)
+    (ha : agree cfg.toConfig src m = true)
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
     (hrec : recognize cfg.toConfig src = .ok r)
     (resolve : ∀ l ∈ FlatOperation.lookups src.operations,
       ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.toRaw.arity,
@@ -145,7 +146,7 @@ without its certificate. -/
 theorem spec_of_compile [CanonicalRepr F] {cfg : CertifiedConfig F}
     {c : FormalCircuit F Input Output} {m : Module} {C : ConstraintSet F} {r : Recognized}
     (hcompile : compile cfg c = .ok m)
-    (hm : ofModule (F := F) m = some C)
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
     (hrec : recognize cfg.toConfig (Compilable.source (F := F) c) = .ok r)
     (resolve : ∀ l ∈ FlatOperation.lookups (Compilable.source (F := F) c).operations,
       ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.toRaw.arity,

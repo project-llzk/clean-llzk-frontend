@@ -65,7 +65,7 @@ Everything about the *circuit* is discharged. What remains hypothetical is this
 compile run, and D017 — that the emitted text means what the reader reads. -/
 theorem add8_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognized}
     (hcompile : compile withBytes add8 = .ok m)
-    (hm : ConstraintSet.ofModule (F := Bab) m = some C)
+    (hm : ConstraintSet.ofModule (F := Bab) (Ty.felt withBytes.field.name) m = some C)
     (hrec : recognize withBytes.toConfig (Compilable.source add8) = .ok r)
     (env : Environment Bab) (outs : Nat → Bab)
     (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
@@ -91,7 +91,7 @@ this records that the conversion is available rather than making every caller
 find it. -/
 theorem add8_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recognized}
     (hcompile : compile withBytes add8 = .ok m)
-    (hm : ConstraintSet.ofModule (F := Bab) m = some C)
+    (hm : ConstraintSet.ofModule (F := Bab) (Ty.felt withBytes.field.name) m = some C)
     (hrec : recognize withBytes.toConfig (Compilable.source add8) = .ok r)
     (env : Environment Bab) (outs : Nat → Bab)
     (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
