@@ -1,7 +1,6 @@
 R6 — gates after the review's repairs
 
-Commit under test: 4e15d3adaa60c819fc89eba220d2e72aa4843dce plus the working-tree changes this
-session made; the commit that carries them is the one this file lands in.
+Commit under test: 2a0930c3 (this session's repairs), reviewed from 4e15d3ad
 Worktree: /home/alh/LLZK/clean-llzk-frontend, branch clean-to-llzk/integration
 Date: 2026-08-04T01:16:30Z
 Tools: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0 (LLZK 3.0.0)
