@@ -21,7 +21,10 @@
 # got in S22.
 #
 #   claim [LABEL]   take the lock, or fail naming the current holder
-#   reclaim [LABEL] take a lock whose owner is provably gone (a deliberate act)
+#   reclaim [LABEL] [--from ID]
+#                   take a lock whose owner is gone (a deliberate act). Without
+#                   --from, only a numeric owner this machine can prove dead;
+#                   with it, any owner, and naming it is the proof you looked.
 #   release         give it up (only the holder may)
 #   status          who holds it, if anyone
 #   require         succeed only if this process holds it
@@ -61,14 +64,35 @@ owner_since() { [[ -f "${lock}" ]] && sed -n '3p' "${lock}" || true; }
 # numeric session leader; an id set through LLZK_SESSION is opaque. Treating
 # "cannot tell" as dead would let any session reclaim any lock it does not
 # understand, which is the failure this script exists to prevent -- so unknown
-# means held, and a genuinely stuck lock is removed by deleting the file, which
-# is a deliberate act.
+# means held.
 lock_is_live() {
   local id; id="$(owner_id)"
   [[ -n "${id}" ]] || return 1
   [[ "${id}" == "$(me)" ]] && return 0
-  [[ "${id}" =~ ^[0-9]+$ ]] || return 0
+  lock_owner_is_opaque && return 0
   kill -0 "${id}" 2>/dev/null
+}
+
+# Whether liveness is decidable for the recorded owner at all. It is not for an
+# id that came from LLZK_SESSION, which is every agent session and CI.
+#
+# **R6 found that this made `reclaim` dead code for exactly the identities D023
+# introduced it for.** `lock_is_live` answers "live" for an opaque owner, so
+# `claim` printed the live-holder refusal, `status` reported the lock as held,
+# and `reclaim` refused with "is live; reclaim is only for a lock whose owner is
+# gone" -- forever. The only way out was `rm`, which D023 does not mention and
+# CURRENT.md's "claim the worktree first" walks straight into. G11 did not see it
+# because all three of its stale-lock cases record a *numeric* owner (999999),
+# which is the one case that did work.
+#
+# The fix is not to guess liveness. It is to let the operator supply the missing
+# observation: `reclaim --from <id>` takes a lock whose recorded owner is `<id>`,
+# and having to copy that id out of the refusal message is the deliberate act.
+# An accident cannot produce it, which is the property `claim` needed and did not
+# have.
+lock_owner_is_opaque() {
+  local id; id="$(owner_id)"
+  [[ -n "${id}" ]] && [[ ! "${id}" =~ ^[0-9]+$ ]]
 }
 
 take_it() {
@@ -81,6 +105,20 @@ case "${1:-status}" in
     label="${2:-unlabelled session}"
     if [[ -f "${lock}" ]] && [[ "$(owner_id)" != "$(me)" ]]; then
       if lock_is_live; then
+        # The exit route differs by whether liveness was *decided* or merely
+        # assumed, and saying so is the whole of R6's repair: before it, an
+        # opaque owner produced this message, whose only advice is "wait", for a
+        # lock that nothing would ever release.
+        if lock_owner_is_opaque; then
+          llzk_fail "the worktree is held by session $(owner_id) — $(owner_label), since $(owner_since).
+Do not write here. That id came from LLZK_SESSION, so this machine cannot tell
+whether the session is still running; it is treated as held. Either wait for it
+to release, take your own worktree:
+  git worktree add -b <branch> ../<dir> \$(git rev-parse HEAD)
+and integrate through commits, per ORCHESTRATION.md §7 — or, if you know that
+session is finished, displace it by name:
+  bash scripts/llzk/worktree-lock.sh reclaim '<what you are doing>' --from '$(owner_id)'"
+        fi
         llzk_fail "the worktree is held by session $(owner_id) — $(owner_label), since $(owner_since).
 Do not write here. Either wait for it to release, or take your own worktree:
   git worktree add -b <branch> ../<dir> \$(git rev-parse HEAD)
@@ -103,13 +141,34 @@ LLZK_SESSION -- see the note at the top of this script."
     take_it "${label}"
     ;;
   reclaim)
-    label="${2:-unlabelled session}"
-    if [[ -f "${lock}" ]] && lock_is_live && [[ "$(owner_id)" != "$(me)" ]]; then
-      llzk_fail "session $(owner_id) — $(owner_label) is live; reclaim is only for a lock whose owner is gone"
+    label="unlabelled session"
+    from=""
+    shift || true
+    while (( $# > 0 )); do
+      case "$1" in
+        --from) from="${2:-}"; shift 2 || llzk_fail "--from needs the recorded owner id" ;;
+        *) label="$1"; shift ;;
+      esac
+    done
+    if [[ -f "${lock}" ]] && [[ "$(owner_id)" != "$(me)" ]]; then
+      if [[ -n "${from}" ]]; then
+        # An explicit owner is the observation the script cannot make. It has to
+        # be the *recorded* one, so a stale --from from an earlier session cannot
+        # displace a holder that arrived since.
+        [[ "${from}" == "$(owner_id)" ]] || llzk_fail "--from ${from} does not match the recorded \
+owner $(owner_id) — $(owner_label). The lock changed hands since you read it; read it again."
+      elif lock_owner_is_opaque; then
+        llzk_fail "session $(owner_id) — $(owner_label) holds the lock, since $(owner_since), and \
+its liveness cannot be decided here: the id came from LLZK_SESSION, not from a process this
+machine can look up. If you know that session is done, say which one you are displacing:
+  bash scripts/llzk/worktree-lock.sh reclaim '<what you are doing>' --from '$(owner_id)'"
+      elif lock_is_live; then
+        llzk_fail "session $(owner_id) — $(owner_label) is live; reclaim is only for a lock whose owner is gone"
+      fi
     fi
     # `[[ ... ]] && echo` would exit 1 here under `set -e` when there is no lock
     # to reclaim, so reclaiming a free tree would fail after writing the file.
-    if [[ -f "${lock}" ]]; then
+    if [[ -f "${lock}" ]] && [[ "$(owner_id)" != "$(me)" ]]; then
       echo "note: reclaiming a stale lock from session $(owner_id) — $(owner_label)"
     fi
     take_it "${label}"
@@ -123,7 +182,12 @@ LLZK_SESSION -- see the note at the top of this script."
     ;;
   status)
     if [[ ! -f "${lock}" ]]; then echo "worktree is free"; exit 0; fi
-    if lock_is_live; then
+    if lock_owner_is_opaque && [[ "$(owner_id)" != "$(me)" ]]; then
+      # Not "held" flatly: liveness was never observed, and reporting an
+      # assumption as a fact is what left R6 with no documented way forward.
+      echo "worktree held by session $(owner_id) — $(owner_label), since $(owner_since); \
+liveness undecidable (LLZK_SESSION id), reclaimable with --from '$(owner_id)'"
+    elif lock_is_live; then
       echo "worktree held by session $(owner_id) — $(owner_label), since $(owner_since)"
     else
       echo "stale lock from session $(owner_id) — $(owner_label), since $(owner_since); reclaimable"

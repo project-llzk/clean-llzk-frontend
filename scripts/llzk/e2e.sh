@@ -104,10 +104,10 @@ echo
 # Without a floor, a change that put a felt.umod in every module would give
 # smt_ok=0, smt_skipped=13 and still print PASS — the count is the only signal
 # G10b produces, and nothing compared it to anything (R4b-5).
-LLZK_EXPECTED_SMT_OK="${LLZK_EXPECTED_SMT_OK:-9}"
+LLZK_EXPECTED_SMT_OK="${LLZK_EXPECTED_SMT_OK:-10}"
 LLZK_EXPECTED_SMT_SKIPPED="${LLZK_EXPECTED_SMT_SKIPPED:-1}"
-LLZK_EXPECTED_ARTIFACTS="${LLZK_EXPECTED_ARTIFACTS:-11}"
-LLZK_EXPECTED_VECTORS="${LLZK_EXPECTED_VECTORS:-30}"
+LLZK_EXPECTED_ARTIFACTS="${LLZK_EXPECTED_ARTIFACTS:-12}"
+LLZK_EXPECTED_VECTORS="${LLZK_EXPECTED_VECTORS:-33}"
 LLZK_EXPECTED_FIXTURES="${LLZK_EXPECTED_FIXTURES:-2}"
 smt_ok=0
 smt_skipped=0

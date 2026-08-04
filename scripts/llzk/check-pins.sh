@@ -33,6 +33,30 @@ if ! git merge-base --is-ancestor "${clean_base}" HEAD; then
   exit 1
 fi
 
+# This branch changes Clean's core in exactly two places, and several decisions
+# rest on that: D012's follow-up defers naming ByteTable's `StaticTable` because
+# "that belongs to a Clean-side session", and GAPS.md item 8 defers removing
+# `Clean/Utils/Primes.lean`'s `native_decide` uses because "that file is Clean
+# core, which this branch keeps byte-identical to the pinned base". Both are
+# arguments about *where* work belongs, and both stop holding the moment the
+# premise does.
+#
+# R6 found the premise was true and gated nowhere -- an invariant three documents
+# rely on, checkable in one line, checked by nobody. The two exceptions are the
+# registration edits a backend has to make: `Clean.lean` imports it and
+# `Clean/Test.lean` imports its test modules.
+core_changes="$(git diff --name-only "${clean_base}" HEAD -- Clean/ \
+  ':!Clean/Backend/LLZK' ':!Clean.lean' ':!Clean/Test.lean')"
+if [[ -n "${core_changes}" ]]; then
+  echo "error: Clean's core is no longer byte-identical to the pinned base ${clean_base}:" >&2
+  sed 's/^/  /' <<<"${core_changes}" >&2
+  echo "  This branch is allowed to add Clean/Backend/LLZK/ and to register it in" >&2
+  echo "  Clean.lean and Clean/Test.lean, and nothing else. A change to Clean's core" >&2
+  echo "  belongs to a Clean-side session with its own review (D012, ORCHESTRATION §11)," >&2
+  echo "  and several decisions cite this invariant by name." >&2
+  exit 1
+fi
+
 actual_toolchain="$(tr -d '\r\n' < lean-toolchain)"
 if [[ "${actual_toolchain}" != "${expected_toolchain}" ]]; then
   echo "error: Lean toolchain is ${actual_toolchain}, expected ${expected_toolchain}" >&2
@@ -40,6 +64,7 @@ if [[ "${actual_toolchain}" != "${expected_toolchain}" ]]; then
 fi
 
 echo "Clean base: ${clean_base}"
+echo "core:       byte-identical outside Clean/Backend/LLZK (plus the two registration files)"
 echo "HEAD:       $(git rev-parse HEAD)"
 echo "upstream:   ${actual_upstream}"
 echo "toolchain:  ${actual_toolchain}"

@@ -894,3 +894,55 @@ Alternatives rejected:
 
 Consequence: a lock left behind by a dead session now needs one deliberate
 command, `reclaim`, instead of resolving itself. That is the intended trade.
+
+**That last sentence was false for every session this entry is about, and R6 hit
+it on the first line of `CURRENT.md`'s "Next session".** `lock_is_live` decides
+liveness by `kill -0`, which needs a numeric session id; an `LLZK_SESSION` id is
+opaque, and the function fails *closed* — unknown means held. So for exactly the
+identities D023 introduced, `reclaim` answered "is live; reclaim is only for a
+lock whose owner is gone", `claim` printed the live-holder refusal whose only
+advice is "wait", and `status` reported an assumption as a fact. There was no
+deliberate command; there was `rm`, which this entry does not mention. S24's own
+lock sat on the tree for two days and R6 had to delete it.
+
+G11 did not see it because all three of its stale-lock cases record owner
+`999999` — a numeric id, the one case that worked.
+
+## D024 — `reclaim --from` supplies the observation the machine cannot make
+
+**Status:** accepted
+**Date:** 2026-08-04
+**Enacted by:** R6
+
+The repair is not to guess liveness. Every rule that would decide it for an
+opaque id is the same rule D023 already rejected. It is to let the operator
+supply the missing observation, in a form an accident cannot produce:
+
+```
+bash scripts/llzk/worktree-lock.sh reclaim '<what you are doing>' --from '<owner-id>'
+```
+
+`--from` must equal the *recorded* owner, so a value copied out of an earlier
+refusal cannot displace a holder that arrived since; and having to copy it at all
+is the deliberate act, in the same spirit as `reclaim` being separate from
+`claim`. Numeric owners keep the automatic path: `reclaim` with no `--from` still
+takes a lock whose owner this machine can prove dead, and still refuses one it
+can prove alive.
+
+Two smaller things the same repair fixes, both of which were reporting an
+assumption as a fact:
+
+- `status` now distinguishes "held, liveness undecidable (LLZK_SESSION id)" from
+  "held", and names the `--from` that would displace it;
+- `claim`'s refusal for an opaque owner now offers that route instead of only
+  "wait or take your own worktree", which for an unreclaimable lock was advice to
+  wait forever.
+
+G11 gained six cases covering the opaque path, and the existing "reclaim while
+the holder is live" case was split: it had been written with `LLZK_SESSION=owner`,
+so it was testing the undecidable path while claiming to test the live one. The
+provably-live case now records this shell's own POSIX session id.
+
+The general lesson is D005's and D019's again, in a third place: a claim about
+what a mechanism guarantees has to be checked against the case the mechanism was
+built for, not against the case that was easiest to write a test for.

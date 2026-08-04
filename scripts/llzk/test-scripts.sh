@@ -107,6 +107,16 @@ echo "leanprover/lean4:v4.99.0" > "${clone}/lean-toolchain"
 expect "toolchain mismatch" 1 "Lean toolchain is leanprover/lean4:v4.99.0" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
+# R6. The invariant D012 and GAPS item 8 both argue from, gated for the first
+# time. Committed in the clone, because check-pins.sh compares HEAD against the
+# base rather than the worktree.
+clone="$(make_clone core-drift)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+echo "-- touched by a backend session" >> "${clone}/Clean/Utils/Primes.lean"
+git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet -am "touch Clean core"
+expect "a change to Clean's core is caught" 1 "no longer byte-identical to the pinned base" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
 clone="$(make_clone happy)"
 git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
 expect "happy path" 0 "pin check:  PASS" \
@@ -168,10 +178,20 @@ expect "require while another session holds it" 1 "held by owner" \
   -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" require
 expect "claim while another session holds it" 1 "the worktree is held by session owner" \
   -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" claim "the intruder"
-expect "reclaim while the holder is live" 1 "is live; reclaim is only for" \
+# An LLZK_SESSION owner is opaque, so "live" here is an assumption rather than an
+# observation and the refusal has to say so; the provably-live case is below.
+expect "reclaim while an opaque holder is recorded" 1 "liveness cannot be decided here" \
   -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" reclaim "the intruder"
 expect "require as the holder" 0 "worktree lock: held" \
   -- env LLZK_SESSION=owner bash "$(lock_of "${clone}")" require
+
+# A numeric owner this machine *can* look up, and which is running: this shell's
+# own POSIX session. The only case where "is live" is a fact.
+clone="$(make_clone lock-live-numeric)"
+printf '%s\na live session\n2026-01-01T00:00:00Z\n' "$(ps -o sid= -p $$ | tr -d ' ')" \
+  > "${clone}/.llzk-worktree-owner"
+expect "reclaim while the holder is provably live" 1 "is live; reclaim is only for" \
+  -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" reclaim "the intruder"
 
 # The defect that motivated splitting `reclaim` out of `claim`. A lock whose
 # recorded owner is a numeric session id that no longer exists used to be taken
@@ -187,6 +207,33 @@ expect "status reports a stale lock as reclaimable" 0 "reclaimable" \
   -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" status
 expect "reclaim takes a stale lock, and says so" 0 "reclaiming a stale lock" \
   -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" reclaim "the next session"
+
+# R6. Every case above records a *numeric* owner, which is the one kind whose
+# liveness this machine can decide -- so the whole stale-lock path was gated only
+# for the identity D023 introduced LLZK_SESSION to replace. For an opaque owner
+# `lock_is_live` fails closed to "live", which made `reclaim` unreachable and
+# `status` report an assumption as a fact. R6 walked into it on the first line of
+# CURRENT.md's "Next session" and had to `rm` the file.
+clone="$(make_clone lock-opaque)"
+printf 'S99\na finished agent session\n2026-01-01T00:00:00Z\n' \
+  > "${clone}/.llzk-worktree-owner"
+expect "claim names --from for an opaque owner" 1 "reclaim '<what you are doing>' --from 'S99'" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" claim "the next session"
+expect "status reports an opaque owner as undecidable" 0 "liveness undecidable" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" status
+expect "bare reclaim refuses an opaque owner, and says how" 1 "--from 'S99'" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" reclaim "the next session"
+expect "reclaim --from refuses the wrong owner" 1 "does not match the recorded owner" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" reclaim "the next session" --from S98
+expect "reclaim --from takes an opaque lock" 0 "reclaiming a stale lock from session S99" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" reclaim "the next session" --from S99
+expect "the reclaimer now holds it" 0 "worktree lock: held" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" require
+
+# Reclaiming a tree you already hold is a relabel, not a displacement: there is
+# no stale owner to announce.
+expect "reclaiming your own lock does not announce a stale owner" 0 "worktree claimed by session tester" \
+  -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" reclaim "a second thing"
 
 clone="$(make_clone lock-release)"
 env LLZK_SESSION=owner bash "$(lock_of "${clone}")" claim "the owner" >/dev/null

@@ -147,7 +147,16 @@ def corpus : Array Entry :=
      Entry.ofSource babybear "Passthrough" (Compilable.source passthrough)
        #[#[0], #[7], #[2013265920]],
      Entry.ofSource babybear "ConstOut" (Compilable.source constOut)
-       #[#[0], #[2013265920]] ]
+       #[#[0], #[2013265920]],
+     -- R5c's shape: a witness cell that is a bare copy of an input, with the
+     -- input also used afterwards. It was a `#guard` in `Test/WitnessCheck.lean`
+     -- and nothing else, so the one module whose reading the project has
+     -- actually got wrong had never been shown to `llzk-opt` or to either witgen
+     -- backend (R6). `@compute` writes the parameter straight into `@w0` and
+     -- `@out0`, which is the case "Canonicalising copies" is about, and the
+     -- vectors make both backends reproduce it.
+     Entry.ofSource babybear "CopyCell" (Compilable.source copyCell)
+       #[#[0], #[7], #[2013265920]] ]
   ++ FieldSpec.registry.map registryEntry
 
 /-- Modules checked for syntax only: `llzk-opt` parses, verifies and round-trips

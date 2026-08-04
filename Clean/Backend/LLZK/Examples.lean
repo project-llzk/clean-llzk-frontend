@@ -15,6 +15,13 @@ one of them is consumed by both the golden tests
 (`Clean/Backend/LLZK/Corpus.lean`), so there is one definition of each rather
 than two that can drift — which is the only reason they live in the library.
 
+**That sentence was false for `copyCell` for as long as it existed** (R6). It was
+in neither: one `#guard` in `Test/WitnessCheck.lean` referred to it, so the one
+shape this project has demonstrably misread — R5c's false refusal — had no golden
+and never reached `llzk-opt` or either witgen backend. It is now in both. The
+claim is worth keeping only if something checks it, so treat adding a circuit
+here without adding it to both as the defect it is.
+
 Circuits that exist only to be *rejected* do not meet that test and are not here:
 they belong to the golden file that pins their diagnostics. Shipping
 deliberately-broken fixtures in a library `Clean.lean` imports was an unforced

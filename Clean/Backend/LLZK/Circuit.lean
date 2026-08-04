@@ -215,9 +215,15 @@ instance {Input Output : TypeMap} [ProvableType Input] [ProvableType Output] :
   ⟨Source.ofFormalCircuit⟩
 
 /-! `compile` and `emit`, the public entry points, are deliberately **not** here.
-They live in `Clean/Backend/LLZK/Constraints.lean`, because they run gate G9 on
-the module before returning it — so no caller can obtain a module from this
-backend that has not been compared against its Clean source. `compileSource`
-above is the raw lowering, used by that check and by nothing else. -/
+They live in `Clean/Backend/LLZK/WitnessCheck.lean`, the last module in the
+chain, because they run **both** halves of gate G9 on the module before returning
+it — the constraint half from `Constraints.lean` and the witness half from that
+module — so no caller can obtain a module from this backend that has not been
+compared against its Clean source on both sides. `compileSource` above is the raw
+lowering, used by those checks and by nothing else, and G12 confines it.
+
+(This note said `Constraints.lean` until R6. That was where they lived between
+S17 and S19; D020 moved them when the witness half arrived, and moving them is
+the whole reason that half is also a precondition of emission.) -/
 
 end LLZK

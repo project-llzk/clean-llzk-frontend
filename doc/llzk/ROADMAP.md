@@ -132,32 +132,43 @@ Status against that definition:
 | Requirement | State |
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
-| unsupported cases fail with structured diagnostics | done — 19 negative fixtures pin exact messages, one per rejection path |
-| `llzk-opt` accepts and round-trips | done — 11 modules and 2 renderer fixtures, G3 and G4 |
-| every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 13 |
-| both witgen backends agree | done — 30 input vectors, G5 and G6 |
+| unsupported cases fail with structured diagnostics | done — 25 negative fixtures pin exact messages. Not "one per rejection path": R5 found three reachable paths with none |
+| `llzk-opt` accepts and round-trips | done — 12 modules and 2 renderer fixtures, G3 and G4 |
+| every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 14 |
+| both witgen backends agree | done — 33 input vectors, G5 and G6 |
 | witnesses match Clean on a corpus | done — G7, via `--check-output` against `FlatOperation.witgen` |
 | the emitted constraints are Clean's | done — G9, and since S17 a precondition of emission, so for every circuit |
+| the emitted witnesses are Clean's | done — G9's witness half, S19/D020, likewise a precondition of emission |
 
 One command, `bash scripts/llzk/e2e.sh`, reproduces all of it.
 
 ### What is still not established
 
-- **The witness side has no G9.** `@compute` is covered by G5–G7 differentially,
-  on 30 vectors, and by nothing else. The class its preservation theorem needs
-  now exists (`CanonicalRepr`, D019), so it is statable; it is not stated.
+**`doc/llzk/GAPS.md` is the register; this is the summary.** R6 found this
+section had drifted into overstating four gaps that later sessions had closed,
+which is the same failure mode in the opposite direction from the one R5 chased —
+so read GAPS.md, and treat a disagreement between the two as a defect in this
+file.
+
 - **G9 validates each translation; it does not verify the translator** (D018,
   D020). A lowering bug surfaces as a refusal to compile rather than as a
   compile-time impossibility. D021 records what actually blocks the stronger
   statement — the emitter's privacy boundary, not the state monad — and the three
-  ways out.
+  ways out; `FieldExpr.lower_spec` is the fragment that exists, and GAPS.md item 5
+  says how much smaller it is than its name.
 - **The reading of LLZK is an assumption** (D017): that `felt.add` is `+`,
   `constrain.eq` is equality, `constrain.in` is membership, and
   `!felt.type<"babybear">` is `ZMod 2013265921`. Nothing in Lean can settle it
   without a formal model of LLZK. Every emitted operation rests on it.
-- **The compiler does not demand a table certificate.** D012's obligation is
-  proved for every table in use (S16), and the build enforces it for the corpus,
-  but `Config.tables` still takes bare `ExportTable`s.
-- **The corpus is chosen, not exhaustive**, and nothing tests
-  `Addition8FullCarry` outside its `Assumptions`.
+- **Nothing ties a table certificate to the circuit's own table.** The compiler
+  does now *demand* one — the public entry points take a `CertifiedConfig` (S24,
+  D022) — but the caller picks both sides of `Certifies`, because `Table.toRaw`
+  erased which `Table` a `RawTable` came from. GAPS.md item 1's second half; the
+  fix is upstream in Clean's core.
+- **Nothing proves the renderer.** GAPS.md item 2, with the counterexample R6
+  verified.
+- **There is no chain from the emitted constraints to a gadget's `Spec`.**
+  GAPS.md item 3.
+- **The corpus is chosen, not exhaustive.** `Addition8FullCarry` is now tested
+  outside its `Assumptions` (three of its nine vectors, S19).
 

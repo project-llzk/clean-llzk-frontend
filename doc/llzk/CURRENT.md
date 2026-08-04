@@ -1,13 +1,12 @@
 # Clean → LLZK current state
 
-Updated: 2026-08-02  
-Active milestone: **Stage 1 finished** — all gates G0–G12 green against the
-pinned tools, the worktree lock is a gate, and R5's X1 is closed on the
-supported path  
-Last accepted session: S24 — the four things between the tree and a
-reproducible Stage 1  
+Updated: 2026-08-04  
+Active milestone: **Stage 1 finished and reviewed** — all gates G0–G12 green
+against the pinned tools, and R6's six findings repaired  
+Last accepted session: R6 — an adversarial review of the finished Stage 1, and
+its repair. `review/R6-findings.md`  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: `doc/llzk/evidence/S24/gates.txt`  
+Integration commit: `doc/llzk/evidence/R6/gates.txt`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
@@ -26,6 +25,12 @@ From a fresh checkout, in this order — every line of it is load-bearing, and S
 established that by running it (`evidence/S24/clean-checkout.md`):
 
 ```bash
+# 0. If the tree carries someone else's lock and you know that session is done:
+#    `reclaim` alone only works for a numeric owner this machine can prove dead.
+#    An LLZK_SESSION owner is opaque, so you have to name it (D024).
+#      bash scripts/llzk/worktree-lock.sh status
+#      bash scripts/llzk/worktree-lock.sh reclaim "what you are doing" --from '<id>'
+
 # 1. G0 checks provenance against `upstream`, which a fresh clone does not have.
 git remote add upstream git@github.com:Verified-zkEVM/clean.git
 
@@ -51,8 +56,8 @@ commands with `LLZK_SESSION=<label>`** — each command there is its own POSIX
 session, so the default identity does not survive from the claim to the run.
 `doc/llzk/CONCURRENCY.md` has the why.
 
-Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 11 circuits, 30
-input vectors, both witgen backends, 2 renderer fixtures, 9 modules lowered to
+Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 12 circuits, 33
+input vectors, both witgen backends, 2 renderer fixtures, 10 modules lowered to
 SMT and 4 out of scope for a declared reason.
 
 CI is *configured* to run G0, G11 and G12 on every pull request, and G1–G10 in
@@ -107,6 +112,17 @@ and records the answer in its handoff.
     the table certificates to all seven public entry points, which no longer
     accept a plain `Config`, so `GAPS.md` §1's first half — the *erasure* — is
     closed. Its second half is not, and is upstream.
+  - **R6**, an adversarial review of the finished Stage 1 and its repair. The
+    gates reproduced on the reviewed commit before anything changed; four claims
+    were attacked specifically and held, above all D019's survival through
+    elaboration. Six findings, all fixed: `reclaim` was unreachable for every
+    identity D023 introduced it for (D024); `GAPS.md` item 2's counterexample was
+    one the toolchain *does* catch, and the correct one is now recorded and
+    verified; Clean-core byte-identity was an invariant three documents argue
+    from and no gate checked; `copyCell` — the one shape this project has
+    demonstrably misread — was in neither the goldens nor the corpus and had
+    reached no LLZK tool; `ROADMAP.md` overstated four closed gaps; two stale
+    pointers. `review/R6-findings.md`.
   - `Gadgets.Addition8FullCarry` compiles to LLZK, `llzk-opt` accepts,
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
@@ -120,20 +136,20 @@ Evidence under `doc/llzk/evidence/`.
 
 | Gate | Result |
 |---|---|
-| G0 state and pins | PASS |
+| G0 state and pins | PASS — and since R6 it also fails on any change to Clean's core outside `Clean/Backend/LLZK/`, `Clean.lean` and `Clean/Test.lean` |
 | G1 lint + `lake build --wfail Clean` + `lake build CleanTests` | PASS |
-| G2 goldens: renderer (2) and five full emitted modules | PASS |
-| G3 `llzk-opt` parse and verify | PASS — 11 modules + 2 fixtures |
-| G4 `llzk-opt --verify-roundtrip` | PASS — 11 modules + 2 fixtures |
-| G5 `llzk-witgen` interpreter | PASS — 30 vectors |
-| G6 `llzk-witgen` execution engine | PASS — 30 vectors |
+| G2 goldens: renderer (2) and six full emitted modules | PASS |
+| G3 `llzk-opt` parse and verify | PASS — 12 modules + 2 fixtures |
+| G4 `llzk-opt --verify-roundtrip` | PASS — 12 modules + 2 fixtures |
+| G5 `llzk-witgen` interpreter | PASS — 33 vectors |
+| G6 `llzk-witgen` execution engine | PASS — 33 vectors |
 | G7 both backends vs Clean's own interpreter | PASS — carried by `--check-output` |
-| G8 fail closed | PASS — 24 negative fixtures, plus tool-version rejection. Not "one per rejection path": R5 found three reachable paths with none, including the field-registry branch that was R4b-1's own repair. Those three now have fixtures; the claim is not reinstated as a general one |
+| G8 fail closed | PASS — 25 negative fixtures, plus tool-version rejection. Not "one per rejection path": R5 found three reachable paths with none, including the field-registry branch that was R4b-1's own repair. Those three now have fixtures; the claim is not reinstated as a general one |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
-| G10a LLZK analysis pipeline admits the module | PASS — all 13 |
-| G11 the harness's own error paths | PASS — 30 exercised, including the ten branches of the worktree lock `e2e.sh` now requires |
+| G10a LLZK analysis pipeline admits the module | PASS — all 14 |
+| G11 the harness's own error paths | PASS — 39 exercised, including the worktree lock's opaque-owner branches, which R6 found were the ones that mattered and the ones nothing covered |
 | G12 every gate-skipping entry point is confined | PASS |
-| G10b SMT lowering | PASS — 9 lowered, 4 out of scope for a declared reason |
+| G10b SMT lowering | PASS — 10 lowered, 4 out of scope for a declared reason |
 
 Every gate is checked to be falsifiable, and the checks are part of the gate
 rather than notes about it:
@@ -172,7 +188,10 @@ The largest, in order: lookup table rows are asserted by the caller and not
 checked (D012 — and the `ConstraintSet.globals` conjunct that claimed to close
 this is a tautology; S24 closed the *erasure* half of this, so the certificate
 now reaches the compiler, but not the tie to the circuit's own table);
-`Module.render` is outside every theorem, uncovered for `@constrain`; there is no proof from the emitted constraints to a gadget's
+`Module.render` is outside every theorem, uncovered for `@constrain` — R6
+replaced that entry's counterexample with two it verified against the pinned
+tools, and narrowed the hazard to the three `Stmt` forms that appear only in
+`@constrain`; there is no proof from the emitted constraints to a gadget's
 `Spec`; `byteTable_lookup_iff` is instantiated nowhere and its `hdiag` therefore
 discharged nowhere; `FieldExpr.lower_spec` is satisfied by five grossly wrong
 lowerings and does not compose; and G9 compares no types.
@@ -238,25 +257,103 @@ needs SMT-LIB that no pass in the pinned `llzk-opt` produces.
 
 ## Next session
 
-- **Claim the worktree first** — `bash scripts/llzk/worktree-lock.sh claim "..."`,
-  and set `LLZK_SESSION` if you are an agent session, or the claim will not
-  survive your next command. `e2e.sh` now refuses without it. Three sessions
-  collided on 2026-08-01; `doc/llzk/CONCURRENCY.md` records what it cost.
-- **D4 of S24 is the one thing left in that packet, and it needs a decision.**
-  The `llzk-harness` and `llzk-e2e` jobs have never run on GitHub. `ci.yml`
-  triggers on `push` to `main`, `pull_request` and `workflow_dispatch`, so
-  pushing `clean-to-llzk/integration` would run *nothing* — the jobs need a pull
-  request on the fork. §11 reserves that for an explicit decision; S24 asked and
-  got no answer, so nothing was pushed and the jobs stay marked unrun.
-- **Otherwise: `GAPS.md` §1's second half**, which is now the largest open
-  soundness gap. S24 closed the erasure; what remains is that a caller picks both
-  sides of `Certifies`, and closing it needs `Table` to survive into `Lookup`
-  rather than being erased to a `RawTable` — a change to Clean's core, with its
-  own review (§11 also reserves that one).
+**Claim the worktree first** — `bash scripts/llzk/worktree-lock.sh claim "..."`,
+and set `LLZK_SESSION` if you are an agent session, or the claim will not survive
+your next command. `e2e.sh` refuses without it. If the tree already carries a
+finished session's lock, `status` will say whether `reclaim` needs `--from`
+(D024). Three sessions collided on 2026-08-01; `CONCURRENCY.md` records the cost.
 
-Beyond that:
+## Roadmap after R6
 
-- **The rest of `GAPS.md`.** §2 the renderer, §3 the chain to a gadget's `Spec`,
-  §7 D017's reading of LLZK. Stage 1 closing does not close these.
-- **Stage 2.** Subcircuits as named components alongside `@Main`, which is the
-  shape D015 was chosen to be compatible with.
+Stage 1 is finished, reproduced, and reviewed twice by sessions that did not
+write it. What remains sorts into five tracks. Nothing below is *in progress*;
+these are the choices.
+
+### A. Close the assurance gaps in this repo
+
+`GAPS.md` is the register; this is the order to take them in, which is not the
+order they are written in there.
+
+1. **§4 → §3: the chain from the emitted module to a gadget's `Spec`.** This is
+   the statement a user assumes the project has and it is the one it does not.
+   `eqs_iff_of_compileSource'` stops at `ConstraintsHoldFlat`; a `FormalCircuit`'s
+   `soundness` is stated over `ConstraintsHold.Soundness`. Bridging them needs
+   three things, and the first is small: instantiate `byteTable_lookup_iff` and
+   discharge its `hdiag` from `ExportTable.diagnose`, which closes §4 and gives
+   the lookup half a semantic theorem. Then `Operations.FullGuarantees` and the
+   offset correspondence between the flattened and unflattened operation lists.
+   **Highest value per unit of work, and entirely inside this repo.**
+2. **§1's second half — tie a certificate to the circuit's own table.** The
+   largest open *soundness* gap: the caller picks both sides of `Certifies`, so
+   it can certify a table the circuit does not look into. Closing it needs the
+   `Table` to survive into `Lookup` instead of being erased to a `RawTable`. That
+   is a change to Clean's core, which since R6 is a **gate** — so it is a
+   Clean-side session with its own review, reserved by ORCHESTRATION §11, not an
+   increment here.
+3. **§6 — make G9 compare types.** Cheap and mechanical: neither reader looks at
+   a `Ty`, so a babybear circuit emitted entirely as `bn254` passes both `agree`
+   checks and is caught only by `Analyze.checkField`, elsewhere. An afternoon.
+4. **§2 — the renderer.** R6 narrowed it: `readMember`, `constrainEq` and
+   `constrainIn` are the three `Stmt` forms emitted only into `@constrain`, so
+   they are the only ones no gate covers, and both verified mutations are in
+   them. A parser back to `Module` over just those three, with a round-trip
+   theorem, would close it — with the usual question of what checks the parser.
+5. **§5 / D021 — the preservation theorem.** Turning D018's translation
+   validation into a verified translator. R5a-4's three obstructions say the
+   *reader* has to be restated before `lower_spec` can be lifted through the
+   assembly loops. Largest item in this track and the one with the least leverage
+   per hour, because `agree` already refuses a wrong module.
+6. **§8 — the copy-canonicalisation premise**, currently three lines checked by
+   inspection under two theorems that are proved. Small.
+
+### B. Make CI real — a decision, not work
+
+**S24's D4, still unanswered.** `llzk-harness` and `llzk-e2e` have never run.
+`ci.yml` triggers on `push` to `main`, `pull_request` and `workflow_dispatch`, so
+pushing `clean-to-llzk/integration` runs *nothing* — the jobs need a pull request
+on the fork, and ORCHESTRATION §11 reserves publishing for an explicit decision.
+Until then every green gate in this document is green on one machine, and the
+workflow itself is untested code. The known risk is `llzk-e2e`'s
+`nix build …#llzk` on a GitHub runner with no substituter for it.
+
+### C. Stage 2 — capability
+
+In dependency order, each an increment of the shape D009 describes (one
+`FieldExpr` constructor, one recognizer case, one `lower` case, one positive and
+one negative fixture):
+
+- **Subcircuits as named components** alongside `@Main`. This is the shape D015
+  was chosen to be compatible with, and the reason the root name is a constant.
+- **Multi-column tables** (D013): needs `array.new` and a multi-dimensional
+  `constrain.in` in the emitter IR.
+- **The rest of the witness IR**: `inv` → `felt.inv`, `ite` → `scf.if`,
+  `listGet` → the array dialect, `let`-steps, `mapRange` → `scf.for`.
+- **General natural arithmetic** (D011's deferred "general treatment"): `NExpr.val`
+  → `cast.toindex`, arithmetic on `index`, `FExpr.ofNat` → `cast.tofelt`. Needs an
+  index bounds policy and LLZK interpreter support that do not exist yet, which is
+  why it is last and why D011 refuses everything but the two matched shapes.
+
+### D. The AIR layer — an unfaced design decision
+
+Clean's `Clean/Table/*` is genuine AIR: a trace of rows with
+`EveryRow`/`EveryRowExceptLast`/`Boundary` transition constraints. **LLZK has no
+analogue**, and Stage 1 and Stage 2 both sidestep it by compiling a single
+flattened circuit. Prior art to copy rather than invent: the
+`airbender-llzk-frontend` tree lowers AIR traces and lookups to LLZK. This is the
+largest unscoped question in the project and it is not on any track above.
+
+### E. VeIR — parallel, non-blocking
+
+D003 holds: VeIR consumes the frozen `.llzk` fixture corpus rather than being a
+dependency. `/home/alh/LLZK/clean-to-veir-readiness.md` has workstreams W0–W8 and
+milestones VM1–VM4; `GAPS.md` §7 (D017 has no formal basis) is the gap only VeIR
+can close, because closing it means formalising LLZK.
+
+### Recommended order
+
+**A1, then B, then A3.** A1 is the claim users care about and the work is
+in-repo; B is a decision that costs nothing to make and currently invalidates the
+word "CI"; A3 is cheap and removes a gap whose protection lives in the wrong
+file. A2 is more important than any of them but is a Clean-core session, so it
+should be *scheduled* rather than slipped into a backend increment — and G0 now
+enforces that.

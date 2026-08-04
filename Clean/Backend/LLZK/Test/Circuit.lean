@@ -123,6 +123,50 @@ info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
 #guard_msgs in
 #eval IO.print (emit babybear multiply)
 
+/-! ### The copy shape
+
+`FieldExpr.lower` emits nothing for a bare variable, so `@compute` writes the
+*parameter* into `@w0` and then into `@out0` — two writes of `%v0` and no
+statement between them. That is the artifact in which `@w0` and the input are
+indistinguishable, which is why both sides of the witness comparison have to
+canonicalise it, and it is the module R5c had refused. R6 added it here and to
+the corpus; before that it lived in one `#guard` and reached no LLZK tool. -/
+
+/--
+info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
+  struct.def @Main {
+    struct.member @w0 : !felt.type<"babybear"> {signal}
+    struct.member @out0 : !felt.type<"babybear"> {llzk.pub}
+
+    function.def @compute(
+      %v0: !felt.type<"babybear"> {function.arg_name = "arg0"}
+    ) -> !struct.type<@Main> {
+      %v1 = struct.new : !struct.type<@Main>
+      struct.writem %v1[@w0] = %v0 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out0] = %v0 : !struct.type<@Main>, !felt.type<"babybear">
+      function.return %v1 : !struct.type<@Main>
+    }
+
+    function.def @constrain(
+      %v0: !struct.type<@Main>,
+      %v1: !felt.type<"babybear"> {function.arg_name = "arg0"}
+    ) {
+      %v2 = struct.readm %v0[@w0] : !struct.type<@Main>, !felt.type<"babybear">
+      %v3 = felt.const 0 : !felt.type<"babybear">
+      %v4 = felt.const 2013265920 : !felt.type<"babybear">
+      %v5 = felt.mul %v4, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v6 = felt.add %v2, %v5 : !felt.type<"babybear">, !felt.type<"babybear">
+      constrain.eq %v6, %v3 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v7 = struct.readm %v0[@out0] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v7, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      function.return
+    }
+  }
+}
+-/
+#guard_msgs in
+#eval IO.print (emit babybear copyCell)
+
 /--
 info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
   struct.def @Main {
