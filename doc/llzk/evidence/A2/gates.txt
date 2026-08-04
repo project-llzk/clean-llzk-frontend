@@ -1,7 +1,7 @@
 A2 — gates after closing GAPS §3
 
 Worktree: /home/alh/LLZK/clean-llzk-frontend, branch clean-to-llzk/integration
-Reviewed from: 45852e88 (A1)
+Commit under test: a00ffebc, reviewed from 45852e88 (A1)
 Date: 2026-08-04T02:50:57Z
 Tools: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0 (LLZK 3.0.0)
 Command: LLZK_SESSION=A2 LLZK_OPT=... LLZK_WITGEN=... bash scripts/llzk/e2e.sh
