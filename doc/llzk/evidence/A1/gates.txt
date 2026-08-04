@@ -1,7 +1,7 @@
 A1 — gates after closing GAPS §4
 
 Worktree: /home/alh/LLZK/clean-llzk-frontend, branch clean-to-llzk/integration
-Reviewed from: d827796e (R6). The commit this file lands in is the one under test.
+Commit under test: f4fe0487, reviewed from d827796e (R6)
 Date: 2026-08-04T02:17:27Z
 Tools: /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0 (LLZK 3.0.0)
 
