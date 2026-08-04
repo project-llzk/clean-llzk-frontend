@@ -1,12 +1,13 @@
 # Clean → LLZK current state
 
 Updated: 2026-08-04  
-Active milestone: **Stage 1 finished and reviewed** — all gates G0–G12 green
-against the pinned tools, and R6's six findings repaired  
-Last accepted session: R6 — an adversarial review of the finished Stage 1, and
-its repair. `review/R6-findings.md`  
+Active milestone: **Stage 1 finished, reviewed, and `GAPS.md` §4 closed** — all
+gates G0–G12 green against the pinned tools  
+Last accepted session: A1 — the lookup half of `ConstraintsHoldFlat`, with its
+hypotheses discharged from the compiler's own checks and instantiated at
+`Addition8FullCarry`  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: `doc/llzk/evidence/R6/gates.txt`  
+Integration commit: `doc/llzk/evidence/A1/gates.txt`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
@@ -123,6 +124,17 @@ and records the answer in its handoff.
     demonstrably misread — was in neither the goldens nor the corpus and had
     reached no LLZK tool; `ROADMAP.md` overstated four closed gaps; two stale
     pointers. `review/R6-findings.md`.
+  - **A1**, closing `GAPS.md` §4 — the first item of the roadmap below.
+    `Lookups.lean` gives the lookup half of `ConstraintsHoldFlat` the semantic
+    theorem the assertion half had had since S15, and `Test/Lookups.lean`
+    instantiates it, and `byteTable_lookup_iff`, at `Addition8FullCarry`. What
+    made it possible was making "the compiler ran a check" into a proposition:
+    `registryOk_of_recognize` and `size_eq_of_recognize` (D010 as a theorem) turn
+    a successful `recognize` into the canonicity bound `certified_membership`
+    needs, so nothing is assumed at the call site. Two behaviour-preserving
+    refactors of `recognize` were needed first — an overlapping `match` that
+    generated no equation lemmas, and a `for` loop that hid the field check
+    inside `forIn`. No new axioms.
   - `Gadgets.Addition8FullCarry` compiles to LLZK, `llzk-opt` accepts,
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
@@ -192,16 +204,20 @@ now reaches the compiler, but not the tie to the circuit's own table);
 replaced that entry's counterexample with two it verified against the pinned
 tools, and narrowed the hazard to the three `Stmt` forms that appear only in
 `@constrain`; there is no proof from the emitted constraints to a gadget's
-`Spec`; `byteTable_lookup_iff` is instantiated nowhere and its `hdiag` therefore
-discharged nowhere; `FieldExpr.lower_spec` is satisfied by five grossly wrong
-lowerings and does not compose; and G9 compares no types.
+`Spec`; `FieldExpr.lower_spec` is satisfied by five grossly wrong
+lowerings and does not compose; and G9 compares no types. (§4 — the lookup half
+having no semantic theorem — was on this list until A1 closed it.)
 
-The lookup side, which R4a-6 found had no semantic theorem, has one in
-`byteTable_lookup_iff` — `Gadgets.ByteTable.Contains t x` holds exactly when `x`
-is one of the field elements the emitted `@Bytes` array holds. This paragraph
-used to add that its canonicity hypothesis was "discharged from the compiler's
-own registry check". It is not: nothing instantiates the theorem, so nothing
-discharges its hypothesis.
+The lookup side, which R4a-6 found had no semantic theorem, has one:
+`Lookups.ofSource_lookups_iff`, the counterpart of `ofSource_eqs_iff`. This
+paragraph used to say its canonicity hypothesis was "discharged from the
+compiler's own registry check", and R5a-7 corrected that to "nothing instantiates
+the theorem, so nothing discharges its hypothesis". Since A1 the original
+sentence is true and is a theorem: `canonical_of_recognize` derives the bound
+from `registryOk_of_recognize` and `size_eq_of_recognize`, and
+`Test/Lookups.lean` instantiates both it and `byteTable_lookup_iff` at
+`Addition8FullCarry`. One hypothesis is left and is named — that the compiler
+accepted the circuit, which is a `#guard` rather than a `rfl`.
 
 **D017 — the reading of LLZK — cannot be closed from this repository.**
 `llzk-witgen`'s help text says it outright: *"llzk-witgen v1 ignores constrain()
@@ -274,36 +290,44 @@ these are the choices.
 `GAPS.md` is the register; this is the order to take them in, which is not the
 order they are written in there.
 
-1. **§4 → §3: the chain from the emitted module to a gadget's `Spec`.** This is
-   the statement a user assumes the project has and it is the one it does not.
+1. **§4 — done (A1).** `Lookups.lean` and `Test/Lookups.lean`: the lookup half of
+   `ConstraintsHoldFlat` has the semantic theorem it lacked, both it and
+   `byteTable_lookup_iff` are instantiated at `Addition8FullCarry`, and the
+   canonicity hypothesis is discharged from the compiler's own registry and field
+   checks rather than assumed — `diagnose_of_mem_registry`,
+   `registryOk_of_recognize`, `size_eq_of_recognize`. One hypothesis remains and
+   is named: "the compiler accepted this circuit", a `#guard` rather than a `rfl`
+   because `recognize` on a real gadget does not reduce in the kernel.
+2. **§3 — the chain from the emitted module to a gadget's `Spec`.** *Now the top
+   of this list.* The statement a user assumes the project has.
    `eqs_iff_of_compileSource'` stops at `ConstraintsHoldFlat`; a `FormalCircuit`'s
-   `soundness` is stated over `ConstraintsHold.Soundness`. Bridging them needs
-   three things, and the first is small: instantiate `byteTable_lookup_iff` and
-   discharge its `hdiag` from `ExportTable.diagnose`, which closes §4 and gives
-   the lookup half a semantic theorem. Then `Operations.FullGuarantees` and the
+   `soundness` is stated over `ConstraintsHold.Soundness`. A1 removed the first of
+   the three prerequisites; what is left is `Operations.FullGuarantees` and the
    offset correspondence between the flattened and unflattened operation lists.
+   Start from `Clean/Circuit/Subcircuit.lean`'s `constraintsHoldFlat_iff`, which
+   is the same bridge for Clean's own two representations.
    **Highest value per unit of work, and entirely inside this repo.**
-2. **§1's second half — tie a certificate to the circuit's own table.** The
+3. **§1's second half — tie a certificate to the circuit's own table.** The
    largest open *soundness* gap: the caller picks both sides of `Certifies`, so
    it can certify a table the circuit does not look into. Closing it needs the
    `Table` to survive into `Lookup` instead of being erased to a `RawTable`. That
    is a change to Clean's core, which since R6 is a **gate** — so it is a
    Clean-side session with its own review, reserved by ORCHESTRATION §11, not an
    increment here.
-3. **§6 — make G9 compare types.** Cheap and mechanical: neither reader looks at
+4. **§6 — make G9 compare types.** Cheap and mechanical: neither reader looks at
    a `Ty`, so a babybear circuit emitted entirely as `bn254` passes both `agree`
    checks and is caught only by `Analyze.checkField`, elsewhere. An afternoon.
-4. **§2 — the renderer.** R6 narrowed it: `readMember`, `constrainEq` and
+5. **§2 — the renderer.** R6 narrowed it: `readMember`, `constrainEq` and
    `constrainIn` are the three `Stmt` forms emitted only into `@constrain`, so
    they are the only ones no gate covers, and both verified mutations are in
    them. A parser back to `Module` over just those three, with a round-trip
    theorem, would close it — with the usual question of what checks the parser.
-5. **§5 / D021 — the preservation theorem.** Turning D018's translation
+6. **§5 / D021 — the preservation theorem.** Turning D018's translation
    validation into a verified translator. R5a-4's three obstructions say the
    *reader* has to be restated before `lower_spec` can be lifted through the
    assembly loops. Largest item in this track and the one with the least leverage
    per hour, because `agree` already refuses a wrong module.
-6. **§8 — the copy-canonicalisation premise**, currently three lines checked by
+7. **§8 — the copy-canonicalisation premise**, currently three lines checked by
    inspection under two theorems that are proved. Small.
 
 ### B. Make CI real — a decision, not work
@@ -351,9 +375,10 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1, then B, then A3.** A1 is the claim users care about and the work is
-in-repo; B is a decision that costs nothing to make and currently invalidates the
-word "CI"; A3 is cheap and removes a gap whose protection lives in the wrong
-file. A2 is more important than any of them but is a Clean-core session, so it
-should be *scheduled* rather than slipped into a backend increment — and G0 now
-enforces that.
+**A1 is done.** Next: **A2 (§3, the `Spec` chain), then B, then A4.** A2 is the
+claim users care about and the work is in-repo, and A1 cleared its first
+prerequisite; B is a decision that costs nothing to make and currently
+invalidates the word "CI"; A4 is cheap and removes a gap whose protection lives
+in the wrong file. A3 is more important than any of them but is a Clean-core
+session, so it should be *scheduled* rather than slipped into a backend increment
+— and G0 now enforces that.

@@ -109,22 +109,64 @@ from how the `Module` meant it.
 
 `eqs_iff_of_compileSource'` relates the emitted `constrain.eq`s to
 `ConstraintsHoldFlat`. That is **not** `ConstraintsHold.Soundness`, which is what
-a `FormalCircuit`'s `soundness` field is stated over. Bridging them needs the
-lookup half (item 4), `Operations.FullGuarantees`, and the offset correspondence
-between the flattened and unflattened operation lists.
+a `FormalCircuit`'s `soundness` field is stated over.
 
 So "the emitted module's constraints hold ⇒ the gadget's `Spec` holds" is not
-proved anywhere, and `grep -r 'Soundness\|Spec' Clean/Backend/LLZK` returns no
-theorem. Found by R5e. This is the statement a user most likely assumes the
-project has.
+proved anywhere. Found by R5e. This is the statement a user most likely assumes
+the project has, and it is now the largest gap that is *entirely inside this
+repository*.
 
-## 4. The lookup half of `ConstraintsHoldFlat` has no semantic theorem
+**A1 removed the first of its three prerequisites.** Bridging needed the lookup
+half of `ConstraintsHoldFlat`, `Operations.FullGuarantees`, and the offset
+correspondence between the flattened and unflattened operation lists. The lookup
+half is item 4, and it is done: with `ofSource_eqs_iff` and
+`Lookups.ofSource_lookups_iff`, both conjuncts of
+`constraintsHoldFlat_iff_forall_mem` now have a semantic theorem on the emitted
+side. What remains is the two structural steps from `ConstraintsHoldFlat` up to
+`ConstraintsHold.Soundness` — and `Clean/Circuit/Subcircuit.lean`'s
+`constraintsHoldFlat_iff` (`ConstraintsHoldFlat env ops.toFlat ↔
+ops.ConstraintsHold env`) is where to start, because it is the same bridge stated
+for Clean's own two representations.
 
-`ofSource_eqs_iff` covers the *assertion* half only. For the lookup half there is
-`byteTable_lookup_iff`, which is stated and proved — but it is instantiated
-nowhere, and its `hdiag` hypothesis is discharged at no call site. Earlier prose
-described `hdiag` as "discharged by the compiler"; a hypothesis of an
-uninstantiated theorem is not discharged by anything.
+## 4. The lookup half of `ConstraintsHoldFlat` — **closed by A1**
+
+It used to read: `ofSource_eqs_iff` covers the *assertion* half only; for the
+lookup half there is `byteTable_lookup_iff`, which is stated and proved — but
+instantiated nowhere, with its `hdiag` hypothesis discharged at no call site.
+
+Both halves of that are now false, and the entry is kept because what closed it
+is the shape the rest of this file's items need.
+
+- **The semantic theorem exists.** `Lookups.ofSource_lookups_iff` is the lookup
+  counterpart of `ofSource_eqs_iff`: Clean's `Lookup.Contains` holds of every
+  lookup in the source exactly when each queried value is one of the field
+  elements the emitted `global.def const` holds — which is what
+  `constrain.in %table, %value` asserts under D017. Together the two cover both
+  conjuncts of `constraintsHoldFlat_iff_forall_mem`.
+- **`hdiag` is discharged, from the compiler's own check.** Three new theorems
+  make "the compiler ran a check" into a proposition: `diagnose_of_mem_registry`
+  (a clean registry means each entry is clean), `registryOk_of_recognize` (a
+  recognized circuit had a clean registry) and `size_eq_of_recognize` (D010 as a
+  theorem — the configured prime is the circuit's, which is what makes a bound
+  against `cfg.field.prime` a bound against `FiniteField.size F`).
+  `canonical_of_recognize` composes them into exactly the hypothesis
+  `certified_membership` needs.
+- **Both are instantiated**, at `Gadgets.Addition8FullCarry` under `withBytes`,
+  in `Test/Lookups.lean`. `add8_lookups_are_byteTable` proves from the gadget's
+  own operations that every lookup it performs is into `Gadgets.ByteTable`.
+
+What is *left* of this entry is one hypothesis and it is named: `recognize
+withBytes.toConfig addSrc = .ok r`, "the compiler accepted this circuit".
+`recognize` on a real gadget does not reduce in the kernel, so it is a `#guard`
+rather than a `rfl`, and adding `native_decide` to close it would trade a
+checked fact for a trusted one — see item 8.
+
+Two small refactors were needed to make any of this provable, and they are worth
+knowing about because they are the kind of thing that silently blocks a proof:
+`recognize`'s registry check was a `match … with | #[] => … | problems => …`,
+whose patterns overlap, so Lean generates no equation lemmas and `split` fails on
+it; and its `for` loop hid the field check inside `forIn`. Both are now shapes a
+proof can name, with identical behaviour and identical diagnostics.
 
 ## 5. `FieldExpr.lower_spec` is much weaker than its name
 

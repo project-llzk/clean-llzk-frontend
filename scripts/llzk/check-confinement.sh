@@ -68,10 +68,12 @@ confine 'Config.unsafeWithTables' 'unsafeWithTables' \
   '^(Clean/Backend/LLZK/Basic\.lean|Clean/Backend/LLZK/Certificate\.lean|Clean/Backend/LLZK/Test/.*\.lean)$' \
   'supply tables through a CertifiedConfig, which requires an ExportTable.Certifies proof per table (Certificate.lean) and is what the public entry points take. If a table genuinely cannot be certified, that is a decision to record, not a call site to add.'
 
-# `Witness.lean` names `lowerRecognized` in prose only; the grep cannot tell, and
-# a file that mentions it in a docstring is not a call site worth blocking.
+# `Witness.lean` and `Lookups.lean` name these in prose only — the first
+# `lowerRecognized`, the second `lookups_perm_of_compileSource'`, which it says
+# its own theorem composes with. The grep cannot tell a docstring from a call
+# site, and a docstring is not one worth blocking.
 confine 'the G9-skipping entry points' "compileSource'?\\b|lowerRecognized" \
-  '^Clean/Backend/LLZK/(Circuit|Constraints|WitnessCheck|Witness|Corpus)\.lean$|^Clean/Backend/LLZK/Test/.*\.lean$' \
+  '^Clean/Backend/LLZK/(Circuit|Constraints|WitnessCheck|Witness|Lookups|Corpus)\.lean$|^Clean/Backend/LLZK/Test/.*\.lean$' \
   'use LLZK.compile or LLZK.emit, which run both halves of G9 (Constraints.lean, WitnessCheck.lean). These three return a module without that comparison; Corpus.lean is allowed because the registry-conformance entries have no Clean circuit to compare against.'
 
 if (( status != 0 )); then

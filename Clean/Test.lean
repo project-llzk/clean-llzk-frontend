@@ -11,3 +11,4 @@ import Clean.Backend.LLZK.Test.Print
 import Clean.Backend.LLZK.Test.Circuit
 import Clean.Backend.LLZK.Test.Constraints
 import Clean.Backend.LLZK.Test.WitnessCheck
+import Clean.Backend.LLZK.Test.Lookups

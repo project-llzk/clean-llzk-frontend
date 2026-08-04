@@ -154,4 +154,24 @@ def diagnoseRegistry (prime : Nat) (tables : Array ExportTable) : Array Diagnost
     else none
   tables.flatMap (ExportTable.diagnose prime) ++ duplicates
 
+/-- **A clean registry means every entry diagnoses clean.**
+
+The step from "the compiler accepted the configuration" to "this table's values
+are canonical", which `certified_membership` needs and which R4a-6 found nothing
+supplied. `Lookups.canonical_of_recognize` is the composition. -/
+theorem diagnose_of_mem_registry {prime : Nat} {tables : Array ExportTable}
+    (h : diagnoseRegistry prime tables = #[]) {t : ExportTable} (ht : t ∈ tables) :
+    ExportTable.diagnose prime t = #[] := by
+  by_contra hne
+  obtain ⟨d, hd⟩ : ∃ d, d ∈ ExportTable.diagnose prime t := by
+    rcases hx : ExportTable.diagnose prime t with ⟨l⟩
+    cases l with
+    | nil => exact absurd hx hne
+    | cons a as => exact ⟨a, by simp⟩
+  have hmem : d ∈ diagnoseRegistry prime tables := by
+    simp only [diagnoseRegistry, Array.mem_append]
+    exact Or.inl (Array.mem_flatMap.mpr ⟨t, ht, hd⟩)
+  rw [h] at hmem
+  simp at hmem
+
 end LLZK

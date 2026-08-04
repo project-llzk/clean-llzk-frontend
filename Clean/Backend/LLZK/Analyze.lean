@@ -203,6 +203,26 @@ private def checkField (cfg : Config) : Except Diagnostic Unit :=
                            the circuit's field has {FiniteField.size F} elements" }
   else .ok ()
 
+/-- One recognition result per flat operation, in order.
+
+Split out of `recognize` so that the array `collect` is applied to is a term a
+proof can name. Inline, the `for` loop's accumulator disappears into `forIn`, and
+`size_eq_of_recognize` would need an induction showing the loop preserves element
+zero instead of one `Array.mem_append_left` (A1). The behaviour is unchanged.
+
+`base` is the circuit variable a witness block starting at that operation would
+define first, and it advances by the `m` a `.witness m` *declares* rather than by
+however many cells recognition produced — so a rejected block still leaves later
+blocks with the right base, which is what makes rejection non-cascading (D009). -/
+private def operationResults [CanonicalRepr F] (cfg : Config) (src : Source F) :
+    Array (Except Diagnostic Contribution) := Id.run do
+  let mut results : Array (Except Diagnostic Contribution) := #[]
+  let mut base := src.inputSize
+  for (op, i) in src.operations.toArray.zipIdx do
+    results := results.push (recognizeOperation cfg.tables cfg.field.prime base i op)
+    if let .witness m _ := op then base := base + m
+  return results
+
 /-- Recognize a whole circuit, or report every reason it cannot be compiled.
 
 The registry is diagnosed first and separately: a malformed entry is reported
@@ -210,16 +230,17 @@ even when no lookup happens to reach it, and once it is known well-formed the
 per-lookup resolution has less to re-check. -/
 def recognize [CanonicalRepr F] (cfg : Config) (src : Source F) :
     Except (Array Diagnostic) Recognized := do
-  match diagnoseRegistry cfg.field.prime cfg.tables with
-  | #[] => pure ()
-  | registryProblems => throw registryProblems
-  let mut results : Array (Except Diagnostic Contribution) :=
-    #[checkField (F := F) cfg |>.map fun _ => ({} : Contribution)]
-  let mut base := src.inputSize
-  for (op, i) in src.operations.toArray.zipIdx do
-    results := results.push (recognizeOperation cfg.tables cfg.field.prime base i op)
-    if let .witness m _ := op then base := base + m
-  let contributions ← collect results
+  -- `if` rather than `match … with | #[] => … | problems => …`. The two are the
+  -- same function; the match is not one Lean can generate equation lemmas for
+  -- (the patterns overlap), so `split at h` fails on it and nothing downstream
+  -- can conclude anything from `recognize … = .ok r`. `registryOk_of_recognize`
+  -- is that conclusion, and it is what discharges `certified_membership`'s
+  -- canonicity hypothesis from the check the compiler already runs (A1).
+  let registryProblems := diagnoseRegistry cfg.field.prime cfg.tables
+  if !registryProblems.isEmpty then throw registryProblems
+  let contributions ←
+    collect (#[checkField (F := F) cfg |>.map fun _ => ({} : Contribution)]
+      ++ operationResults cfg src)
   let lookups := contributions.flatMap (·.lookups)
   return {
     inputSize := src.inputSize
@@ -228,5 +249,75 @@ def recognize [CanonicalRepr F] (cfg : Config) (src : Source F) :
     lookups
     tables := cfg.tables.filter fun table => lookups.any (·.tableName = table.name)
     outputs := src.outputs.map FieldExpr.ofExpression }
+
+/-! ## What a successful recognition establishes
+
+Two facts, and they exist for one reason: `certified_membership` (`Certificate.lean`)
+needs the table's values to be canonical, and R4a-6 found that hypothesis
+discharged at no call site. It is discharged by checks the compiler *already
+runs* — `diagnoseRegistry` and `checkField` — and until now nothing could say so,
+because "the compiler ran a check" is not a proposition unless success is a
+theorem about the check.
+
+`collect` and `checkField` are private, so these live here rather than beside the
+theorem that consumes them. -/
+
+/-- `collect` returns `.ok` only if everything it was given was `.ok`. -/
+private theorem collect_ok {α : Type} {results : Array (Except Diagnostic α)} {xs : Array α}
+    (h : collect results = .ok xs) {e : Except Diagnostic α} (he : e ∈ results) :
+    ∃ a, e = .ok a := by
+  cases e with
+  | ok a => exact ⟨a, rfl⟩
+  | error d =>
+    exfalso
+    have hmem : d ∈ results.filterMap (fun | .error d => some d | .ok _ => none) :=
+      Array.mem_filterMap.mpr ⟨.error d, he, rfl⟩
+    have hne : ¬ (results.filterMap (fun | .error d => some d | .ok _ => none)).isEmpty = true := by
+      intro hE
+      rw [Array.isEmpty_iff.mp hE] at hmem
+      simp at hmem
+    simp only [collect] at h
+    rw [if_neg hne] at h
+    cases h
+
+/-- **A recognized circuit had a clean registry.**
+
+Every entry of `Config.tables` diagnosed clean — in particular every row value is
+below the configured prime, which with `size_eq_of_recognize` is what
+`ExportTable.values_lt_prime_of_diagnose` needs. -/
+theorem registryOk_of_recognize [CanonicalRepr F] {cfg : Config} {src : Source F}
+    {r : Recognized} (h : recognize cfg src = .ok r) :
+    diagnoseRegistry cfg.field.prime cfg.tables = #[] := by
+  by_cases hE : (diagnoseRegistry cfg.field.prime cfg.tables).isEmpty
+  · exact Array.isEmpty_iff.mp hE
+  · rw [recognize] at h
+    simp only [hE, Bool.not_false, if_true] at h
+    cases h
+
+/-- **A recognized circuit's field is the configured one.**
+
+D010 says a wrong field is a diagnostic rather than silently wrong arithmetic.
+This is that sentence as a theorem, and it is what lets a `Nat` bound against
+`cfg.field.prime` be read as a bound against `FiniteField.size F`. -/
+theorem size_eq_of_recognize [CanonicalRepr F] {cfg : Config} {src : Source F}
+    {r : Recognized} (h : recognize cfg src = .ok r) :
+    FiniteField.size F = cfg.field.prime := by
+  have hreg := registryOk_of_recognize h
+  -- The bind on `collect` must have succeeded, or nothing after it ran.
+  rcases hc : collect (#[checkField (F := F) cfg |>.map fun _ => ({} : Contribution)]
+      ++ operationResults cfg src) with d | cs
+  · exfalso; rw [recognize] at h; simp [hreg, hc] at h
+  · obtain ⟨_, hfield⟩ :=
+      collect_ok hc (e := checkField (F := F) cfg |>.map fun _ => ({} : Contribution))
+        (Array.mem_append_left _ (by simp))
+    -- `Except.map` sends `.error d` to `.error d`, so the field check is `.ok`,
+    -- so neither of its two guards fired — and the second is D010's.
+    unfold checkField at hfield
+    split at hfield
+    · simp [Except.map] at hfield
+    · split at hfield
+      · simp [Except.map] at hfield
+      · rename_i hsize
+        exact not_not.mp hsize
 
 end LLZK

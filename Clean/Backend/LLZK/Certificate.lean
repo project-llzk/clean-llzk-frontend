@@ -154,4 +154,13 @@ unproved representation is *justified by a proof that was supplied*. -/
 def CertifiedConfig.toConfig (c : CertifiedConfig F) : Config :=
   Config.unsafeWithTables c.field (c.tables.map (·.exported))
 
+/-- A certified table's export entry is one of the plain `Config`'s tables.
+
+The bridge every theorem about `recognize cfg.toConfig …` needs, stated here so
+that no proof elsewhere has to unfold `unsafeWithTables` and be reported by G12.
+`Lookups.canonical_of_recognize'` is the consumer. -/
+theorem CertifiedConfig.mem_toConfig_tables {c : CertifiedConfig F} {ct : CertifiedTable F}
+    (h : ct ∈ c.tables) : ct.exported ∈ c.toConfig.tables :=
+  Array.mem_map.mpr ⟨ct, h, rfl⟩
+
 end LLZK
