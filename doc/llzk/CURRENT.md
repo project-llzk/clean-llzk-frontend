@@ -88,6 +88,25 @@ It is the same lesson as R6-2 and R6-3, in the place hardest to see: **a claim
 about the world outside the repository has to be checked against the world, and
 the control plane is not evidence about itself.**
 
+**What it costs, which nobody had measured either.** `llzk-e2e` took **4h23m** on
+2026-08-02 (03:22:08 → 07:45:45) and the 2026-08-04 run is on the same step at
+the same pace. Essentially all of it is step 6, `nix build …#llzk`, building LLZK
+from source because the runner has no substituter for it; `llzk-harness` by
+contrast is 11 seconds.
+
+That matters for two reasons. GitHub's per-job limit is 6 hours, so the job
+currently finishes with about 25% of head-room and a slower runner or a heavier
+LLZK would turn a green gate into a timeout — a failure mode indistinguishable
+from a real one. And every push to the PR spends four and a half hours of runner
+time, which makes `llzk-e2e` something to trigger deliberately rather than a
+check you get on each commit.
+
+The fix is a binary cache for the pinned LLZK — `PINS.md` already records a
+substituter and cache key for the local build; pointing `cachix/install-nix-action`
+at the same one would cut step 6 to a download. Not done here: it needs a cache
+the fork can read, which is a decision about infrastructure rather than a change
+to this repository.
+
 What is still true: every gate in the table below is green on one machine *and*
 on a runner, but only G0–G12 are gated in CI; §11 still reserves publishing for
 an explicit decision, which was given.
