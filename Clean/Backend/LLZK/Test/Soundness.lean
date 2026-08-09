@@ -18,9 +18,13 @@ Discharged here, by unfolding the gadget's own operations:
 Left as hypotheses, and they are all of the form "this run of the compiler
 succeeded": `compile … = .ok m`, `ofModule m = some C`, and `recognize … = .ok r`.
 None of them reduces in the kernel — the operation list carries `Expression`s and
-`Fact` instances — so they are `#guard`ed rather than `rfl`'d, which is the same
-check gate G1 runs. Closing them with `native_decide` would trade a checked fact
-for a trusted one; see `GAPS.md` item 8.
+`Fact` instances — so they are checked rather than `rfl`'d, which is the same
+check gate G1 runs: two by `#guard` below (`compile … isSome`,
+`recognize … isOk`), and `ofModule m = some C` entailed by the first, because a
+successful `compile` has evaluated `agree`, which requires `ofModule` to return
+`some` (R7-15 — an earlier version of this comment said all three were
+`#guard`ed). Closing them with `native_decide` would trade a checked fact for a
+trusted one; see `GAPS.md` item 8.
 -/
 
 namespace LLZK.Test.Soundness

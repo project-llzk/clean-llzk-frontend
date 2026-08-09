@@ -45,18 +45,26 @@ closed the first:
    demanded at one wrapper and discarded there, and what reached the compiler was
    a convention plus a grep. An earlier version of this entry said the obligation
    was "carried and visible", which is exactly the kind of claim R5 exists to
-   catch, and it survived four commits here after being written. The seven public
-   entry points now take a `CertifiedConfig F`, which holds `CertifiedTable`s;
-   `ofCertified` is retired and there is no public function from a `Config` to a
-   `CertifiedConfig`. `Test/Constraints.lean` records what this means for
-   `fatBytes`: not a `#guard`, because the point is that there is no term to
-   write down.
+   catch, and it survived four commits here after being written. The five public
+   entry points in `WitnessCheck.lean` — `verify`, `compileSourceVerified`,
+   `compile`, `emit`, `emitSource` — now take a `CertifiedConfig F`, which holds
+   `CertifiedTable`s (an earlier version of this entry counted "seven" by
+   including the two theorems about them); `ofCertified` is retired and there is
+   no public function from a `Config` to a `CertifiedConfig`.
+   `Test/Constraints.lean` records what this means for `fatBytes`: not a
+   `#guard`, because the point is that there is no term to write down.
 2. **The tie to the circuit's own table — open, and upstream.** Even with the
    certificate carried,
    the caller picks *both* sides of `Certifies`, so it can certify a table the
    circuit does not look into. Closing that needs the `Table` to survive into
    `Lookup` instead of being erased to a `RawTable`, which *is* a change to
-   Clean's core.
+   Clean's core. R7 closed a *sub*-gap here that was this backend's own:
+   `Certifies` constrains values only, so a certificate could pair rows exported
+   under one name with a Clean table named another, making `spec_of_compile`'s
+   lookup hypothesis incomparable with what the module asserts (R7-12).
+   `CertifiedTable.name_certifies` now demands `exported.name = table.name`.
+   The caller still picks both sides; what it can no longer do is have them
+   speak about different globals.
 
 S24 executed S23, which closed (1) and left (2) exactly where it is. The
 remaining gap is the one that matters most for soundness: a caller can still
@@ -101,9 +109,24 @@ second reader, with the usual question of what checks *it*) or a semantic accoun
 of the concrete syntax, which is item 3. What changed is that the entry now names
 a hazard the toolchain demonstrably does not catch, rather than one it does.
 
-`Print.lean` proves the converse — equal modules render to equal strings. The
-hazard is unequal modules rendering to equal text, or text LLZK reads differently
-from how the `Module` meant it.
+R7 measured how alone this leaves the emit-time comparison: a module whose
+`@constrain` body is *empty*, one with a constraint deleted, and one demanding
+`out0 == 8` where `@compute` writes 7 all pass G3, G4, G5, G6, G10a **and G10b's
+SMT lowering** (`evidence/R7/probes.txt`) — the toolchain checks `@constrain`
+for well-formedness, never for content, and the discriminator's LLZK probe only
+establishes that a *missing* `@constrain` function is rejected (an empty one is
+accepted). The same holds for field names: retyping a babybear module as
+`bn254` passes every binary gate, exactly as `Analyze.checkField`'s docstring
+warns. None of this contradicts a documented claim — G9 is a precondition of
+emission and the artifacts are hash-pinned goldens — but it means constraint
+content and field correctness each rest on a *single* Lean-side check with no
+independent downstream confirmation, which is the strongest argument this file
+has for the parser.
+
+The renderer is a deterministic fold, so equal modules trivially render to
+equal strings — nothing in `Print.lean` proves anything, and an earlier version
+of this entry said it did (R7-16). The hazard is unequal modules rendering to
+equal text, or text LLZK reads differently from how the `Module` meant it.
 
 ## 3. The chain from the emitted constraints to a gadget's `Spec` — **closed by A2**
 
@@ -117,9 +140,26 @@ R5e called it the statement a user most likely assumes the project has.
 
 > take any assignment of the emitted component's cells — `env` for the circuit
 > variables, `outs` for the `@out{j}` members D008 adds — that satisfies every
-> polynomial the reader extracts from `@constrain` and every lookup it extracts;
-> assume the gadget's own `Assumptions` of the input; then the gadget's own
-> `Spec` holds of that input and the corresponding output.
+> polynomial the reader extracts from `@constrain`, **and every lookup of the
+> source, in certified-values form** (for each source lookup into a certified
+> table, the queried value is `fromNat` of one of the exported values); assume
+> the gadget's own `Assumptions` of the input; then the gadget's own `Spec`
+> holds of that input and the corresponding output.
+
+The bolded half is R7-12's finding: the lookup hypothesis is stated over the
+*source's* lookups via the certificate, not over the `C.lookups`/`C.globals` the
+reader extracts from the module — an earlier version of this blockquote said
+"every lookup it extracts", which is the statement a user would want and not the
+one the theorem has. Under D017 the module's assertion is membership in the
+global *named* `l.table.name`; equating that with the certified-values form
+needs `exported.name = table.name`, which `CertifiedTable.name_certifies`
+demands since R7 — so the bridging lemma is now *provable*, but it is not
+*proved*, and until it is, a caller holding a satisfying assignment of the
+module discharges `hlookups` by that (unproved, routine) step. The theorem also
+carries the caller-supplied `resolve` hypothesis — that every source lookup is
+into one of the configuration's certified tables — which is item 1's second
+half surfacing in the statement, proved at the instantiation by
+`add8_lookups_are_byteTable`.
 
 Four links, three of them Clean's own: the two conjuncts of
 `constraintsHoldFlat_iff_forall_mem` (item 4, closed by A1 — this chain could not
@@ -133,10 +173,13 @@ is the one place Stage 1's narrowness pays rather than costs.
 
 **What it is not.** It is the *soundness* direction only: nothing here says the
 module has a satisfying assignment. It is stated over the `ConstraintSet` the
-reader extracts, so D017 (item 7) and the renderer (item 2) still stand between
-it and the emitted text. And the three hypotheses of the form "this compile run
-succeeded" are `#guard`ed rather than proved, because `recognize` on a real
-gadget does not reduce in the kernel.
+reader extracts (equality half) and the certificate (lookup half — see above),
+so D017 (item 7) and the renderer (item 2) still stand between it and the
+emitted text. And the hypotheses of the form "this compile run succeeded" are
+checked rather than proved, because `recognize` on a real gadget does not reduce
+in the kernel: two are `#guard`ed (`compile … isSome`, `recognize … isOk`) and
+the third (`ofModule … = some C`) is entailed by the first — an earlier version
+here counted "three `#guard`s", which is not what the file contains (R7-15).
 
 ## 4. The lookup half of `ConstraintsHoldFlat` — **closed by A1**
 
@@ -208,10 +251,13 @@ both `agree` checks, and what catches it is `Analyze.checkField`'s registry
 membership — a different mechanism in a different file, while G9's summary
 reports both halves green. Found by R5e.
 
-Both readers now take the expected `Ty` and check it everywhere: every
-`felt.const`, `felt.add`/`mul`, `struct.readm`/`writem`, `constrain.eq` and
-`constrain.in` operand type, every parameter, every `struct.member`, and every
-`global.def`'s element type. `agree` passes `Ty.felt cfg.field.name`, so the
+Both readers now take the expected `Ty` and check it everywhere they look:
+every `felt.const`, `felt.add`/`mul`, `struct.readm`/`writem`, `constrain.eq`
+and `constrain.in` operand type, every parameter and every `struct.member`;
+`global.def` element types are checked by the *constraint* reader, which is the
+only one that can see a global (`@compute` cannot reference them, so
+`WitnessSet.ofModule` maps a `globalRead` to `none` — R7-15 corrected "both
+readers" on this one point). `agree` passes `Ty.felt cfg.field.name`, so the
 field the module is read in is the field the *configuration* names rather than
 one the module asserts about itself.
 
@@ -238,9 +284,12 @@ Everything the emitter believes about what `felt.umod`, `felt.uintdiv`,
 its tools' behaviour, not a theorem. There is no formal semantics of LLZK in
 Lean; producing one is VeIR's project (D003).
 
-The `@compute` half has real evidence: 30 vectors across two independent LLZK
-backends, plus R5c's confirmation of the `umod`/`uintdiv` reading on all six
-registry fields rather than only babybear. **The `@constrain` half has none**, and
+The `@compute` half has real evidence: 33 vectors across two independent LLZK
+backends (27 with a Clean circuit behind them, 6 on the `Square_*` registry
+entries whose expected values are computed in Lean — earlier counts of 27 and
+30 in various documents predate `CopyCell` and the registry entries; 33 is the
+corpus, R7-15), plus R5c's confirmation of the `umod`/`uintdiv` reading on all
+six registry fields rather than only babybear. **The `@constrain` half has none**, and
 cannot acquire any from this repository: `llzk-witgen`'s own help text says it
 ignores `constrain()`, so there is no executor for it in the pinned toolchain.
 

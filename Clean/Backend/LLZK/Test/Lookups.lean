@@ -47,7 +47,7 @@ private def addSrc : Source Bab :=
 #guard (recognize withBytes.toConfig addSrc).isOk
 
 private def bytesCert : CertifiedTable Bab :=
-  ⟨byteTable, Gadgets.ByteTable, byteTable_certified⟩
+  ⟨byteTable, Gadgets.ByteTable, byteTable_certified, rfl⟩
 
 private theorem bytesCert_mem : bytesCert ∈ withBytes.tables := by
   simp [withBytes, bytesCert]

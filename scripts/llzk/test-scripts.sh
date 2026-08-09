@@ -117,6 +117,16 @@ git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet -am "touch Cle
 expect "a change to Clean's core is caught" 1 "no longer byte-identical to the pinned base" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
+# R7-01. The commit-vs-commit diff above is blind to the working tree, which is
+# what G1 builds and G2 emits from: an *uncommitted* core edit reported
+# "byte-identical PASS" while being exactly what got built and certified, and
+# G9 cannot see it because both of its sides move together.
+clone="$(make_clone core-dirty)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+echo "-- uncommitted working-tree edit" >> "${clone}/Clean/Utils/Primes.lean"
+expect "an uncommitted change to Clean's core is caught" 1 "uncommitted changes" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
 clone="$(make_clone happy)"
 git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
 expect "happy path" 0 "pin check:  PASS" \

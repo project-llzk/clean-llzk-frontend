@@ -160,10 +160,15 @@ private def mulModule : Option Module := (compileSource babybear.toConfig mulSrc
 #guard match mulModule with
   | some m => (WitnessSet.ofModule (Ty.felt "bn254") m).isNone
   | none => false
+#guard match mulModule with
+  | some m => (WitnessSet.ofModule (Ty.felt "mersenne31") m).isNone
+  | none => false
 
 -- The same for the circuit that has a `global.read`, so the array path is
 -- covered as well as the felt one: `constrain.in`'s array type is checked
--- against the global's own element type *and* length.
+-- against the global's own element type *and* length. R7-15 found the prose
+-- claimed the full readers × modules × fields matrix while only half of it was
+-- pinned; it is now the full matrix.
 private def addModule : Option Module := (compileSource withBytes.toConfig addSrc).toOption
 
 #guard match addModule with
@@ -171,6 +176,15 @@ private def addModule : Option Module := (compileSource withBytes.toConfig addSr
   | none => false
 #guard match addModule with
   | some m => (ofModule (F := Bab) (Ty.felt "bn254") m).isNone
+  | none => false
+#guard match addModule with
+  | some m => (ofModule (F := Bab) (Ty.felt "mersenne31") m).isNone
+  | none => false
+#guard match addModule with
+  | some m => (WitnessSet.ofModule (Ty.felt "bn254") m).isNone
+  | none => false
+#guard match addModule with
+  | some m => (WitnessSet.ofModule (Ty.felt "mersenne31") m).isNone
   | none => false
 
 /-! ### The two R4 named as residual risks, and which are real

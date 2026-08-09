@@ -118,11 +118,22 @@ plus a `grep`. `CertifiedConfig` carries it to the entry point instead. See
 -/
 
 /-- An export table together with the proof that its values are the Clean
-table's. -/
+table's — and that it is exported under that table's own name.
+
+The name field is R7-12. `Certifies` constrains values only, so without it a
+configuration could pair exported rows named "Bytes" with a Clean table named
+"Foo" and vice versa; everything would compile (lookups resolve by *name*), and
+then `spec_of_compile`'s lookup hypothesis — stated over the Clean table via
+`Certifies` — would be incomparable with what the emitted module asserts, which
+is membership in the global *named* `l.table.name`. The tie makes the two speak
+about the same global. It does **not** close `GAPS.md` item 1's second half:
+the caller still picks both sides of `Certifies`, and a `selfTable` can be
+given any name at all. -/
 structure CertifiedTable (F : Type) [FiniteField F] where
   exported : ExportTable
   table : Table F field
   certificate : exported.Certifies table
+  name_certifies : exported.name = table.name
 
 /-- A configuration whose tables carry their certificates.
 

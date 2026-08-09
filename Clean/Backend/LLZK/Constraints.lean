@@ -372,10 +372,17 @@ def agreeCompiled [CanonicalRepr F] (cfg : Config) (src : Source F) : Bool :=
 /-! ## Emission is verified, not merely checked
 
 `agree` is decidable, so the emitter can run it on every circuit it compiles and
-refuse to hand back a module that fails. That is what `compileSource'` below does,
-and it is why the public entry points live in this module rather than in
-`Circuit.lean`: **there is no way to obtain a module from this backend that has
-not been compared against its Clean source.**
+refuse to hand back a module that fails. That is what `compileSource'` below
+does: **no module leaves a supported entry point — `compile`, `emit`,
+`emitSource` in `WitnessCheck.lean` — without having been compared against its
+Clean source.** Not "no module leaves this backend": `compileSource`,
+`compileSource'` itself and `lowerRecognized` are public Lean defs that return
+un- or half-compared modules — the six `Square_*` registry entries come through
+the last of them with `constraintsAgree = none` — and what confines them to
+this file, `Circuit.lean`, `WitnessCheck.lean`, `Corpus.lean` and `Test/` is
+G12, a gate over the source rather than the type system. An earlier version of
+this paragraph claimed the stronger sentence, and R7-13 found the same file
+contradicting it two sections later.
 
 This is translation validation rather than a verified translator. It is weaker
 than a preservation theorem about `lower` in one way — it says nothing about

@@ -1,0 +1,58 @@
+# R7 elaboration probes, run on acbf8c32 after `bash scripts/llzk/e2e.sh`
+# (so the oleans are the reviewed tree's — the `lake env lean` staleness trap).
+# Source: probe.lean (this directory); raw output: probes-raw.txt.
+
+## P2 — axiom hygiene
+
+Generic theorems, expected and got the classical trio only:
+
+  spec_of_compile, ofSource_lookups_iff, canonical_of_recognize,
+  certified_membership, registryOk_of_recognize, size_eq_of_recognize
+    -> [propext, Classical.choice, Quot.sound]
+
+Babybear instantiations, expected and got exactly the two native_decide
+prime facts GAPS §8 admits, and nothing else:
+
+  Test.Soundness.add8_spec_of_compile, Test.Lookups.add8_lookup_iff
+    -> + instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+       + primeBabybear._native.native_decide.ax_1
+
+No sorryAx anywhere in either closure. In particular
+Clean/Circomlib/Poseidon.lean:22's `sorry` (R7-16) is outside it.
+
+## P3 — non-vacuity of the reader at the instantiation
+
+ofModule on the compiled Addition8FullCarry module:
+
+  (some (4, (1, 1)))   -- 4 equality polynomials, 1 lookup, 1 global
+
+so `heqs` in add8_spec_of_compile quantifies over real content.
+
+## P4 — R7-12 witness
+
+The following elaborates without error, i.e. `CertifiedTable` accepts a
+certificate with no tie between `exported.name` and `table.name`:
+
+  example (e : LLZK.ExportTable) (t : Table (F pBabybear) field)
+      (h : e.Certifies t) : LLZK.CertifiedTable (F pBabybear) := ⟨e, t, h⟩
+
+(That is the state at acbf8c32, the reviewed commit. The R7 repair adds
+`name_certifies : exported.name = table.name` to `CertifiedTable`, so P4 no
+longer elaborates on the repaired tree — which is the fix working.)
+
+## Red-team mutations (R7-02), pinned binaries
+
+All of the following pass llzk-opt parse+verify (G3), --verify-roundtrip (G4),
+and both llzk-witgen backends on the recorded vectors (G5/G6); the first also
+lowers under --llzk-product-program and the SMT pass (G10a/G10b):
+
+  - @constrain demands out0 == 8 while @compute writes 7 (unsatisfiable)
+  - Multiply with the multiplication constrain.eq deleted (w0 unconstrained)
+  - Multiply with @constrain body = bare function.return
+  - Addition8FullCarry with one of its four constrain.eq dropped
+  - Multiply with every felt.type renamed babybear -> bn254 (R4b-1 at file level)
+
+llzk-opt rejects a struct with no @constrain *function*, but accepts an empty
+one — the discriminator probe is presence-only. None of this contradicts a
+documented claim (G9 is a precondition of emission; D017 stands); it is the
+measured absence of any second line of defense for the on-disk artifact.

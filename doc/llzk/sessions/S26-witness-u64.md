@@ -46,9 +46,13 @@ So there are three honest options, and **picking one is this session's first
 deliverable, recorded as a decision entry before any code**:
 
 1. **Accept `U64Expr` only over fields that hold a `u64`** — bn254 and grumpkin.
-   Cheapest, sound, and immediately useful: bn254 is `circomPrime`, the field
-   zkGolf uses. Costs the babybear corpus, which is most of what exists today, so
-   it cannot be the whole answer.
+   Cheapest and immediately useful — but **not "sound" as this line used to say**
+   (R7-11): on exactly those two fields `U64Expr.val` *truncates* `ZMod.val` to
+   64 bits (see S25 Deliverable 2a), so faithfulness on the wide fields needs a
+   bound on the field element under every `val`, which a `U64Expr → Option Nat`
+   analysis cannot see — the hazard is on **both** ends of this table. Costs the
+   babybear corpus, which is most of what exists today, so it cannot be the
+   whole answer.
 2. **Range-bound the values and accept narrower widths.** Most real uses are not
    64-bit: `AssertBytes` needs 8, `U32` gadgets need 32. If recognition can prove
    an expression's values stay below `2^k` with `2^k < p`, the lowering is
@@ -60,7 +64,10 @@ deliverable, recorded as a decision entry before any code**:
 `u64` has the bound for free. Write the bound analysis as a total function
 `U64Expr → Option Nat` returning a proven upper bound, and refuse when it returns
 `none`. That keeps the fail-closed discipline D004 sets and makes the field
-question a side condition rather than a special case.
+question a side condition rather than a special case. **The decision entry must
+also cover the `val` bridge** (R7-11): what bound on `FiniteField.val x` makes
+`U64Expr.val x` exact, who establishes it, and what is refused when nothing
+does — field width alone does not settle it.
 
 Whatever is chosen: it must be stated as a *theorem or a refusal*, never as
 prose. D011's own history is the warning — R2-05 found its central side condition
@@ -88,9 +95,16 @@ unstated for four sessions, and closing it needed a whole class (D019).
 5. **`WExpr`** extended in step, since G9's witness half compares against it, and
    `WExpr.eval`'s new cases *are* the D017 reading of the new operations — say so
    in the docstring, as `eval`'s `umod` case already does.
-6. **Corpus entries** for what this unlocks. At minimum `Xor32` and one of
-   `BLAKE3.G` / `Keccak256.Theta`, with input vectors, so the new lowering is
-   validated by `llzk-opt` and both witgen backends rather than only by G9.
+6. **Corpus entries** for what this unlocks — which is **less than this line
+   used to claim** (R7-05): `Xor32`, `And8`, `BLAKE3.G` and `Keccak256.Theta`
+   all *also* look up 3-column tables (`ByteXorTable` and kin), which D013
+   refuses regardless of any witness-IR increment — the ROADMAP's corrected
+   coverage table and `Test/Coverage.lean` carry the decomposition. Their
+   corpus entries belong to **S28 (multi-column tables)**. What S26 itself can
+   put in the corpus is bitwise/`bitsOf` circuits with no multi-column lookup —
+   pure-`lxor` compositions, `bitsOf` decompositions — plus updated
+   `Test/Coverage.lean` guards showing the bitwise diagnostic counts drop to
+   exactly the lookup refusals.
 7. **Negative fixtures** for every new rejection path, per G8.
 
 ## Non-goals

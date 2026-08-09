@@ -70,17 +70,30 @@ Verified 2026-08-04 against `upstream/main`:
 | `WitnessIR.lean` | +213 |
 | `WitnessIRSugar.lean` | +310 |
 
-What changed in the witness IR, constructor by constructor:
+What changed in the witness IR, constructor by constructor. **R7 checked this
+list against the actual upstream file and corrected three entries** (R7-10) —
+write the new exhaustive matches from `upstream/main`'s
+`Clean/Circuit/WitnessIR.lean`, not from here:
 
-- **`FExpr`**: `envGet` **removed**; `ofNat` → **`ofU64`**; **`lor` added**.
+- **`FExpr`**: `envGet` **removed**; `ofNat` → **`ofU64`**. (An earlier version
+  said "`lor` added" — upstream `FExpr` is
+  expr/const/localVar/add/mul/inv/ofU64/ite/listGet/dataGet/hintGet, no `lor`.)
 - **`NExpr` deleted**, replaced by **`U64Expr`** — `const (n : UInt64)`, `val`,
   `idx`, `localVar`, `add`, `mul`, `div`, `mod`, `land`, `lor`, `lxor`, `shiftL`,
   `shiftR`, `ite`. Docstring: *"All operations wrap modulo `2^64`."*
-- **`BExpr` is new** as a sort of its own: `true`, `false`, `feq`, `neq`, `lt`,
-  `flt`, `bit (x : FExpr F) (i : ℕ)`, `not`, `and`. `ite` on both `FExpr` and
-  `U64Expr` now takes a `BExpr`.
-- **`VExpr`** gains `mapRange`, `envRange`, **`bitsOf`**, keeps `lit`, `append`.
-- **`Step`** is `letF` / `letU` (was `letF` / `letN`).
+- **`BExpr`** existed at our pin already (`true`, `false`, `feq`, `neq`, `lt`,
+  `not`, `and`, and `ite` already took one); what is new is **`flt`** and
+  **`bit (x : FExpr F) (i : ℕ)`**.
+- **`VExpr`** keeps `lit`, `append`, `mapRange` (already at our pin) and gains
+  **`envRange`** and **`bitsOf`**.
+- **`Step`** is `letF` / `letU` (was `letF` / `letN`); locals are `F ⊕ UInt64`
+  (was `F ⊕ ℕ`).
+
+**And the change that is not a rename (R7-08, SEVERE):** `U64Expr.val` is
+**truncating** — `UInt64.ofNat (FiniteField.val (x.eval ctx))`, "ZMod.val
+truncated to 64 bits" — where the deleted `NExpr.val` was exact. See the new
+Deliverable 2a below; this is the one place "translate exactly and re-prove"
+is not available.
 
 ## Allowed scope
 
@@ -125,12 +138,42 @@ Expect the breakage to be concentrated, and expect it to be *loud*:
   `.ofNat (.div …)`. Those patterns are gone. **Deliverable 2 keeps the accepted
   set the same size** — translate the two shapes to their `U64Expr` equivalents
   and reject everything else, exactly as now. Widening the accepted set is S26.
-- **`WitnessCheck.lean`** — `WExpr.ofWitgen` matches the same two shapes, and
-  `eval_ofWitgen` is stated over `Witgen.FExpr.eval`, which moved.
+- **`WitnessCheck.lean`** — `WExpr.ofWitgen` matches the same two shapes.
+  `eval_ofWitgen` did not "move"; its subject changed semantics — see
+  Deliverable 2a, which owns this.
 - **`Differential.lean`** — rides on `FlatOperation.witgen`; check its signature.
 - General churn: two Lean minors and a mathlib bump. Our proofs lean on
   `Array.mem_filterMap`, `Array.isEmpty_iff`, `zipIdx`, `flatMap`,
   `List.isPerm`, `Nat.eq_of_not_ne`. Expect renames.
+- **`circuit_norm` was re-keyed** (R7-10): upstream removed `@[circuit_norm]`
+  from `ProvableStruct.eval`/`eval.go` and `toComponents`, added the
+  `StructEvalSimprocs` machinery, new `@[simp, circuit_norm]`
+  `fromNat_zero`/`fromNat_one`, Witnessable projection lemmas and a `u64Wrap`
+  simproc. `Test/Soundness.lean` and `Test/Lookups.lean` are this backend's
+  `circuit_norm` consumers — their proofs can break or close differently with
+  no witness-IR involvement at all. Budget for it.
+
+## Deliverable 2a — the `val` truncation, as a recorded decision (R7-08)
+
+For the recognized shape `ofU64 (div (val x) (const c))`, upstream now
+evaluates `fromNat ((val x % 2^64) / c)` where the backend's reading
+(`WExpr.uintdiv`) means `fromNat (val x / c)`. These differ whenever
+`val x ≥ 2^64` — impossible on babybear/koalabear/mersenne31/goldilocks,
+reachable exactly on **bn254 and grumpkin**. (`mod` survives untouched only
+because `256 ∣ 2^64`.) So after the prescribed translation, `eval_ofWitgen` as
+stated over generic `[FiniteField F]` is **false**, and no gate will say so:
+every div/mod corpus entry is babybear, where truncation is invisible.
+
+The scope-preserving move, which this packet prescribes: restate
+`eval_ofWitgen` (and whatever of the G9 witness chain rests on it) with the
+hypothesis `FiniteField.size F ≤ 2^64`, and record a decision entry (D026)
+saying out loud that the witness meaning theorem no longer covers bn254 and
+grumpkin for `val`-rooted div/mod witnesses — those fields' registry entries
+stay, and circuits without such witnesses are unaffected. The alternative
+(changing `WExpr` semantics to truncate) touches D017's reading and the G2
+goldens, and belongs to S26's design question if taken at all. Either way the
+acceptance criterion below reads "gates identical" and **cannot see this** —
+the handoff and D026 are where it must be visible.
 
 **Hold the line on scope.** If a construct is newly expressible, reject it with a
 diagnostic and note it in the handoff. The temptation to "just support `bitsOf`
@@ -177,6 +220,11 @@ Expected, and **identical to today** — that is the acceptance criterion:
 PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
   12 circuit(s), 33 input vector(s), both witgen backends.
 ```
+
+— with one recorded exception the gates cannot express: Deliverable 2a's
+restatement of `eval_ofWitgen` is a semantic weakening on two fields, visible
+only in the theorem statement and D026. "All gates green" plus "no decision
+entry written" is a **failed** S25, not a passed one (R7-08).
 
 Two gates deserve attention because they are the ones a bump can quietly weaken:
 

@@ -1,0 +1,17 @@
+'LLZK.spec_of_compile' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.ofSource_lookups_iff' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.canonical_of_recognize' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.certified_membership' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.registryOk_of_recognize' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.size_eq_of_recognize' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.Test.Soundness.add8_spec_of_compile' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1]
+'LLZK.Test.Lookups.add8_lookup_iff' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1]
+"(some (4, (1, 1)))"

@@ -7,7 +7,8 @@ import Clean.Backend.LLZK.Certificate
 `Constraints.lean` does this for `@constrain`. This is the other half, and until
 S19 it was the last part of the pipeline with no check of its own: `@compute` was
 covered by G5–G7 — the two `llzk-witgen` backends agreeing with Clean's
-interpreter on 27 input vectors — and by nothing else. Twenty-seven vectors is
+interpreter on the recorded input vectors (33 as of R7; the corpus has grown
+since this comment first said 27) — and by nothing else. A few dozen vectors is
 evidence, not a statement about all inputs.
 
 The shape is the same as the constraint side, and so are its limits:

@@ -77,13 +77,14 @@ Reject before rendering:
 ## Measured coverage of Clean's gadget library
 
 Stage 1's capability list above says what the *analyzer* accepts. It does not say
-how much of Clean's actual library that is, and nobody had checked — the corpus is
-five fixtures plus `Addition8FullCarry`, which invites the assumption that the
-answer is "almost nothing".
+how much of Clean's actual library that is. The sweep is
+`Clean/Backend/LLZK/Test/Coverage.lean` — every verdict below is a `#guard`
+there, with the refusals counted *by kind*, so this table cannot drift without
+moving a test (R7-06; the first version of this section was an interactive
+session's output that nothing could re-run).
 
-It is not. Measured by calling `LLZK.compile` on the real gadgets (so both halves
-of G9 ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen
-them):
+Measured by calling `LLZK.compile` on the real gadgets (so both halves of G9
+ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen them):
 
 | gadget | verdict |
 |---|---|
@@ -94,29 +95,50 @@ them):
 | `Rotation32` | compiles |
 | `Rotation64` | compiles |
 | `Not.Not64` | compiles |
-| `Xor.Xor32` | refused — `lxor` (5 diagnostics) |
-| `And.And8` | refused — `land` (2) |
-| `BLAKE3.G` | refused — `lxor` (20) |
-| `Keccak256.Theta` | refused — `lxor` (450) |
-| `IsZero` | refused — `ite` |
-| `SHA256.SHA256Round` | n/a — needs `Fact (p > 2^33)`, so a larger field than babybear |
+| `Xor32` | refused — 1 × `lxor` + **4 × unregistered `ByteXorTable`** |
+| `And.And8` | refused — 1 × `land` + **1 × unregistered table** |
+| `BLAKE3.G` | refused — 4 × `lxor` + **16 × unregistered table** |
+| `Keccak256.Theta` | refused — 50 × `lxor` + **400 × unregistered table** |
+| `IsZeroField` | refused — `ite` (and the expression also needs `inv`) |
+| `SHA256.SHA256Round` | n/a — needs `Fact (p > 2^33)`; but see below, field width is not its real blocker |
 
-**The whole arithmetic half of the library already compiles**, subcircuits and
-lookups included: `Addition32Full` and `Rotation64` are compositions several
-gadgets deep.
+**The seven arithmetic rows compile**, subcircuits and lookups included:
+`Addition32Full` and `Rotation64` are compositions several gadgets deep. That is
+a real result and it was the surprise of the original sweep.
 
-**The whole bitwise half is blocked by exactly two witness-IR constructors** —
-`land`/`lor`/`lxor`, and `ite`. That is one increment, not an architecture
-problem, and it is what stands between this backend and BLAKE3, Keccak, SHA256,
-Xor and And. It reorders Stage 2: bitwise operations come *before* subcircuits as
-named components, because the second is a scaling concern and the first is the
-difference between "a demo" and "the library".
+**The bitwise half is blocked by two features, not one** (R7-05 — the first
+version of this section said "exactly two witness-IR constructors", and its own
+diagnostic counts refute that: 80–89% of them are lookup refusals summarized
+above as one word). Every byte-oriented bitwise gadget looks up `ByteXorTable`
+or a sibling — **3-column, 65536-row tables**, and this backend is
+single-column-only (D013). So:
 
-Two smaller observations worth keeping. `Keccak256.Theta` produced **450**
-diagnostics rather than stopping at the first, which is D009's non-cascading
-property working at a scale nothing had tested it at. And `SHA256Round` is not a
-frontend limitation at all: it needs a prime above `2^33`, so it is a
-`goldilocks`/`bn254` circuit, and the field registry already has both.
+- `land`/`lor`/`lxor` + `ite` (one witness-IR increment) removes the first
+  column of refusals — and unlocks, by itself, only gadgets that use no lookup
+  tables, roughly five.
+- **Multi-column tables (D013's retirement)** removes the second, and is what
+  actually stands between this backend and Xor32/And8/Keccak/BLAKE3 — together
+  with certifying a 65536×3 table through `CertifiedConfig`, whose cost at that
+  size nobody has measured.
+
+Both move to the head of Stage 2, in that order; "subcircuits as named
+components" stays behind them because it is a scaling concern, not a
+capability one.
+
+Denominators, stated so the table cannot imply them (R7-07): this sweep is 12
+gadgets. `Clean/Gadgets/` has ~61 `FormalCircuit` tops; `Clean/Circomlib/`
+(~35 circuits, Poseidon included), `Clean/Tables/`, `Clean/Examples/` and
+`Clean/Air/` are unmeasured; and `GeneralFormalCircuit` (19), `FormalAssertion`
+(8), `FormalTable` (3), `InductiveTable` (6) and `LookupCircuit` (1) tops are
+not "refused" — `Compilable` has exactly one instance, `FormalCircuit`, so
+they cannot reach `compile` at all. `SHA256Round`'s row above is also not a
+field-width story: its witnesses use `let`-steps, `mapRange` outputs and `>>>`
+(`Clean/Gadgets/SHA256/Add32.lean`), all refused, so it needs the witness-IR
+loop increment *and* a `goldilocks`/`bn254` instantiation.
+
+One smaller observation worth keeping: `Keccak256.Theta` produced 450
+diagnostics rather than stopping at the first — D009's non-cascading property
+working at a scale nothing had tested it at.
 
 ## Critical path
 
@@ -176,7 +198,7 @@ Status against that definition:
 | Requirement | State |
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
-| unsupported cases fail with structured diagnostics | done — 25 negative fixtures pin exact messages. Not "one per rejection path": R5 found three reachable paths with none |
+| unsupported cases fail with structured diagnostics | done — 29 negative fixtures pin exact messages. Not "one per rejection path": R5 found three reachable paths with none, and R7 found three more (R7-04); each round's were added |
 | `llzk-opt` accepts and round-trips | done — 12 modules and 2 renderer fixtures, G3 and G4 |
 | every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 14 |
 | both witgen backends agree | done — 33 input vectors, G5 and G6 |
@@ -210,9 +232,10 @@ file.
   erased which `Table` a `RawTable` came from. GAPS.md item 1's second half; the
   fix is upstream in Clean's core.
 - **Nothing proves the renderer.** GAPS.md item 2, with the counterexample R6
-  verified.
-- **There is no chain from the emitted constraints to a gadget's `Spec`.**
-  GAPS.md item 3.
+  verified. R7 sharpened why this matters: the toolchain gates certify nothing
+  about `@constrain` content (a module with an *empty* `@constrain` body passes
+  G3–G6 and both G10 halves), so the emit-time Lean comparison is the artifact's
+  only line of defense, and a parser back to `Module` would be its second.
 - **The corpus is chosen, not exhaustive.** `Addition8FullCarry` is now tested
   outside its `Assumptions` (three of its nine vectors, S19).
 

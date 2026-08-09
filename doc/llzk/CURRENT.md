@@ -1,13 +1,22 @@
 # Clean → LLZK current state
 
-Updated: 2026-08-04  
-Active milestone: **Stage 1 finished and reviewed; `GAPS.md` §3, §4 and §6
-closed** — all gates G0–G12 green against the pinned tools, and green in CI  
-Last accepted session: A4 — G9 reads types; and B, which found that CI had been
-green on this branch for two days while three sessions said it had never run  
-Next session: **S25** — `sessions/S25-align-upstream.md`. Bootstrapped, not started  
+Updated: 2026-08-09  
+Active milestone: **Stage 1 finished, reviewed three times, and reproduced by
+R7** — all gates green against the pinned tools and in CI; the pipeline
+milestone (a Clean circuit compiled, validated, and its emitted constraints
+proved to imply the gadget's `Spec`) stands. **The plan to scale it was wrong
+and is corrected**: see `review/R7-findings.md`  
+Last accepted session: R7 — a five-surface adversarial review of the finished
+Stage 1 *and of the plan*. The formal chain held; the coverage headline
+(R7-05), two of the three bootstrapped session packets (R7-08, R7-09), and G0's
+blindness to the working tree (R7-01) did not. All findings repaired in the
+same session; the coverage sweep is now a checked test
+(`Test/Coverage.lean`), `CertifiedTable` carries a name tie, and S28
+(multi-column tables) joined the critical path  
+Next session: **S25** — `sessions/S25-align-upstream.md`, **as corrected by R7**
+(read its Deliverable 2a first). Bootstrapped, not started  
 Integration branch: `clean-to-llzk/integration`  
-Integration commit: `doc/llzk/evidence/A4/gates.txt`  
+Integration commit: `doc/llzk/evidence/R7/gates.txt`  
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 
 ## Accepted pins
@@ -157,9 +166,10 @@ an explicit decision, which was given.
     stale by the next command and `claim` took a stale lock silently. `reclaim`
     is now separate, `LLZK_SESSION` is the identity, and CI claims rather than
     being exempted (D023). Then S23 was executed: `CertifiedConfig F` carries
-    the table certificates to all seven public entry points, which no longer
-    accept a plain `Config`, so `GAPS.md` §1's first half — the *erasure* — is
-    closed. Its second half is not, and is upstream.
+    the table certificates to the five public entry points (R7-15 corrected
+    "seven", which had counted two theorems), which no longer accept a plain
+    `Config`, so `GAPS.md` §1's first half — the *erasure* — is closed. Its
+    second half is not, and is upstream.
   - **R6**, an adversarial review of the finished Stage 1 and its repair. The
     gates reproduced on the reviewed commit before anything changed; four claims
     were attacked specifically and held, above all D019's survival through
@@ -205,6 +215,25 @@ an explicit decision, which was given.
     "Reproduce everything" above: PR #1 has been open since 2026-08-02 with CI
     green on all four jobs, while this document said none of it had ever run and
     R6 repeated that in its roadmap without checking.
+  - **R7**, five independent adversarial reviews of the finished Stage 1, the
+    closed gaps, the gates, and — for the first time — the *plan*. What held:
+    the gates (reproduced before anything changed), the soundness chain link by
+    link, axiom hygiene exactly as documented, the fatBytes attack blocked by
+    `resolve`, and the R2-06/R4b-2 vacuity class still closed. What did not:
+    the coverage headline — "bitwise blocked by exactly two constructors" was
+    false, 80–89% of its own diagnostics being multi-column-lookup refusals
+    (R7-05), so **D013's retirement is now on the critical path (S28)**; S25's
+    "translate exactly, re-prove `eval_ofWitgen`" is unsatisfiable because
+    upstream `U64Expr.val` truncates (R7-08); S27's premises were false three
+    ways — GF(2) not bn254, no bitwise ops, real blocker `letF` (R7-09); G0
+    never looked at the working tree it certified (R7-01, fixed + G11 case);
+    three refusal paths had no fixture (fixed, 29 now); `CertifiedTable` had no
+    name tie, leaving `spec_of_compile`'s lookup hypothesis incomparable with
+    module satisfaction under swapped names (R7-12, fixed with
+    `name_certifies`); the coverage sweep was unreproducible (fixed —
+    `Test/Coverage.lean` pins every verdict and its decomposition); and eight
+    document-drift items (R7-13…17). `review/R7-findings.md`,
+    `evidence/R7/`.
   - `Gadgets.Addition8FullCarry` compiles to LLZK, `llzk-opt` accepts,
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
@@ -226,10 +255,10 @@ Evidence under `doc/llzk/evidence/`.
 | G5 `llzk-witgen` interpreter | PASS — 33 vectors |
 | G6 `llzk-witgen` execution engine | PASS — 33 vectors |
 | G7 both backends vs Clean's own interpreter | PASS — carried by `--check-output` |
-| G8 fail closed | PASS — 25 negative fixtures, plus tool-version rejection. Not "one per rejection path": R5 found three reachable paths with none, including the field-registry branch that was R4b-1's own repair. Those three now have fixtures; the claim is not reinstated as a general one |
+| G8 fail closed | PASS — 29 negative fixtures, plus tool-version rejection. Not "one per rejection path": R5 found three reachable paths with none, and R7 found three more (R7-04); each round's were added and the general claim is not reinstated |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 14 |
-| G11 the harness's own error paths | PASS — 42 exercised, including the worktree lock's opaque-owner branches, which R6 found were the ones that mattered and the ones nothing covered |
+| G11 the harness's own error paths | PASS — 43 exercised, including the worktree lock's opaque-owner branches, which R6 found were the ones that mattered and the ones nothing covered, and since R7 the uncommitted-core-edit branch of G0 (R7-01) |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |
@@ -268,17 +297,20 @@ strongly than the code supported. Two of them were consequences of paragraphs
 that stood right here. The list below is the summary; `GAPS.md` is the thing to
 read, and the docstrings it points at now agree with it.
 
-The largest, in order: lookup table rows are asserted by the caller and not
-checked (D012 — and the `ConstraintSet.globals` conjunct that claimed to close
-this is a tautology; S24 closed the *erasure* half of this, so the certificate
-now reaches the compiler, but not the tie to the circuit's own table);
-`Module.render` is outside every theorem, uncovered for `@constrain` — R6
-replaced that entry's counterexample with two it verified against the pinned
-tools, and narrowed the hazard to the three `Stmt` forms that appear only in
-`@constrain`; there is no proof from the emitted constraints to a gadget's
-`Spec`; `FieldExpr.lower_spec` is satisfied by five grossly wrong
-lowerings and does not compose; and G9 compares no types. (§4 — the lookup half
-having no semantic theorem — was on this list until A1 closed it.)
+The largest still open, in order (R7-14 — an earlier version of this paragraph
+kept listing §3 and §6 after other sections of this same file recorded them
+closed): lookup table rows are asserted by the caller and not checked (D012 —
+and the `ConstraintSet.globals` conjunct that claimed to close this is a
+tautology; S24 closed the *erasure* half, so the certificate reaches the
+compiler, and R7 tied it to the table's *name*, but not to the circuit's own
+table); `Module.render` is outside every theorem, uncovered for `@constrain` —
+R6 narrowed the hazard to the three `Stmt` forms that appear only in
+`@constrain`, and R7 measured how alone the emit-time check is (an empty
+`@constrain` body passes every binary gate including the SMT lowering); and
+`FieldExpr.lower_spec` is satisfied by five grossly wrong lowerings and does
+not compose. (§4 was on this list until A1 closed it; §3 until A2 —
+`spec_of_compile`, with R7-12's correction of what its lookup hypothesis says;
+§6 until A4.)
 
 The lookup side, which R4a-6 found had no semantic theorem, has one:
 `Lookups.ofSource_lookups_iff`, the counterpart of `ofSource_eqs_iff`. This
@@ -298,7 +330,8 @@ toolchain, and no formal LLZK semantics in Lean, so the assumption that
 `constrain.eq` is equality and `constrain.in` is membership has no empirical
 check and cannot acquire one here. Closing it means formalising LLZK, which is
 VeIR's project (D003). The `@compute` half of the same reading *does* have
-evidence: 30 vectors across two independent LLZK backends.
+evidence: 33 vectors across two independent LLZK backends (27 with a Clean
+circuit behind them; R7-15 unified the stale counts).
 
 **S20 — the preservation theorem — exists, and is much smaller than this section
 used to claim.** Every module `compile` returns has been compared against its
@@ -321,7 +354,10 @@ invariant, which R4b-3 had just tightened — while `FieldExpr` lives in a modul
 that imports them, so the proof has nowhere to live. **D021** records the three
 ways out and recommends one (make the emitters pure functions and keep the monad
 as a wrapper). The attempt was reverted rather than left half-built; nothing in
-the tree carries a `sorry`.
+the *backend* carries a `sorry` — and its axiom closure is clean, checked by
+`#print axioms` in `evidence/R7/probes.txt`. (Not "nothing in the tree": pinned
+Clean core carries one at `Clean/Circomlib/Poseidon.lean:22`, outside the
+backend's closure, plus deliberate ones in `Clean/Utils/Test/` — R7-16.)
 
 Two smaller facts, stated so they are not mistaken for gaps: the whole-vector
 witness statement rests on the block-prefix discipline `Analyze` enforces rather
@@ -351,28 +387,43 @@ your next command. `e2e.sh` refuses without it. If the tree already carries a
 finished session's lock, `status` will say whether `reclaim` needs `--from`
 (D024). Three sessions collided on 2026-08-01; `CONCURRENCY.md` records the cost.
 
-## The next three sessions are written
+## The next sessions, as R7 corrected them
 
-Bootstrapped 2026-08-04 and not started. Read them in order; each is unexecutable
-before the one above it.
+Bootstrapped 2026-08-04; **R7 falsified parts of all three packets against the
+primary sources before execution** (R7-08…11), and the corrections are written
+into the packets themselves. Read them in order.
 
-| packet | does | why in this order |
+| packet | does | R7 correction |
 |---|---|---|
-| `sessions/S25-align-upstream.md` | bump to upstream `0e53b9f2` / Lean 4.32.2, gates unchanged | the witness IR was rebuilt; everything below targets the new one |
-| `sessions/S26-witness-u64.md` | lower `U64Expr` structurally; `bitsOf`, `land`/`lor`/`lxor` | retires D011's whole-shape matching. Unlocks Xor32, And8, BLAKE3.G, Keccak256.Theta — measured, see the coverage table in `ROADMAP.md` |
-| `sessions/S27-fork-gadgets.md` | port `~/zkgolf/submission_gf2` onto fork `main`, advance `clean_base` | a zkGolf gadget is bitwise, so before S26 the backend still refuses it |
+| `sessions/S25-align-upstream.md` | bump to upstream `0e53b9f2` / Lean 4.32.2 | constructor inventory fixed (three errors); **Deliverable 2a added**: upstream `U64Expr.val` truncates, so `eval_ofWitgen` cannot be re-proved as stated — restating it costs bn254/grumpkin div/mod coverage and must be recorded as a decision (D026), which no gate can see |
+| `sessions/S26-witness-u64.md` | lower `U64Expr` structurally; `bitsOf`, `land`/`lor`/`lxor`, `ite` | unlocks ~5 lookup-free gadgets, **not** the bitwise half (R7-05); the width decision must also cover the `val` bridge on *large* fields |
+| `sessions/S28-multicolumn-tables.md` | **new** — retire D013: `array.new`, multi-dim `constrain.in`, certification at 65536×3 | this, with S26, is what actually unlocks Xor32/And8/Keccak/BLAKE3; outline now, expand after S26 |
+| `sessions/S27-fork-gadgets.md` | port `~/zkgolf/submission_gf2` onto fork `main` | **returned for re-scoping** (R7-09): the submission is GF(2) — not an LLZK field — has zero bitwise ops, and its real blocker is `letF`. The port survives as Clean-side library work; its backend payoff needs a decision first |
 
 S25 keeps the accepted subset exactly the size it is now, so its gates say one
-thing only: the bump did or did not break the backend. S26 is where capability
-grows, and it owes a width analysis as a theorem or a refusal — a `u64` does not
-fit in a babybear felt, and D025 says why that is a replacement for D011's problem
-rather than a removal of it.
+thing only: the bump did or did not break the backend — except D026, which only
+the theorem statement and the decision register can express (R7-08's point: the
+realistic bump failure is green gates over a silently weakened theorem). S26 is
+where capability grows; S28 is where the *library* does.
 
-## Roadmap after R6
+## Roadmap after R7
 
-Stage 1 is finished, reproduced, and reviewed twice by sessions that did not
-write it. What remains sorts into five tracks. Nothing below is *in progress*;
-these are the choices.
+Stage 1 is finished, reproduced, and reviewed three times by sessions that did
+not write it. What remains sorts into five tracks. Nothing below is *in
+progress*; these are the choices.
+
+**The two milestones, stated in the grant's terms.** Milestone 1 — one Clean
+circuit compiled through the whole LLZK pipeline, validated end to end — is
+**done and revalidated by R7**: gates green on this machine and in CI, the
+formal chain attacked and held. Milestone 2 — the *library* of Clean circuits —
+is what the corrected plan below is for, and its honest denominators are in
+`ROADMAP.md`'s coverage section: ~7 of ~128 tops measured-compiling today,
+S26+S28 unlock the ~29-gadget bitwise family, the witness-IR loop increment
+(`letF`/`mapRange`/`shr`) unlocks SHA256 and most Circomlib bit gadgets, `inv`+
+`ite` unlock the comparator family, and a `Compilable` story for
+`GeneralFormalCircuit`/`FormalAssertion` (37 tops have no entry point today)
+plus the AIR layer (track D) are the two design decisions standing between
+this backend and the rest.
 
 ### A. Close the assurance gaps in this repo
 
@@ -437,26 +488,30 @@ In dependency order, each an increment of the shape D009 describes (one
 `FieldExpr` constructor, one recognizer case, one `lower` case, one positive and
 one negative fixture):
 
-- **Bitwise operations first** — `land`/`lor`/`lxor`, then `ite` (`scf.if`).
-  Measured, not guessed: `ROADMAP.md`'s coverage table shows the whole arithmetic
-  half of Clean's gadget library *already compiles* (`Addition32Full`,
-  `Rotation64`, `Not64`, `ByteDecomposition`, subcircuits and lookups included),
-  and the whole bitwise half is blocked by exactly these two constructors —
-  `Xor32`, `And8`, `BLAKE3.G` and `Keccak256.Theta` all refuse for that one
-  reason. This is the difference between a demo and the library, and it comes
-  before everything else in this track.
+- **Bitwise operations first** — `land`/`lor`/`lxor`, then `ite` (`scf.if`) —
+  **S26**. The seven arithmetic rows of `ROADMAP.md`'s coverage table already
+  compile (`Addition32Full`, `Rotation64`, `Not64`, `ByteDecomposition`,
+  subcircuits and lookups included). What this increment does *not* do is
+  unlock the bitwise gadgets — R7-05 corrected the claim that it would.
+- **Multi-column tables** (D013) — **S28**, immediately after, because it is
+  the other half of the same unlock: every byte-oriented bitwise gadget looks
+  up a 3-column `ByteXorTable`-family table. `array.new`, a multi-dimensional
+  `constrain.in`, and table certification at 65536×3.
+- **The rest of the witness IR**: `let`-steps and `mapRange` → `scf.for` (this
+  is SHA256's real blocker, R7-07, and the zkGolf Add32 ports' too, R7-09),
+  `inv` → `felt.inv` (with `ite`, the `IsZero`/comparator family), `listGet` →
+  the array dialect.
+- **A `Compilable` story beyond `FormalCircuit`** — `GeneralFormalCircuit`,
+  `FormalAssertion` and `LookupCircuit` tops (28 in `Gadgets`+`Circomlib`)
+  cannot reach `compile` at all today; R7-07 found the coverage table silently
+  excluded them. Whether each gets an instance, an adapter, or a documented
+  refusal is a design decision to record, not code to sneak in.
 - **Subcircuits as named components** alongside `@Main`. This is the shape D015
-  was chosen to be compatible with, and the reason the root name is a constant.
-  A scaling concern rather than a capability one, which is why it now comes
-  second.
-- **Multi-column tables** (D013): needs `array.new` and a multi-dimensional
-  `constrain.in` in the emitter IR.
-- **The rest of the witness IR**: `inv` → `felt.inv`, `ite` → `scf.if`,
-  `listGet` → the array dialect, `let`-steps, `mapRange` → `scf.for`.
-- **General natural arithmetic** (D011's deferred "general treatment"): `NExpr.val`
-  → `cast.toindex`, arithmetic on `index`, `FExpr.ofNat` → `cast.tofelt`. Needs an
-  index bounds policy and LLZK interpreter support that do not exist yet, which is
-  why it is last and why D011 refuses everything but the two matched shapes.
+  was chosen to be compatible with. A scaling concern rather than a capability
+  one.
+- **General natural arithmetic** (D011's deferred "general treatment", now over
+  `U64Expr`): needs an index bounds policy and LLZK interpreter support that do
+  not exist yet, which is why it is last.
 
 ### D. The AIR layer — an unfaced design decision
 
@@ -476,19 +531,25 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1, A2, A4 and B are done — §3, §4 and §6 are closed and CI is green on a
-runner.** But the next thing is **not** in this track: it is S25, the upstream
-alignment, because the Clean pin is a month stale and the witness IR underneath us
-has been rebuilt (D025).
+**A1, A2, A4 and B are done, and R7 revalidated all of it.** The next thing is
+still **S25**, the upstream alignment — the pin is now five weeks stale, the
+witness IR underneath us has been rebuilt (D025), and upstream has not moved
+past `0e53b9f2` (checked 2026-08-09) — but execute it *as R7 corrected it*:
+Deliverable 2a (the `val`-truncation decision, D026) is the part the gates
+cannot see. Then **S26** (bitwise + `ite`, with the val bridge in its decision
+entry), then **S28** (multi-column tables — new, and the actual library
+unlock), then the witness-IR loop increment. S27 is returned for re-scoping and
+should not be executed as written (R7-09).
 
-After S25–S27, the assurance track resumes at **A5, the renderer** — now the
-largest thing standing between `spec_of_compile` and the emitted *text*, which is
-exactly what A2 makes it worth doing, and R6 narrowed it to the three `Stmt` forms
-that appear only in `@constrain`. Then A6 (the preservation theorem, D021) and A7
-(the copy-canonicalisation premise). A3 is more important than any of them but is
-a Clean-core session, so it should be *scheduled* rather than slipped into a
-backend increment — and G0 now enforces that. S27 is the first session that
-exercises that discipline for real.
+The assurance track resumes at **A5, the renderer** — R7-02 made it more than
+a proof-hygiene item: an empty `@constrain` body passes every binary gate
+including the SMT lowering, so the emit-time Lean comparison is the on-disk
+artifact's *only* line of defense, and a parser back to `Module` with a
+round-trip check is its second. Then A6 (the preservation theorem, D021) and A7
+(the copy-canonicalisation premise). A3 is more important than any of them but
+is a Clean-core session, so it should be *scheduled* rather than slipped into a
+backend increment — and G0 now enforces that, including against uncommitted
+edits (R7-01).
 
 One process item, from B: **check the world, not the document.** Track B was on
 this list at all because three sessions in a row read a paragraph saying CI had

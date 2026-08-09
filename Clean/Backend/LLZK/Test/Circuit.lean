@@ -734,4 +734,44 @@ assertion 0: constant 2013265928 is not below the field prime 2013265921; `felt.
   { inputSize := 1, witnesses := #[], asserts := #[.const (pBabybear + 7)],
     lookups := #[], tables := #[], outputs := #[] }))
 
+-- And in a witness cell (R5c's own position) and a lookup entry — R7-04 found
+-- `checkLowerable` covers four positions and the fixtures pinned only two.
+/--
+info: compilation failed:
+witness cell 0: constant 2013265928 is not below the field prime 2013265921; `felt.const` reduces its operand modulo the prime, so the emitted module would not denote what this expression says
+-/
+#guard_msgs in
+#eval IO.print (viaRecognized (recognizedWith #[.const (pBabybear + 7)] #[.var 1]))
+
+/--
+info: compilation failed:
+lookup 0 into @Bytes: constant 2013265928 is not below the field prime 2013265921; `felt.const` reduces its operand modulo the prime, so the emitted module would not denote what this expression says
+-/
+#guard_msgs in
+#eval IO.print (viaRecognized
+  { inputSize := 1, witnesses := #[], asserts := #[],
+    lookups := #[{ tableName := "Bytes", tableRows := 1, entry := .const (pBabybear + 7) }],
+    tables := #[], outputs := #[] })
+
+-- The `env.size = 0` branch of the undefined-variable refusal: a distinct
+-- message text that no fixture had pinned (R7-04). `undefinedVariable` above
+-- exercises only the sibling branch, because its circuit has an input.
+/--
+info: compilation failed:
+output 0: expression reads circuit variable 0, but nothing is in scope here: the circuit has no inputs and no earlier witness cells
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear (source 0 [] #[.var ⟨0⟩]))
+
+-- `lowerRecognized`'s own field-registry branch (R7-04): a shorter message than
+-- `checkField`'s, reachable only through the hand-built-`Recognized` door, and
+-- driven by nothing until now.
+/--
+info: compilation failed:
+field: configured field 'babybear-ish' with prime 2013265921 is not an entry of `FieldSpec.registry`
+-/
+#guard_msgs in
+#eval IO.print (renderResult (lowerRecognized unregisteredField
+  (recognizedWith #[] #[.var 0])))
+
 end LLZK.Test.Circuit

@@ -57,6 +57,22 @@ if [[ -n "${core_changes}" ]]; then
   exit 1
 fi
 
+# The diff above compares two *commits* -- but G1 builds and G2 emits from the
+# working tree. R7 demonstrated the gap: an uncommitted edit to
+# Clean/Utils/Primes.lean reported "byte-identical PASS" while being exactly
+# what got built, emitted, and certified, and G9 cannot catch it because both
+# of its sides move together (R7-01). So the same pathspec is checked against
+# the working tree too, staged or not.
+dirty_core="$(git status --porcelain -- Clean/ \
+  ':!Clean/Backend/LLZK' ':!Clean.lean' ':!Clean/Test.lean')"
+if [[ -n "${dirty_core}" ]]; then
+  echo "error: Clean's core has uncommitted changes; the tree that would be" >&2
+  echo "  built is not the tree the byte-identity check above certified (R7-01):" >&2
+  sed 's/^/  /' <<<"${dirty_core}" >&2
+  echo "  Commit to Clean/Backend/LLZK/ only, or restore these files." >&2
+  exit 1
+fi
+
 actual_toolchain="$(tr -d '\r\n' < lean-toolchain)"
 if [[ "${actual_toolchain}" != "${expected_toolchain}" ]]; then
   echo "error: Lean toolchain is ${actual_toolchain}, expected ${expected_toolchain}" >&2

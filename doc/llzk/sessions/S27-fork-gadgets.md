@@ -1,11 +1,45 @@
 # S27 — Upstream the zkGolf-optimised gadgets onto the fork, and re-pin
 
-Status: proposed
-Depends on: S25 (landed) and S26 (landed). Doing this before S26 produces gadgets
-the backend still refuses — see "Why last".
+Status: **returned for re-scoping by R7 — do not execute as written**
+Depends on: S25 (landed) and S26 (landed). ~~Doing this before S26 produces
+gadgets the backend still refuses — see "Why last"~~ — false, see below.
 Base integration commit: S26's resulting commit
 Worktree: **a second worktree.** This is a Clean-side change; see "Where".
 Branch: `clean-gadgets/zkgolf` off `alexanderlhicks/clean` `main`
+
+## R7: three of this packet's premises are false (R7-09)
+
+Checked against `~/zkgolf` itself; `review/R7-findings.md` has the evidence.
+
+1. **The field is GF(2), not bn254.** `submission_gf2`'s circuits are over
+   `p2 := 2` (`Challenge/Utils/F2Bits.lean:17`); `circomPrime` = bn254 belongs
+   to the *SHA256* challenge, not this submission. GF(2) is not in
+   `FieldSpec.registry` and is not an LLZK registry field, so Deliverable 3
+   ("corpus entry … the easy case for S26's lowering") is unimplementable as
+   written: the ported gadgets cannot become corpus entries at all without an
+   LLZK-side field that does not exist.
+2. **There are no bitwise operations to wait for.** Over GF(2), xor is `+` and
+   and is `*`; the submission uses native-closure witnesses of embedded field
+   expressions — zero `lxor`/`land`, zero `Witgen` usage, zero bit
+   decompositions. The claimed dependency on S26 does not exist.
+3. **The real blocker is `Step.letF`, which S26 excludes.** The Add32 gadgets
+   witness 31 carries through the recursive `carryVal`; a `VExpr.lit` inlining
+   of that recurrence doubles per bit (~2^31 terms), so the faithful IR port
+   needs `letF` chains — refused today, and a non-goal of S26. The tops are
+   also `GeneralFormalCircuit`, for which `Compilable` has no instance. As
+   written, this session's ported gadgets would not be exportable even after
+   S26 lands.
+
+**What survives:** the port itself (Deliverables 1–2 — the gadgets onto the
+fork, the pin advance, the `computableWitnesses` proof archaeology across 203
+upstream commits) is still real and still a Clean-side session under
+ORCHESTRATION §11. But its *backend* payoff needs a decision first: either an
+export story for GF(2) (an LLZK field question, not a Clean one), or re-target
+the port at gadgets the backend can host (bn254 material from the SHA256
+challenge — noting `axiom hCircomPrime` in that challenge's interface, which
+would fail the axiom gate), or run the port purely as library work with no
+corpus claim. Re-scope before executing; do not inherit this packet's
+acceptance criteria.
 
 ## Objective
 

@@ -165,6 +165,6 @@ type, so D012's obligation is a *precondition of emission* rather than a fact
 recorded next to one. What it still does not establish is `GAPS.md` item 1's
 second half — the caller picks both sides of `Certifies`. -/
 def withBytes : CertifiedConfig (F pBabybear) :=
-  ⟨.babybear, #[⟨byteTable, Gadgets.ByteTable, byteTable_certified⟩]⟩
+  ⟨.babybear, #[⟨byteTable, Gadgets.ByteTable, byteTable_certified, rfl⟩]⟩
 
 end LLZK.Examples

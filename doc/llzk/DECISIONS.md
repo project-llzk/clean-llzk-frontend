@@ -828,12 +828,17 @@ now the path of least resistance and its absence is greppable and gated.
 sentence above — "greppable and gated" — was the honest description of a
 convention, and S23 said why that is not closure: `Config.ofCertified` demanded
 the certificates and then *erased* them, so what reached `compile` was a plain
-`Config`. The seven public entry points in `WitnessCheck.lean` now take a
+`Config`. The five public entry points in `WitnessCheck.lean` (`verify`,
+`compileSourceVerified`, `compile`, `emit`, `emitSource` — R7-15 corrected an
+earlier "seven", which counted the two theorems) now take a
 `CertifiedConfig F`; `ofCertified` is retired; there is no public function from a
 `Config` to a `CertifiedConfig`. `Config` and `unsafeWithTables` both stay, and
 both stay confined by G12, because the negative fixtures must be able to build
 malformed registries and `Analyze`/`Circuit`/`Constraints` need a plain `Config`
-internally — what changed is that nothing *public* accepts one.
+internally — what changed is that no *supported* compile or emit path accepts
+one. ("Nothing public" was also too strong: `compileSource`, `compileSource'`
+and `lowerRecognized` are Lean-public and take a plain `Config`; G12 is what
+gates any new caller of them — R7-13.)
 
 Two consequences worth naming. The type is indexed by `F`, which `Config` was
 not, because a `CertifiedTable F` mentions a Clean `Table F field`; that is why
