@@ -56,3 +56,9 @@ llzk-opt rejects a struct with no @constrain *function*, but accepts an empty
 one — the discriminator probe is presence-only. None of this contradicts a
 documented claim (G9 is a precondition of emission; D017 stands); it is the
 measured absence of any second line of defense for the on-disk artifact.
+
+## Commits
+
+Reviewed tree: acbf8c32 (gates.txt). Repaired tree: 51b69679
+(gates-post-repair.txt ran on its working tree, committed unchanged as that
+commit; the follow-up commit pointing this file at both is the one you are on).
