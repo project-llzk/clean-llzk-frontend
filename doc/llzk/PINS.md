@@ -6,22 +6,22 @@ updates require an explicit session and decision-log entry.
 | Component | Revision | Role |
 |---|---|---|
 | Clean | `0e53b9f2d05f06defa2aa0a859f549b611583f10` | Frontend host and source semantics; S25 |
-| LLZK | `5db6f8f9baaa40787a1a40625796497445f2da36` | LLZK 3.0 syntax, verifier, and witgen reference |
+| LLZK | `25fb3740ea3465c9129a06289297bb4f0554b7a5` | LLZK 3.0 syntax, verifier, and witgen reference; L0 |
 | project-llzk VeIR | `eae1c27e7842c0503233ec99155c39791bd5f502` | Existing LLZK-aware VeIR fork |
 | upstream VeIR | `a4e6194d5810a02d74f0094ff6014cda6db6d617` | Long-term Lean MLIR framework |
 | llzk-lean VeIR | `d899d95004d4bd988c8456d686c33b11a7a5eb4a` | Previously accepted differential harness pin |
 
-Public-readiness note (checked 2026-08-21): `project-llzk/llzk-lib` `main` is
-`25fb3740ea3465c9129a06289297bb4f0554b7a5`, 25 commits ahead of the accepted
-LLZK pin. The changed surface includes core transforms, analysis,
-`llzk-witgen`, and downstream backends. There is no newer tagged GitHub release
-than v2.1.2 even though the pinned build identifies itself as LLZK 3.0.0, so a
-tag comparison is not a sufficient update policy. L0 in
-`PUBLIC-READINESS.md` will either retain this known reproducible pin or advance
-it through a separate full-gate compatibility session. Its read-only delta
-inventory and same-tree decision procedure are prepared in
-`sessions/L0-review-llzk-pin.md`. Until that decision, the table above remains
-authoritative.
+Public-readiness note (checked 2026-08-21): L0 advanced the accepted pin from
+`5db6f8f9baaa40787a1a40625796497445f2da36` to current
+`project-llzk/llzk-lib` `main`,
+`25fb3740ea3465c9129a06289297bb4f0554b7a5`, after running both exact Nix
+outputs against one frozen frontend tree. Both passed the unchanged G0-G12
+matrix with identical counts and declared diagnostics. The 25-commit delta
+includes core transforms, analysis, `llzk-witgen`, and downstream backends.
+There is still no newer tagged GitHub release than v2.1.2 even though both
+builds identify themselves as LLZK 3.0.0; the immutable SHA and L0 evidence,
+not the tag or version string, are the compatibility authority. Evidence is in
+`evidence/L0/` and the decision is D032.
 
 ## CI execution environment
 
@@ -48,11 +48,11 @@ rather than following the action's moving `stable` default. The captured API
 results and full-gate run are in `evidence/P0/ci-hardening.txt`.
 
 The LLZK job installs the exact `veridise-public.cachix.org` substituter and key
-recorded below, then builds with `--max-jobs 0`. The accepted output was present
-in that public cache during S01, so CI downloads it or fails; it cannot silently
-turn a missing substitute into a multi-hour LLVM source build. The first run of
-the frozen candidate in the organization repository must still demonstrate
-that the cache remains anonymously readable there.
+recorded below, then builds with `--max-jobs 0`. L0 materialized the newly
+accepted output from that public cache, so CI downloads it or fails; it cannot
+silently turn a missing substitute into a multi-hour LLVM source build. The
+first run of the frozen candidate in the organization repository must still
+demonstrate that the cache remains anonymously readable there.
 
 The self-hosted benchmark workflows are deliberately excluded from the normal
 release gates and require `CLEAN_BENCH_ENABLED == 'true'`. Keep that repository
@@ -77,15 +77,16 @@ accepted input. Fetch, merge, constructor-diff, and full-gate evidence are in
 
 ## LLZK tools
 
-Provisioned by S01. Evidence: `doc/llzk/evidence/S01/tools.txt`.
+Originally provisioned by S01 and advanced by L0. Evidence:
+`doc/llzk/evidence/L0/`.
 
 ```bash
 nix build --no-link --max-jobs 0 --print-out-paths \
-  github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk
+  github:project-llzk/llzk-lib/25fb3740ea3465c9129a06289297bb4f0554b7a5#llzk
 ```
 
-- S01 evidence-machine output:
-  `/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0` (provenance,
+- L0 evidence-machine output:
+  `/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0` (provenance,
   not a portable path)
 - `LLZK_OPT` = `<that>/bin/llzk-opt`, reports `LLZK version 3.0.0`
 - `LLZK_WITGEN` = `<that>/bin/llzk-witgen`

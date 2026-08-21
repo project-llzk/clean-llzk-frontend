@@ -11,7 +11,7 @@ three times, and reproduced by R7; all gates were green against the pinned tools
 and in CI, and the pipeline milestone (a Clean circuit compiled, validated, and
 its emitted constraints proved to imply the gadget's `Spec`) stands.
 
-Last accepted session: **S25** — upstream Clean was fetched and accepted at
+Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
 Compatibility commit `6ccca6f8` preserves the accepted frontend subset, makes
 all new witness-IR constructors fail closed with named diagnostics, and records
@@ -56,11 +56,12 @@ including ten controls for these policies. Full G0-G12 passed on clean commit
 `9b809e32`; evidence is in `evidence/P0/ci-hardening.txt`. The workflows have
 not run remotely at this commit, and no external state changed.
 
-Current session: **L0** — bootstrapped 2026-08-21 from the complete S25 evidence
-tip `f4ffaf05`. The worktree is isolated on the L0 branch and the live candidate
-was re-resolved as `25fb3740`, unchanged from the read-only preflight. No LLZK
-pin has moved and no candidate build or compatibility run has started. The
-procedure and decision rule are in `sessions/L0-review-llzk-pin.md`.
+Latest completed dependency session: **L0** — both the previous LLZK input
+`5db6f8f9` and candidate `25fb3740` were materialized by exact Nix flake
+reference and run against the same frozen post-S25 frontend tree. Both passed
+G0-G12 with identical counts and declared diagnostics. D032 advances the
+accepted LLZK pin to `25fb3740`; the comparison and theorem audit are in
+`evidence/L0/`.
 
 Integration branch: `clean-to-llzk/integration`
 
@@ -79,22 +80,23 @@ commits. A public release candidate must put the branch, evidence, and CI on the
 same frozen commit. No push is authorized by this status update.
 
 Dependency state, also verified 2026-08-21: Clean upstream remains exactly
-`0e53b9f2`, now S25's accepted base. LLZK `main` is `25fb3740`, 25 commits
-ahead of the accepted `5db6f8f9` tool pin. The delta touches LLZK core
-transforms, analysis, and `llzk-witgen`, not only unrelated backends. The
-3.0.0 pin remains accepted and reproducible. The isolated L0 review now decides
-whether to retain it or advance it and rerun the full compatibility matrix.
+`0e53b9f2`, S25's accepted base. LLZK `main` is `25fb3740`, now the accepted
+source/tool pin after L0's same-tree comparison with the previous `5db6f8f9`
+input. Both exact outputs report 3.0.0 and passed 12 circuits, 33 vectors on both
+witness backends, 2 renderer fixtures, all 14 product-program admissions, and
+the unchanged 10-lowered/4-declared-out-of-scope SMT split. The candidate was
+substituted from the public cache with source builds disabled.
 
-L0 preflight is complete without building or accepting a candidate. The
-25-commit delta is frozen at `25fb3740`, classified across syntax, product,
-SMT, memory, and witness-generation surfaces, and converted into a same-tree
-old-versus-candidate procedure in `sessions/L0-review-llzk-pin.md`. Its execution
-is the next critical-path session.
+The accepted 25-commit delta touches LLZK core transforms, analysis, memory,
+SMT, and `llzk-witgen`, not only unrelated backends. D032 records why its
+relevant correctness fixes justify advancing despite the absence of a newer tag
+and the large transform surface. The immutable SHA and L0 evidence are the
+authority; the unchanged 3.0.0 version banner is not.
 
 ## Accepted pins
 
 - Clean: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
-- LLZK source: `5db6f8f9baaa40787a1a40625796497445f2da36`
+- LLZK source: `25fb3740ea3465c9129a06289297bb4f0554b7a5`
 - LLZK tools: the Nix output of the pinned LLZK source; reports version 3.0.0
 - project-llzk VeIR: `eae1c27e7842c0503233ec99155c39791bd5f502`
 - upstream VeIR: `a4e6194d5810a02d74f0094ff6014cda6db6d617`
@@ -131,7 +133,7 @@ lake exe cache get
 # 3. Build/substitute the pinned LLZK tools. The command prints a machine-local
 #    Nix store path; PINS.md records the required cache key.
 nix build --no-link --max-jobs 0 --print-out-paths \
-  github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk
+  github:project-llzk/llzk-lib/25fb3740ea3465c9129a06289297bb4f0554b7a5#llzk
 export LLZK_OPT=/the/printed/store/path/bin/llzk-opt
 export LLZK_WITGEN=/the/printed/store/path/bin/llzk-witgen
 
@@ -193,11 +195,12 @@ time, which makes `llzk-e2e` something to trigger deliberately rather than a
 check you get on each commit.
 
 The CI-hardening branch now installs the exact public substituter and key from
-`PINS.md` and passes `--max-jobs 0`. S01 established that the accepted output is
-in that cache, so CI now downloads it or fails instead of silently building LLVM
-from source. This configuration has not yet run remotely at its own commit, so
-the expected duration reduction is not evidence; organization CI on the frozen
-candidate must establish anonymous cache access and the actual runtime.
+`PINS.md` and passes `--max-jobs 0`. L0 established that the newly accepted
+output is in that cache, so CI now downloads it or fails instead of silently
+building LLVM from source. This configuration has not yet run remotely at its
+own commit, so the expected duration reduction is not evidence; organization CI
+on the frozen candidate must establish anonymous cache access and the actual
+runtime.
 
 What is still true: every gate in the table below is green on one machine *and*
 on a runner, but only G0–G12 are gated in CI; §11 still reserves publishing for
@@ -318,11 +321,10 @@ an explicit decision, which was given.
     reconstructed types and the function boundary, before releasing an
     artifact. `Module.render_constraintSurface` states the generic round trip;
     five mutations make it red. G0-G12 passed on clean commit `28132f64`.
-- In progress: **L0**, bootstrapped from S25 evidence tip `f4ffaf05`; accepted
-  LLZK pin `5db6f8f9` and live candidate `25fb3740` are frozen for the same-tree
-  comparison. No toolchain has been built or accepted in L0 yet.
-- Decision pending: retain or advance the LLZK tool pin after both exact SHAs
-  complete the unchanged compatibility matrix.
+- In progress: none. L0 advanced the LLZK pin to `25fb3740` after both exact
+  toolchains passed the unchanged same-tree matrix; S26 is next.
+- Decision pending: none for the LLZK pin. D032 records the advance and its
+  costs; WTNS/R1CS export remains outside the frontend claim.
 - Blocked: none.
 
 ## Last green gates
@@ -623,11 +625,11 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1, A2, A4, A5, A7, B, and S25 are done.** S25 fetched and merged the
+**A1, A2, A4, A5, A7, B, S25, and L0 are done.** S25 fetched and merged the
 unchanged `0e53b9f2` head, preserved the narrow accepted subset, and made
 Deliverable 2a visible as D026 rather than letting green gates hide the weakened
-theorem domain. The next thing is **L0**, the prepared same-tree LLZK pin review.
-Then come **S26**
+theorem domain. L0 advanced the LLZK input to exact SHA `25fb3740` after the old
+and new tools passed the unchanged same-tree matrix. The next thing is **S26**
 (bitwise + `ite`, with the val bridge in its decision entry), **S28**
 (multi-column tables and the actual library unlock), and the witness-IR loop
 increment. S27 remains returned for re-scoping (R7-09).

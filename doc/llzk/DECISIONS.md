@@ -1233,3 +1233,41 @@ points therefore require the repository variable `CLEAN_BENCH_ENABLED` to equal
 `true`, and publication keeps it unset. A later enablement requires an explicit
 runner-owner and threat-review decision; it is not part of the four release
 checks.
+
+## D032 — Advance the LLZK tool pin after an unchanged same-tree matrix
+
+**Status:** accepted
+
+**Date:** 2026-08-21
+
+**Enacted by:** L0
+
+L0 compared the previously accepted
+`5db6f8f9baaa40787a1a40625796497445f2da36` tools with exact current-main
+candidate `25fb3740ea3465c9129a06289297bb4f0554b7a5` on frontend commit
+`782160ddc4ed57f9dbfecebf655f6d220381f43b`. Both Nix outputs were materialized
+by immutable flake reference with `--max-jobs 0`; the candidate came entirely
+from the accepted public cache. Live `main` was re-queried immediately before
+the build and still matched the inventoried candidate.
+
+Both tools passed the unchanged G0-G12 matrix: 12 circuits, 33 vectors through
+both witness backends, 2 renderer fixtures, all 14 modules through the product
+pipeline, the same 10-lowered/4-declared-out-of-scope SMT split, all six field
+probes, and all 53 harness red paths. The candidate added the expected WTNS
+help surface but did not change the full-witness JSON contract, accepted
+artifacts, diagnostics, fixtures, counts, or theorem closure used here.
+
+Advance to `25fb3740`. The delta contains relevant correctness and maintenance
+value: witness generation now honours the selected output scope; redundant
+read/write elimination correctly handles dynamic aliases and observed writes;
+poly lowering fixes non-Felt equality and replaces an assertion failure with an
+error; and `BUILD_TESTING=OFF` is repaired. These affect exactly the witness,
+memory, SMT, transform, and reproducibility surfaces L0 exercised.
+
+The costs do not disappear: the 25-commit transform surface is large, no newer
+tag supplies a release contract, and both inputs still report version 3.0.0.
+The controls are the immutable source SHA, public-cache provenance, complete
+same-tree comparison, and a post-pin repository run. The version string is a
+compatibility check, not revision identity. `scripts/llzk/lib.sh` therefore
+does not change, and the new WTNS/R1CS output remains outside this frontend's
+claims.

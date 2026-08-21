@@ -1,0 +1,46 @@
+L0 accepted-tool baseline
+Date: 2026-08-21
+
+Frozen frontend tree:
+  782160ddc4ed57f9dbfecebf655f6d220381f43b
+
+LLZK source revision under test:
+  5db6f8f9baaa40787a1a40625796497445f2da36
+
+Exact materialization command:
+  nix build --no-link --max-jobs 0 --print-out-paths \
+    github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk
+
+Result: exit 0
+Nix output:
+  /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0
+
+`llzk-opt --version`:
+  LLVM 20.1.8; LLZK 3.0.0
+
+The help surface contained every interface used by the matrix:
+  --verify-roundtrip
+  --llzk-full-inlining
+  --llzk-product-program
+  --llzk-to-smt-no-cf
+  --backend=interpreter|execution-engine
+  --output-scope=full-witness
+  --check-output
+
+Matrix command:
+  LLZK_SESSION=L0 \
+  LLZK_OPT=/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result: exit 0
+
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+    12 circuit(s), 33 input vector(s), both witgen backends.
+    2 renderer fixture(s), syntax only.
+    G10a: all 12 + 2 module(s) admitted by --llzk-product-program.
+    G10b: 10 module(s) lowered to SMT, 4 out of scope for a declared reason.
+
+G11 exercised all 53 harness error paths. The only Lean warnings were the ten
+accepted upstream `TestCircuitProofStart.lean` sorry warnings documented by
+S25. No expected count, fixture, diagnostic policy, or frontend source changed.

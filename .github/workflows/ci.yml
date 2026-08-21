@@ -92,7 +92,7 @@ jobs:
         id: llzk
         run: |
           out="$(nix build --no-link --max-jobs 0 --print-out-paths \
-            'github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk')"
+            'github:project-llzk/llzk-lib/25fb3740ea3465c9129a06289297bb4f0554b7a5#llzk')"
           echo "path=${out}" >> "$GITHUB_OUTPUT"
           "${out}/bin/llzk-opt" --version
       - uses: leanprover/lean-action@38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9 # v1

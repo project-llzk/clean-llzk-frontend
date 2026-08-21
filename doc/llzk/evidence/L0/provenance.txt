@@ -1,0 +1,36 @@
+L0 LLZK provenance
+Date: 2026-08-21
+
+Frontend branch and comparison commit:
+  clean-to-llzk/l0-llzk-pin
+  782160ddc4ed57f9dbfecebf655f6d220381f43b
+
+Worktree:
+  clean; held throughout both runs by LLZK_SESSION=L0
+
+Live-candidate query immediately before materialization:
+  git ls-remote https://github.com/project-llzk/llzk-lib.git refs/heads/main
+
+Result:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5  refs/heads/main
+
+The result equals the read-only preflight candidate, so the reviewed 25-commit
+inventory remained applicable. Compare:
+  https://github.com/project-llzk/llzk-lib/compare/5db6f8f9baaa40787a1a40625796497445f2da36...25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Accepted input:
+  5db6f8f9baaa40787a1a40625796497445f2da36
+  /nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0
+
+Candidate input:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+Nix:
+  nix 2.34.7
+  both exact commands used --no-link --max-jobs 0 --print-out-paths
+  the candidate output was downloaded from veridise-public.cachix.org
+  no LLZK source build was permitted or performed
+
+No remote, branch, GitHub setting, corpus, golden, frontend implementation, or
+external publication state was mutated while producing this comparison.

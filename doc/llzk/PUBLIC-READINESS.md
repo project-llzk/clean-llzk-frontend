@@ -51,12 +51,12 @@ authorized.
   constraints imply the gadget's semantic `Spec` under named hypotheses.
 - **Done locally:** align to current upstream Clean before adding capability
   (S25, exact fetched head `0e53b9f2`, Lean 4.32.2).
-- Review the LLZK toolchain pin after S25 and before capability work. As of
-  2026-08-21, `project-llzk/llzk-lib` `main` is 25 commits past the accepted
-  `5db6f8f9` pin and includes changes in LLZK transforms and `llzk-witgen`.
-  Retaining the reproducible 3.0.0 pin or advancing it must be an explicit,
-  separately gated decision; "main moved" is not by itself a reason to discard a
-  known toolchain.
+- **Done locally:** review the LLZK toolchain pin after S25 and before
+  capability work. L0 ran the previous `5db6f8f9` input and exact current-main
+  `25fb3740` candidate against one frozen frontend tree. Both passed the
+  unchanged complete matrix; D032 advances the accepted pin because the
+  candidate's witness, memory, lowering, and build fixes justify the move. The
+  immutable SHA, not the unchanged 3.0.0 banner, identifies the accepted input.
 - Retire the two capability blockers identified by R7: structural `U64Expr`
   lowering with bitwise/conditional support (S26), then multi-column lookup
   tables and their certificates (S28).
@@ -98,7 +98,7 @@ authorized.
 P0 public documentation and repository hygiene
   -> A5 renderer + A7 copy-canonicalisation assurance (done)
   -> S25 upstream Clean / Lean alignment (done locally)
-  -> L0 LLZK pin review and compatibility run
+  -> L0 LLZK pin review and compatibility run (done locally)
   -> S26 structural U64 and bitwise lowering
   -> S28 multi-column lookup tables
   -> P1 promote headline examples into the full corpus
@@ -108,12 +108,11 @@ P0 public documentation and repository hygiene
 
 S25 was intentionally isolated from capability work: its green bump says the
 existing frontend survived upstream change, subject to D026's explicit theorem
-boundary. L0 applies the same discipline to
-the live LLZK delta and either retains or advances the accepted tool pin with
-evidence. A5 has already strengthened the one assurance boundary R7 showed
-every LLZK binary gate can miss, and A7 removed the witness reader's remaining
-inspection-only semantic premise. S26 and S28 together create the impactful
-example increment.
+boundary. L0 applied the same discipline to the live LLZK delta and advanced
+the accepted tool pin to `25fb3740` with same-tree evidence. A5 has already
+strengthened the one assurance boundary R7 showed every LLZK binary gate can
+miss, and A7 removed the witness reader's remaining inspection-only semantic
+premise. S26 and S28 together create the impactful example increment.
 
 ## Current scorecard
 
@@ -125,8 +124,8 @@ example increment.
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
 | CI supply-chain policy | complete locally | commit `9b809e32`; immutable action SHAs, fixed Ubuntu/Rust/Nix-cache inputs, 53 G11 controls; organization CI still required on the frozen SHA |
 | Upstream Clean alignment | complete locally | S25; G0-G12 on `6ccca6f8`, `evidence/S25/`; `0e53b9f2` / Lean 4.32.2, D026 recorded |
-| LLZK pin review | preflight complete; ready to execute | `sessions/L0-review-llzk-pin.md`; exact 25-commit risk inventory and same-tree matrix |
-| Structural bitwise witness IR | pending L0 | S26 |
+| LLZK pin review | complete locally | D032; `25fb3740` accepted after both exact outputs passed the unchanged matrix; `evidence/L0/` |
+| Structural bitwise witness IR | next | S26 |
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |
 | Renderer round-trip assurance | complete locally | A5; G0-G12 green on `28132f64` |

@@ -1,0 +1,43 @@
+L0 candidate-tool compatibility run
+Date: 2026-08-21
+
+Frozen frontend tree:
+  782160ddc4ed57f9dbfecebf655f6d220381f43b
+
+LLZK source revision under test:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Exact materialization command:
+  nix build --no-link --max-jobs 0 --print-out-paths \
+    github:project-llzk/llzk-lib/25fb3740ea3465c9129a06289297bb4f0554b7a5#llzk
+
+Result: exit 0; entirely substituted from veridise-public.cachix.org
+Nix output:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+`llzk-opt --version`:
+  LLVM 20.1.8; LLZK 3.0.0
+
+Every interface used by the baseline remained present. The relevant help delta
+was the expected new `llzk-witgen --output-wtns` option; the matrix does not use
+WTNS output. The backend, full-witness, output-checking, round-trip, product,
+and SMT interfaces were unchanged.
+
+Matrix command:
+  LLZK_SESSION=L0 \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result: exit 0
+
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+    12 circuit(s), 33 input vector(s), both witgen backends.
+    2 renderer fixture(s), syntax only.
+    G10a: all 12 + 2 module(s) admitted by --llzk-product-program.
+    G10b: 10 module(s) lowered to SMT, 4 out of scope for a declared reason.
+
+All six field-registry probes passed. G11 exercised all 53 error paths. The four
+SMT refusals had exactly the two declared reasons seen in the baseline. No
+artifact, JSON shape, accepted diagnostic, corpus count, or pipeline result
+changed.
