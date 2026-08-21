@@ -80,13 +80,16 @@ Current session: **S28** — bootstrapped 2026-08-21 from final S26 evidence tip
 `91d43ffd0b4dcfd0841cc97f402b2d6006c58358`. Its scope is to retire D013 with
 row-preserving multi-column tables and certificates, then demonstrate `And8`
 end to end. The mandatory pinned-LLZK syntax probe and row/certificate decision
-come before lowering. No S28 syntax decision, lowering, certificate change,
-corpus change, build, compatibility gate, push, or external issue creation has
-occurred.
+come before lowering. A pre-implementation adversarial review strengthened the
+packet's G9 and certificate-carrier obligations and added the missing exact
+wide-field `.val` refusal fixture; its targeted warning-free build passed, with
+evidence in `evidence/S28/pre-implementation-review.txt`. No
+S28 syntax decision, lowering, certificate change, corpus change, compatibility
+gate, push, or external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 bootstrap)
+Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 pre-implementation)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -326,7 +329,8 @@ an explicit decision, which was given.
     upstream `U64Expr.val` truncates (R7-08); S27's premises were false three
     ways — GF(2) not bn254, no bitwise ops, real blocker `letF` (R7-09); G0
     never looked at the working tree it certified (R7-01, fixed + G11 case);
-    three refusal paths had no fixture (fixed, 29 before S25 and 34 now);
+    three refusal paths had no fixture (fixed, 29 before S25, 34 after it, and
+    35 after the pre-S28 wide-field `.val` control);
     `CertifiedTable` had no
     name tie, leaving `spec_of_compile`'s lookup hypothesis incomparable with
     module satisfaction under swapped names (R7-12, fixed with
@@ -348,9 +352,10 @@ an explicit decision, which was given.
   measured coverage update are implemented and G0-G12 are green on `8951f016`.
 - Decision complete: D033 settles the width/field policy and `U64Expr.val`
   bridge as a recursively proved bound plus explicit refusal.
-- In progress: **S28 bootstrap only**, from final S26 evidence tip `91d43ffd`.
-  D013's row encoding, exact LLZK syntax, generic certificate statement, and
-  65536×3 scale result remain undecided; implementation has not begun.
+- In progress: **S28 pre-implementation**, from final S26 evidence tip
+  `91d43ffd`. The adversarial bootstrap review is resolved; D013's row encoding,
+  exact LLZK syntax, generic certificate statement, and 65536×3 scale result
+  remain undecided, and lowering has not begun.
 - Blocked: none.
 
 ## Last green gates

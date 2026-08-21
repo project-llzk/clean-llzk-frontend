@@ -129,7 +129,7 @@ needs the range contract D033 exposed.
 | Upstream Clean alignment | complete locally | S25; G0-G12 on `6ccca6f8`, `evidence/S25/`; `0e53b9f2` / Lean 4.32.2, D026 recorded |
 | LLZK pin review | complete locally | D032; `25fb3740` accepted after both exact outputs passed, then G0-G12 passed on committed pin `5fe8f465`; `evidence/L0/` |
 | Structural bitwise witness IR | complete locally | S26/D033; G0-G12 green on `8951f016`, `evidence/S26/` |
-| Multi-column tables | next after S26 handoff | S28 |
+| Multi-column tables | active, bootstrap reviewed | S28 from final S26 evidence tip `91d43ffd`; row/G9/certificate decision precedes lowering |
 | Headline bitwise examples end to end | not started | tables plus a proved range contract, then promote |
 | Renderer round-trip assurance | complete locally | A5; G0-G12 green on `28132f64` |
 | Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |

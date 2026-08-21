@@ -46,6 +46,7 @@ is now pinned below, in this order:
 | an unrecognized `FExpr` (`ite`) | `Gadgets.IsZeroField` |
 | new `BExpr.flt` under a rejected `ite` | `fieldLessThanWitness` |
 | new `BExpr.bit` under a rejected `ite` | `bitConditionWitness` |
+| a `.val` bridge on a field wider than `UInt64` | `wideFieldValWitness` |
 | a bitwise result whose bound exceeds the prime | `xorUnboundedWitness` |
 | a shift count at the UInt64 masking boundary | `shift64Witness` |
 | a dynamic shift count | `dynamicShiftWitness` |
@@ -580,6 +581,20 @@ private def rawChannel : RawChannel (F pBabybear) where
 private def shiftWitness : Source (F pBabybear) :=
   source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 (.shiftR (.val (.expr (.var ⟨0⟩))) (.const 8))]))]
 
+/-- The expression type is immaterial to the bound check: supplying the exact
+BN254 prime exercises D033's refusal of a `.val` leaf whose field representative
+could be truncated by `UInt64.ofNat`. This targets the witness recognizer
+directly because constructing `F bn254` in a test would add a large primality
+proof unrelated to the refusal under test. -/
+private def wideFieldValWitness : Witgen.WitgenIR (F pBabybear) 1 :=
+  .ir [] (.lit #v[.ofU64 (.val (.expr (.var ⟨0⟩)))])
+
+private def renderWitnessRecognition
+    (result : Except Diagnostic (Array FieldExpr)) : String :=
+  match result with
+  | .ok _ => "witness recognition unexpectedly succeeded\n"
+  | .error diagnostic => "compilation failed:\n" ++ diagnostic.render ++ "\n"
+
 /-- `val` supplies only the whole Babybear range; that does not prove an xor
 result remains below the prime. -/
 private def xorUnboundedWitness : Source (F pBabybear) :=
@@ -771,6 +786,14 @@ operation 0 (witness): unsupported witness expression: `ite` with `bit` (a field
 #eval IO.print (emitSource babybear bitConditionWitness)
 
 #guard (compileSource babybear.toConfig shiftWitness).toOption.isSome
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `val` (the truncating field-to-u64 bridge) applied on its own; no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (renderWitnessRecognition
+  (Witness.recognize FieldSpec.bn254.prime "operation 0 (witness)" 1 wideFieldValWitness))
 
 /--
 info: compilation failed:

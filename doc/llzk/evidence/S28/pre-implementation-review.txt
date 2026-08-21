@@ -1,0 +1,36 @@
+S28 pre-implementation adversarial review repair
+Date: 2026-08-21
+
+Reviewed bootstrap commit:
+  9ee478a4cd7cf8f0dcf4f3b464b0f324b6a35045
+  Bootstrap the multi-column lookup session
+
+Findings repaired before design or lowering:
+  - made ordered row shape and nested globals mandatory on both sides of G9;
+  - required a public certificate carrier that can hold heterogeneous row types,
+    a concrete ByteXorTable certificate, and an And8 soundness-chain instance;
+  - added the missing exact wide-field U64Expr.val refusal fixture;
+  - synchronized required reading, exact acceptance commands, boundary counts,
+    and public-readiness state.
+
+Targeted checks on the repaired working tree:
+  LLZK_SESSION=S28 bash scripts/llzk/worktree-lock.sh require
+    PASS
+
+  lake build --wfail Clean.Backend.LLZK.Test.Circuit
+    PASS — 1753 jobs
+
+  python3 scripts/check-consecutive-empty-lines.py
+    PASS
+
+  bash scripts/llzk/check-pins.sh
+    PASS
+
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/doctor.sh --require-llzk
+    PASS — LLZK 3.0.0 from the accepted Nix output
+
+This is targeted pre-implementation evidence, not G0-G12 acceptance evidence.
+No LLZK syntax probe, row/certificate decision, lowering, corpus change, full
+compatibility gate, push, or external issue creation occurred in this repair.

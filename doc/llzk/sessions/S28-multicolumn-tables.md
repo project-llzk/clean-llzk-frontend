@@ -37,8 +37,10 @@ elements and break the assurance story.
 
 ## Required reading before implementation
 
+- `AGENTS.md`, `CURRENT.md`, `PINS.md`, and `GATES.md`, as required by the
+  session template.
 - `DECISIONS.md`: D012, D013, D017, D022, and D033.
-- `GAPS.md`: sections 1 and 7.
+- `GAPS.md`: sections 1, 7, and 8.
 - `evidence/S26/coverage.md` and `evidence/S26/llzk-bitwise-ops.md`.
 - `IR.lean`, `Print.lean`, `Table.lean`, `Certificate.lean`, `TableCert.lean`,
   `Analyze.lean`, `Circuit.lean`, `Constraints.lean`, `Lookups.lean`, and
@@ -58,15 +60,22 @@ Record the result as a new decision before changing the lowering.
    `llzk-opt`, round trip, and product formation. Record that `llzk-witgen`
    ignores `@constrain`; tool acceptance is evidence for syntax, not lookup
    semantics (D017).
-2. **Choose one row-preserving emitter model.** `ConstArray` must retain table
-   shape and `RecognizedLookup` must retain every entry in order. The builder
-   must make the row type and global element type equal by construction or fail
-   with a named diagnostic. Flattened scalar membership is forbidden.
+2. **Choose one row-preserving emitter and G9 model.** `ConstArray` must retain
+   table shape and `RecognizedLookup` must retain every entry in order. The
+   builder must make the row type and global element type equal by construction
+   or fail with a named diagnostic. `ConstraintSet.lookups`, its source reader,
+   its independent module reader, and its global comparison must likewise retain
+   one ordered row per lookup and the nested rows of each global. Flattened
+   scalar membership is forbidden on either side of G9.
 3. **Generalize the certificate, do not weaken it.** Restate `Certifies`,
    canonicity, and `certified_membership` over rows of arbitrary supported
-   arity. Re-prove the chain from successful recognition to the certificate
-   premise. D012's residual source-table identity gap remains named in
-   `GAPS.md`; S28 may not hide it behind a stronger name.
+   arity. The decision must settle how `CertifiedTable` and `CertifiedConfig`
+   carry certificates for different row types in one configuration; merely
+   proving a generic theorem while leaving the public carrier fixed to
+   `Table F field` is not a solution. Re-prove the chain from successful
+   recognition to the certificate premise. D012's residual source-table
+   identity gap remains named in `GAPS.md`; S28 may not hide it behind a
+   stronger name.
 4. **Measure the real table.** `ByteXorTable` contains 65536 rows and 196608
    field values. Measure registry construction, certificate elaboration,
    rendering, and the pinned LLZK stages before calling the representation
@@ -93,10 +102,16 @@ Clean-side increment and review, not an incidental S28 edit.
    certificate statement, and scale result.
 2. A typed `array.new`/row IR surface and protected renderer readback, with
    positive fixtures reaching the pinned tools and mutations going red.
-3. Row-preserving `ConstArray`, `ExportTable`, and `RecognizedLookup` paths with
-   exact arity/type checks and stable diagnostics.
-4. Generic row certification and the corresponding lookup/soundness lemmas,
-   with no new axioms and no weakened table-certificate requirement.
+3. Row-preserving `ConstArray`, `ExportTable`, `RecognizedLookup`, and
+   `ConstraintSet` paths with exact arity/type checks and stable diagnostics.
+   G9 must compare one ordered row per lookup and nested global rows, not a
+   common scalarization performed by both readers.
+4. A public certificate carrier that can hold the existing single-column table
+   and `ByteXorTable` together; generic row certification and the corresponding
+   lookup/soundness lemmas; a concrete `ByteXorTable` certificate; and an
+   `And8` instantiation of the lookup-to-`spec_of_compile` chain. No theorem may
+   remain assurance-critical but instantiated nowhere, and no new axiom or
+   weakened table-certificate requirement is allowed.
 5. `And8` in the external-tool corpus with boundary vectors checked against
    Clean by both witness backends.
 6. A re-measured coverage sweep. `And8` must compile; the XOR family must retain
@@ -111,7 +126,10 @@ At minimum, pin refusals for an arity mismatch, a row-width mismatch, a row
 element of the wrong field type, an empty/invalid multi-column table where the
 registry contract forbids it, and any malformed row construction accepted by a
 shallower parser. Re-run the existing unresolved-table, duplicate-name,
-out-of-field-value, and protected-renderer mutations.
+out-of-field-value, and protected-renderer mutations. G9-specific mutations must
+also make `agree` go red when one row is split into independent scalar
+memberships, when two columns are exchanged, and when a global's values are
+regrouped or transposed without changing the flattened scalar bag.
 
 ## Non-goals
 
@@ -139,16 +157,40 @@ out-of-field-value, and protected-renderer mutations.
 
 ## Acceptance gates and evidence
 
-The implementation commit must pass G0–G12 with the exact accepted pins. In
-addition to the ordinary gate log, preserve:
+The implementation commit must pass G0–G12 with the exact accepted pins. The
+acceptance commands are:
+
+```bash
+LLZK_SESSION=S28 \
+LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+bash scripts/llzk/e2e.sh
+
+lake env lean doc/llzk/evidence/S28/probe.lean
+```
+
+In addition to the ordinary gate log, preserve:
 
 - `evidence/S28/bootstrap.txt` — branch point, pins, ownership, and scope;
+- `evidence/S28/pre-implementation-review.txt` — adversarial bootstrap-review
+  findings, repairs, and targeted checks;
 - `evidence/S28/llzk-multicolumn-ops.md` — primary-source syntax and direct
   pinned-tool probes;
 - `evidence/S28/scale.md` — 65536×3 measurements;
 - `evidence/S28/coverage.md` — exact before/after diagnostic decomposition;
 - `evidence/S28/probe.lean` — theorem/axiom closure; and
 - `evidence/S28/gates.txt` — final clean-commit G0–G12 run.
+
+## Pre-implementation adversarial review
+
+The 2026-08-21 review accepted the bootstrap provenance and technical premise,
+but found four packet/control omissions before lowering began. This revision
+closes them by making row shape part of both sides of G9, requiring a
+heterogeneous public certificate carrier and a concrete `And8` soundness-chain
+instantiation, adding the missing wide-field `.val` refusal fixture, and
+synchronizing the required reading and milestone state. These are controls on
+the forthcoming implementation; they make no LLZK syntax or representation
+decision themselves.
 
 ## Bootstrap state
 

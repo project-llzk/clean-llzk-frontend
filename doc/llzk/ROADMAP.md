@@ -197,7 +197,7 @@ controls. The current u64-related boundaries are:
 | XOR byte bounds are invisible to witness lowering | D033, GAPS §8, coverage and exact negative fixtures | Clean source/range-analysis enhancement; [Clean #429](https://github.com/Verified-zkEVM/clean/issues/429) and [PR #442](https://github.com/Verified-zkEVM/clean/pull/442) explain the prior u64 migration but do not provide exporter-visible evidence. A focused follow-up issue is warranted and not yet opened. |
 | shift counts at least 64 or dynamically unproved | D033 and exact shift-count fixtures | Intentional adapter refusal: Clean masks modulo 64 while LLZK consumes the felt count. Not an upstream bug; schedule a local masked-lowering increment only if needed. |
 | multi-column static lookup rows | D013 and table refusal fixtures | S28, active from S26 evidence tip `91d43ffd`. |
-| wide-field `.val` | D033 and GAPS §8 | Resolved for the current contract by refusal; general support shares the range-contract/limb-design owner above. |
+| wide-field `.val` | D033, GAPS §8, and exact `wideFieldValWitness` refusal fixture | Resolved for the current contract by refusal; general support shares the range-contract/limb-design owner above. |
 
 This register should be updated in the same commit whenever a refusal is added,
 retired, or changes owner. It prevents a sound refusal from becoming an
@@ -262,7 +262,7 @@ Status against that definition:
 | Requirement | State |
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
-| unsupported cases fail with structured diagnostics | done — 34 negative fixtures pin exact messages, including S25's five new constructor paths. This is still not claimed to be one per rejection path |
+| unsupported cases fail with structured diagnostics | done — 35 negative fixtures pin exact messages, including S25's five new constructor paths and the pre-S28 wide-field `.val` control. This is still not claimed to be one per rejection path |
 | `llzk-opt` accepts and round-trips | done — 12 modules and 2 renderer fixtures, G3 and G4 |
 | every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 14 |
 | both witgen backends agree | done — 33 input vectors, G5 and G6 |
