@@ -44,6 +44,16 @@ The claim prevents concurrent sessions from rebuilding the same generated
 artifacts and attributing evidence to the wrong tree. See
 `doc/llzk/CONCURRENCY.md` if the worktree is already claimed.
 
+The public corpus table in `doc/llzk/EXAMPLES.md` is generated from Lean. If a
+corpus entry or its purpose changes, regenerate it explicitly:
+
+```bash
+lake env lean --run Clean/Backend/LLZK/ShowcaseMain.lean doc/llzk/EXAMPLES.md
+```
+
+The full conformance suite compares the generated and checked-in pages
+byte-for-byte; do not repair a stale table by editing its counts manually.
+
 ## Pull-request evidence
 
 A frontend pull request should state:

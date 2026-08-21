@@ -34,9 +34,8 @@ pin remains an explicit decision boundary
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/a7-copy-canonicalisation` (A7 assurance
-work on top of A5 and the public-readiness documentation; no pin or capability
-change)
+Active working branch: `clean-to-llzk/public-showcase` (a generated public
+example page and its drift gate on top of A7; no pin or capability change)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 

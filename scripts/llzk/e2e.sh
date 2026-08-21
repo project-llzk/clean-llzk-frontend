@@ -53,6 +53,19 @@ echo "== G1: Lean =="
 python3 scripts/check-consecutive-empty-lines.py
 lake build --wfail Clean
 lake build CleanTests
+
+# The public example table is executable documentation, not a hand-maintained
+# copy of corpus counts. Generate it from the working tree and require the
+# checked-in page to be byte-identical. A new corpus entry therefore needs a
+# purpose label and a reviewed documentation diff before the release gate passes.
+showcase_tmp="$(mktemp)"
+trap 'rm -f -- "${showcase_tmp}"' EXIT
+lake env lean --run Clean/Backend/LLZK/ShowcaseMain.lean "${showcase_tmp}"
+if ! diff -u doc/llzk/EXAMPLES.md "${showcase_tmp}"; then
+  fail "doc/llzk/EXAMPLES.md is stale; regenerate it with ShowcaseMain.lean"
+fi
+rm -f -- "${showcase_tmp}"
+trap - EXIT
 echo
 
 echo "== G2: emit the corpus =="

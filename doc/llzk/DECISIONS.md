@@ -1110,3 +1110,29 @@ renaming theorems and distinguishes the bare-copy and computed-cell cases.
 identity map. This closes GAPS section 8's copy-canonicalisation premise without
 strengthening the separate whole-vector witness claim or D017's reading of
 LLZK.
+
+## D030 — Generate public example claims from the conformance corpus
+
+**Status:** accepted
+
+**Date:** 2026-08-21
+
+**Enacted by:** public-showcase increment
+
+The public-readiness contract requires a small checked example table. Copying
+the corpus names and counts into Markdown would immediately create the kind of
+second source of truth that repeatedly made `CURRENT.md` overstate or understate
+coverage during R2–R7.
+
+`Showcase.markdown` therefore derives each row's name, field, vector count, and
+G9 source-agreement status from `Corpus.corpus`. The only editorial input is an
+exhaustive purpose label: an unknown corpus entry makes generation fail, so
+adding an artifact also requires deciding what a public reader should learn from
+it. Failed modules, empty vector sets, and failed or half-present agreement
+results likewise refuse generation.
+
+`ShowcaseMain.lean` materializes `doc/llzk/EXAMPLES.md`. The full gate regenerates
+the page and requires byte equality, while `Test/Showcase.lean` pins the corpus
+ordering, denominator, vector total, source-backed count, and purpose coverage.
+The prose remains intentionally honest about D017, the caller-to-circuit table
+identity gap, and selected rather than exhaustive coverage.

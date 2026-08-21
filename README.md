@@ -18,8 +18,9 @@ Stage 1 is complete. Its reference example, Clean's formally proved
 `Addition8FullCarry` gadget, is compiled to LLZK, parsed, verified,
 round-tripped, and run through both LLZK witness generators. The emitted
 constraints and witness program are also compared in Lean with the circuit they
-came from. The checked corpus currently contains 12 LLZK modules and 33 input
-vectors.
+came from. The [generated example showcase](doc/llzk/EXAMPLES.md) derives the
+current module and vector counts from the tested corpus and explains exactly
+what each example establishes.
 
 The project is deliberately explicit about its boundary: this is a verified
 source-to-typed-module pipeline with differential checks over the rendered
@@ -29,10 +30,15 @@ kept in one [gap register](doc/llzk/GAPS.md), rather than hidden behind a genera
 
 Start here:
 
+- [Verified example showcase](doc/llzk/EXAMPLES.md)
 - [Frontend guide and document map](doc/llzk/README.md)
 - [Current status and exact next action](doc/llzk/CURRENT.md)
-- [Public-readiness milestone](doc/llzk/PUBLIC-READINESS.md)
 - [Capability roadmap](doc/llzk/ROADMAP.md)
+- [Assurance gaps and claim boundary](doc/llzk/GAPS.md)
+
+Project governance:
+
+- [Public-readiness milestone](doc/llzk/PUBLIC-READINESS.md)
 - [Contribution guide](CONTRIBUTING.md)
 
 To build the Lean project:

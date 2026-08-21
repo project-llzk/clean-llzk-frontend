@@ -46,6 +46,13 @@ carries pre-existing `declaration uses 'sorry'` warnings at the pinned base
 (`Clean/Utils/Test/TestCircuitProofStart.lean`), and CI does not gate on them
 either. Backend test modules must not add new ones — G9 covers that.
 
+The full `e2e.sh` form of G1 also generates `doc/llzk/EXAMPLES.md` from
+`LLZK.Corpus.corpus` through `ShowcaseMain.lean` and requires byte equality with
+the checked-in page. `Test/Showcase.lean` pins the corpus denominator, ordering,
+vector total, source-agreement count, and editorial coverage. Public example
+counts are therefore executable documentation rather than a second source of
+truth.
+
 ## G2–G4 — emit and check the corpus
 
 ```bash

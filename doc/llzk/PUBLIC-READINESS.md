@@ -61,8 +61,11 @@ authorized.
   Each promoted example must reach `llzk-opt`, both witness backends, the Clean
   differential, and the source-to-module checks; a compile-only `#guard` is not
   release evidence.
-- Publish a small checked example table generated from, or pinned by, repository
-  tests. Do not use hand-maintained coverage counts as evidence.
+- **Done locally:** publish a small checked example table generated from, or
+  pinned by, repository tests. `EXAMPLES.md` is generated from
+  `LLZK.Corpus.corpus`; G1 requires byte equality and `Test/Showcase.lean` pins
+  its denominator and labels. Do not use hand-maintained coverage counts as
+  evidence.
 
 ### 3. High assurance with honest boundaries
 
@@ -113,6 +116,7 @@ example increment.
 |---|---|---|
 | Stage-1 vertical slice | complete locally | A7 G0-G12 on `a32593bf`; fork CI is seven commits behind integration and further behind this branch |
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
+| Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus and enforced by G1 |
 | Upstream Clean alignment | pending explicit pin decision | S25 |
 | LLZK pin review | not started | live `main` is 25 commits ahead; isolate after S25 |
 | Structural bitwise witness IR | pending S25 | S26 |

@@ -21,18 +21,17 @@ has five assurance layers:
 5. Both `llzk-witgen` backends are checked against Clean's witness interpreter
    over a boundary-oriented input corpus.
 
-Stage 1 demonstrates that chain on `Addition8FullCarry`. The conformance corpus
-contains 12 emitted modules and 33 input vectors. This is a strong vertical
-slice, not broad library coverage: the measured coverage sweep currently finds
-roughly seven compiling gadgets among approximately 128 top-level circuits, and
-only the corpus has reached the external LLZK tools.
+Stage 1 demonstrates that chain on `Addition8FullCarry`. `EXAMPLES.md` derives
+the exact conformance-corpus counts from Lean. This is a strong vertical slice,
+not broad library coverage: the measured coverage sweep currently finds roughly
+seven compiling gadgets among approximately 128 top-level circuits, and only the
+corpus has reached the external LLZK tools.
 
 ## Reading path
 
 Read these in order:
 
-1. [`PUBLIC-READINESS.md`](PUBLIC-READINESS.md) — the milestone for an
-   organization-owned, presentable release candidate.
+1. [`EXAMPLES.md`](EXAMPLES.md) — the generated, gate-checked public showcase.
 2. [`CURRENT.md`](CURRENT.md) — the exact repository state, last green evidence,
    and next action.
 3. [`ROADMAP.md`](ROADMAP.md) — supported capability, measured coverage, and
@@ -42,6 +41,8 @@ Read these in order:
 
 For reproducibility and review:
 
+- [`PUBLIC-READINESS.md`](PUBLIC-READINESS.md) is the organization-publication
+  acceptance contract.
 - [`PINS.md`](PINS.md) records every accepted external revision and tool.
 - [`GATES.md`](GATES.md) defines G0-G12 and their falsification controls.
 - [`DECISIONS.md`](DECISIONS.md) records semantic and trust-boundary decisions.
