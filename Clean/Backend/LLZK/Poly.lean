@@ -7,7 +7,8 @@ The common language in which a Clean constraint and an emitted LLZK constraint
 can be compared. Both sides are polynomial: Clean's `Expression` has exactly
 `var`, `const`, `add`, `mul`, and the emitted `@constrain` uses exactly
 `felt.const`, `felt.add`, `felt.mul` and reads of parameters and members — the
-non-native `felt.uintdiv`/`felt.umod` are witness-only and never appear there.
+non-native natural, bitwise, and shift operations are witness-only and never
+appear there.
 
 So a *syntactic* comparison of normal forms is an *exact* comparison of the two
 constraint systems, which is what `Clean/Backend/LLZK/Constraints.lean` does.

@@ -78,19 +78,21 @@ private def diags {Input Output : TypeMap} [ProvableType Input] [ProvableType Ou
 #guard (compile withBytes (Gadgets.Rotation64.circuit (p := pBabybear) 1)).toOption.isSome
 #guard (compile withBytes (Gadgets.Not.circuit (p := pBabybear))).toOption.isSome
 
-/-! ## The bitwise rows: refused, and by *two* features, not one
+/-! ## The bitwise rows: one safe narrowing, three explicit bound refusals
 
-Each guard pins the total and its decomposition. The witness-IR half
-(`lxor`/`land`) is one diagnostic per witness block, because `Witness.ofVExpr`
-stops at a block's first error; the lookup half is one per `.lookup` operation.
-S26 (bitwise constructors) removes the first number; only D013's retirement
-(multi-column tables, S28) removes the second. -/
+Each guard pins the total and its decomposition. S26 removes `And8`'s `land`
+diagnostic because `x &&& y ≤ x` proves the result remains below Babybear.
+It deliberately retains the `lxor` diagnostics: the source IR contains only
+`.val` operands, while the byte bounds live in assumptions/constraints that the
+witness recognizer cannot inspect. Treating those hidden bounds as available
+would violate D033's theorem-or-refusal rule. The lookup half remains one per
+`.lookup` operation and awaits D013's retirement (multi-column tables, S28). -/
 
 private def xor32 := diags (Gadgets.Xor32.circuit (p := pBabybear))
 #guard xor32.size = 5 ∧ count "lxor" xor32 = 1 ∧ count registryRefusal xor32 = 4
 
 private def and8 := diags (Gadgets.And.And8.circuit (p := pBabybear))
-#guard and8.size = 2 ∧ count "land" and8 = 1 ∧ count registryRefusal and8 = 1
+#guard and8.size = 1 ∧ count "land" and8 = 0 ∧ count registryRefusal and8 = 1
 
 private def blake3g := diags (Gadgets.BLAKE3.G.circuit (p := pBabybear) 0 1 2 3)
 #guard blake3g.size = 20 ∧ count "lxor" blake3g = 4 ∧ count registryRefusal blake3g = 16

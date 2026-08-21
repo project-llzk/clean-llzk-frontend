@@ -299,32 +299,27 @@ module" is a question about a field.
 
 ## 7. D017 — the reading of LLZK — has no formal basis
 
-Everything the emitter believes about what `felt.umod`, `felt.uintdiv`,
-`constrain.eq` and `constrain.in` *mean* is a reading of LLZK's documentation and
-its tools' behaviour, not a theorem. There is no formal semantics of LLZK in
-Lean; producing one is VeIR's project (D003).
+Everything the emitter believes about what `felt.umod`, `felt.uintdiv`, the five
+bitwise/shift operations, `constrain.eq`, and `constrain.in` *mean* is a reading
+of LLZK's documentation and its tools' behaviour, not a theorem. There is no
+formal semantics of LLZK in Lean; producing one is VeIR's project (D003).
 
-The `@compute` half has real evidence: 33 vectors across two independent LLZK
-backends (27 with a Clean circuit behind them, 6 on the `Square_*` registry
-entries whose expected values are computed in Lean — earlier counts of 27 and
-30 in various documents predate `CopyCell` and the registry entries; 33 is the
-corpus, R7-15), plus R5c's confirmation of the `umod`/`uintdiv` reading on all
-six registry fields rather than only babybear. **The `@constrain` half has none**, and
-cannot acquire any from this repository: `llzk-witgen`'s own help text says it
-ignores `constrain()`, so there is no executor for it in the pinned toolchain.
+The `@compute` half has real evidence: 45 vectors across two independent LLZK
+backends (39 with a Clean circuit behind them, 6 on the `Square_*` registry
+entries whose expected values are computed in Lean), plus S26's direct probes
+of every exact bitwise/shift spelling and R5c's all-field confirmation of the
+`umod`/`uintdiv` reading. **The `@constrain` half has none**, and cannot acquire
+any from this repository: `llzk-witgen`'s own help text says it ignores
+`constrain()`, so there is no executor for it in the pinned toolchain.
 
 ## 8. Small, named, and real
 
-- **The wide-field `U64Expr.val` bridge.** S25 preserved the two whole
-  division/modulo shapes after upstream replaced unbounded `NExpr` with wrapping
-  `U64Expr`. `U64Expr.val` truncates a field representative modulo `2^64`, while
-  the emitted felt operation sees the full representative. Consequently
-  `WExpr.eval_ofWitgen` now requires `FiniteField.size F ≤ 2^64`: it covers
-  babybear, koalabear, mersenne31, and goldilocks, but not bn254 or grumpkin for
-  `val`-rooted division/modulo witnesses. G9 cannot see the difference because
-  its source reader is structural and the wide-field corpus entries do not use
-  this shape. D026 records the boundary; S26 owns the range/limb, truncation, or
-  refusal decision.
+- **The wide-field `U64Expr.val` bridge — resolved by refusal, not removed.**
+  D033 admits `.val` only when the field size is at most `2^64`, proves every
+  recursively admitted result below the prime, and refuses bn254/grumpkin
+  `.val` trees. `eval_lt_upperBound` and the extended `eval_ofWitgen` now make
+  that policy executable. General wide-field u64 support would still require a
+  source-visible range contract or limb decomposition.
 - **The copy-canonicalisation premise — closed by A7.** `WitnessSet.ofSource` collapses a
   witness cell that is a bare variable into the variable it copies, which is
   forced — the emitted module does not distinguish them. `WExpr.eval_rename` and
@@ -357,7 +352,8 @@ Worth stating, because a gaps file with no floor reads as though nothing holds.
 These were attacked directly across R2–R5 and held:
 
 - the `Poly` normal form and every one of its evaluation homomorphisms;
-- `WExpr.eval_ofWitgen` under its explicit field-size hypothesis,
+- `WExpr.eval_lt_upperBound`, structural `WExpr.eval_ofWitgen`, and
+  `WExpr.eval_bitsOf` under D033's checked bounds,
   `ofStatic_certifies`, `byteTable_certifies`,
   `certified_membership`, `values_lt_prime_of_diagnose`;
 - `CanonicalRepr`'s enforcement at every entry point, and that its two laws

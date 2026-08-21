@@ -64,16 +64,19 @@ accepted LLZK pin to `25fb3740`; the comparison and theorem audit are in
 `evidence/L0/`. The required post-pin run passed on clean commit `5fe8f465`.
 
 Current session: **S26** — bootstrapped 2026-08-21 from final L0 evidence tip
-`884d5b1c`. The worktree is isolated on the S26 branch and held by session S26;
-the accepted Clean and LLZK pins are unchanged. No lowering, corpus, fixture,
-count, or design decision has started. The first deliverable is the explicit
-width/field and `U64Expr.val` bridge decision required by
-`sessions/S26-witness-u64.md` before implementation.
+`884d5b1c`. D033 now makes the width/field and `U64Expr.val` bridge executable:
+every admitted u64 value is proved below the field prime, narrow-field `.val`
+is exact, and wide-field `.val` is refused. Structural lowering and the
+independent G9 reader cover bounded add/mul/div/mod, bitwise operations, literal
+shifts, and `VExpr.bitsOf`; `eval_lt_upperBound` and `eval_ofWitgen` discharge
+the source semantics. The conformance corpus has grown to 14 artifacts and 45
+vectors with lookup-free `LowByte` and `Bits8` entries. The re-measured gadget
+sweep removes `And8`'s `land` diagnostic but retains XOR diagnostics whose byte
+bounds exist only outside witness IR. Full gates are not yet recorded.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s26-witness-u64` (S26 capability work;
-currently bootstrap-only)
+Active working branch: `clean-to-llzk/s26-witness-u64` (S26 capability work)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -114,9 +117,10 @@ See `PINS.md` for how to obtain the tools, including the cache-key requirement.
 delta at `0e53b9f2` and moved Lean from 4.30.0 to **4.32.2**. The backend now
 matches `U64Expr`, `ofU64`, `letU`, `BExpr.flt`/`bit`, and
 `VExpr.envRange`/`bitsOf` exhaustively while preserving the old accepted subset.
-The non-obvious cost is D026: `U64Expr.val` truncates, so
-`WExpr.eval_ofWitgen` requires field size at most `2^64` and no longer covers
-bn254/grumpkin `val`-rooted div/mod witnesses.
+The non-obvious cost found by S25 was D026: `U64Expr.val` truncates. S26's D033
+now turns that temporary theorem premise into a structural policy: narrow-field
+`.val` trees are eligible only while every nested value remains below the prime,
+and bn254/grumpkin `.val` trees are explicitly refused.
 
 ## Reproduce everything
 
@@ -156,9 +160,10 @@ commands with `LLZK_SESSION=<label>`** — each command there is its own POSIX
 session, so the default identity does not survive from the claim to the run.
 `doc/llzk/CONCURRENCY.md` has the why.
 
-Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 12 circuits, 33
-input vectors, both witgen backends, 2 renderer fixtures, 10 modules lowered to
-SMT and 4 out of scope for a declared reason.
+Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 14 circuits, 45
+input vectors, both witgen backends, and 2 renderer fixtures. G10a must admit all
+16 modules; G10b's exact accepted/refused split is recorded by the latest gate
+evidence rather than inferred from the corpus count.
 
 CI is *configured* to run G0, G11 and G12 on every pull request, and G1–G10 in
 the `llzk-e2e` job, which builds the pinned LLZK from the same flake reference
@@ -328,11 +333,12 @@ an explicit decision, which was given.
     reconstructed types and the function boundary, before releasing an
     artifact. `Module.render_constraintSurface` states the generic round trip;
     five mutations make it red. G0-G12 passed on clean commit `28132f64`.
-- In progress: **S26**, bootstrapped from L0 evidence tip `884d5b1c`; no
-  implementation or accepted-count change has started.
-- Decision pending: S26's width/field policy and the `U64Expr.val` bridge. The
-  packet requires this to be stated as a theorem or refusal before lowering
-  code; field width alone does not settle the wide-field truncation hazard.
+- In progress: **S26**, bootstrapped from L0 evidence tip `884d5b1c`; D033, the
+  structural lowering, theorem-backed independent reader, corpus, and measured
+  coverage update are implemented locally. The committed full pinned gate is
+  the remaining handoff step.
+- Decision complete: D033 settles the width/field policy and `U64Expr.val`
+  bridge as a recursively proved bound plus explicit refusal.
 - Blocked: none.
 
 ## Last green gates
@@ -428,8 +434,8 @@ toolchain, and no formal LLZK semantics in Lean, so the assumption that
 `constrain.eq` is equality and `constrain.in` is membership has no empirical
 check and cannot acquire one here. Closing it means formalising LLZK, which is
 VeIR's project (D003). The `@compute` half of the same reading *does* have
-evidence: 33 vectors across two independent LLZK backends (27 with a Clean
-circuit behind them; R7-15 unified the stale counts).
+evidence: 45 vectors across two independent LLZK backends (39 with a Clean
+circuit behind them), plus S26's direct bitwise/shift probes.
 
 **S20 — the preservation theorem — exists, and is much smaller than this section
 used to claim.** Every module `compile` returns has been compared against its
@@ -494,8 +500,8 @@ into the packets themselves. Read them in order.
 | packet | does | R7 correction |
 |---|---|---|
 | `sessions/S25-align-upstream.md` | bump to upstream `0e53b9f2` / Lean 4.32.2 | constructor inventory fixed (three errors); **Deliverable 2a added**: upstream `U64Expr.val` truncates, so `eval_ofWitgen` cannot be re-proved as stated — restating it costs bn254/grumpkin div/mod coverage and must be recorded as a decision (D026), which no gate can see |
-| `sessions/S26-witness-u64.md` | lower `U64Expr` structurally; `bitsOf`, `land`/`lor`/`lxor`, `ite` | unlocks ~5 lookup-free gadgets, **not** the bitwise half (R7-05); the width decision must also cover the `val` bridge on *large* fields |
-| `sessions/S28-multicolumn-tables.md` | **new** — retire D013: `array.new`, multi-dim `constrain.in`, certification at 65536×3 | this, with S26, is what actually unlocks Xor32/And8/Keccak/BLAKE3; outline now, expand after S26 |
+| `sessions/S26-witness-u64.md` | bounded structural `U64Expr` and direct `bitsOf`; `ite` remains refused | implemented locally as D033; adds lookup-free `LowByte`/`Bits8`, but correctly retains XOR whose bounds are not in witness IR |
+| `sessions/S28-multicolumn-tables.md` | **new** — retire D013: `array.new`, multi-dim `constrain.in`, certification at 65536×3 | unlocks `And8`; XOR-family promotion additionally needs a source-visible/proved range contract |
 | `sessions/S27-fork-gadgets.md` | port `~/zkgolf/submission_gf2` onto fork `main` | **returned for re-scoping** (R7-09): the submission is GF(2) — not an LLZK field — has zero bitwise ops, and its real blocker is `letF`. The port survives as Clean-side library work; its backend payoff needs a decision first |
 
 S25 keeps the accepted subset exactly the size it was, so its gates say one
@@ -516,7 +522,8 @@ circuit compiled through the whole LLZK pipeline, validated end to end — is
 formal chain attacked and held. Milestone 2 — the *library* of Clean circuits —
 is what the corrected plan below is for, and its honest denominators are in
 `ROADMAP.md`'s coverage section: ~7 of ~128 tops measured-compiling today,
-S26+S28 unlock the ~29-gadget bitwise family, the witness-IR loop increment
+S26+S28 plus a proved witness-visible range contract unlock the ~29-gadget
+bitwise family, the witness-IR loop increment
 (`letF`/`mapRange`/`shr`) unlocks SHA256 and most Circomlib bit gadgets, `inv`+
 `ite` unlock the comparator family, and a `Compilable` story for
 `GeneralFormalCircuit`/`FormalAssertion` (37 tops have no entry point today)
@@ -591,15 +598,18 @@ In dependency order, each an increment of the shape D009 describes (one
 `FieldExpr` constructor, one recognizer case, one `lower` case, one positive and
 one negative fixture):
 
-- **Bitwise operations first** — `land`/`lor`/`lxor`, then `ite` (`scf.if`) —
-  **S26**. The seven arithmetic rows of `ROADMAP.md`'s coverage table already
-  compile (`Addition32Full`, `Rotation64`, `Not64`, `ByteDecomposition`,
-  subcircuits and lookups included). What this increment does *not* do is
-  unlock the bitwise gadgets — R7-05 corrected the claim that it would.
+- **Bounded structural u64 first** — **S26, implemented locally**. D033 admits
+  only expressions whose syntax proves every result canonical and every `.val`
+  exact; `bitsOf` lowers directly. This removes `And8`'s `land` refusal and adds
+  lookup-free `LowByte`/`Bits8` corpus entries, while correctly retaining XOR
+  rows whose range evidence is outside witness IR.
 - **Multi-column tables** (D013) — **S28**, immediately after, because it is
-  the other half of the same unlock: every byte-oriented bitwise gadget looks
-  up a 3-column `ByteXorTable`-family table. `array.new`, a multi-dimensional
-  `constrain.in`, and table certification at 65536×3.
+  the remaining `And8` unlock and one XOR-family blocker: every byte-oriented
+  bitwise gadget looks up a 3-column `ByteXorTable`-family table. `array.new`, a
+  multi-dimensional `constrain.in`, and table certification at 65536×3.
+- **A range contract visible to witness lowering** before claiming end-to-end
+  Xor32/Keccak/BLAKE3: either source annotations or a proved constraint
+  analysis, never an unstated use of `FormalCircuit.Assumptions`.
 - **The rest of the witness IR**: `let`-steps and `mapRange` → `scf.for` (this
   is SHA256's real blocker, R7-07, and the zkGolf Add32 ports' too, R7-09),
   `inv` → `felt.inv` (with `ite`, the `IsZero`/comparator family), `listGet` →
@@ -612,9 +622,8 @@ one negative fixture):
 - **Subcircuits as named components** alongside `@Main`. This is the shape D015
   was chosen to be compatible with. A scaling concern rather than a capability
   one.
-- **General natural arithmetic** (D011's deferred "general treatment", now over
-  `U64Expr`): needs an index bounds policy and LLZK interpreter support that do
-  not exist yet, which is why it is last.
+- **The remaining natural/control-flow IR**: dynamic divisors/shifts, `idx`,
+  `localVar`, and `ite` still need loop, let, and control-flow policies.
 
 ### D. The AIR layer — an unfaced design decision
 
@@ -638,11 +647,11 @@ can close, because closing it means formalising LLZK.
 unchanged `0e53b9f2` head, preserved the narrow accepted subset, and made
 Deliverable 2a visible as D026 rather than letting green gates hide the weakened
 theorem domain. L0 advanced the LLZK input to exact SHA `25fb3740` after the old
-and new tools passed the unchanged same-tree matrix. **S26 is now bootstrapped**;
-its first action is the width and `val`-bridge decision, followed by structural
-bitwise lowering. Then come **S28**
-(multi-column tables and the actual library unlock), and the witness-IR loop
-increment. S27 remains returned for re-scoping (R7-09).
+and new tools passed the unchanged same-tree matrix. **S26 is implemented
+locally**: D033, structural lowering, direct `bitsOf`, proofs, corpus, and
+remeasured coverage are in place. After its committed gate/handoff come **S28**
+(multi-column tables), a witness-visible range contract for the XOR family, and
+the witness-IR loop increment. S27 remains returned for re-scoping (R7-09).
 
 The assurance track's A5 renderer and A7 copy-canonicalisation items are now
 done: the on-disk constraint surface has the second line of defense R7-02 called

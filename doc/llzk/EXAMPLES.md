@@ -28,8 +28,8 @@ program even where `llzk-witgen` ignores `@constrain`.
 
 ## Checked conformance corpus
 
-The current corpus contains 12 emitted modules and 33 input vectors.
-6 modules come from a flattened Clean circuit and pass both halves of G9; the
+The current corpus contains 14 emitted modules and 45 input vectors.
+8 modules come from a flattened Clean circuit and pass both halves of G9; the
 remaining 6 are independent field-registry probes,
 so source agreement is deliberately reported as not applicable rather than passing.
 
@@ -37,6 +37,8 @@ so source agreement is deliberately reported as not applicable rather than passi
 |---|---|---:|---:|---|
 | `Multiply` | `babybear` | yes — constraints and witnesses agree | 4 | Minimal proved source-to-LLZK vertical slice |
 | `Decompose` | `babybear` | yes — constraints and witnesses agree | 6 | Accepted `felt.umod` and `felt.uintdiv` witness shapes |
+| `LowByte` | `babybear` | yes — constraints and witnesses agree | 6 | Bounded `felt.bit_and` witness lowering |
+| `Bits8` | `babybear` | yes — constraints and witnesses agree | 6 | First-class `bitsOf` decomposition with felt shifts |
 | `Addition8FullCarry` | `babybear` | yes — constraints and witnesses agree | 9 | Headline proved byte addition with a certified lookup |
 | `Passthrough` | `babybear` | yes — constraints and witnesses agree | 3 | Direct public output with no witness cells |
 | `ConstOut` | `babybear` | yes — constraints and witnesses agree | 2 | Constant public output with no witness cells |

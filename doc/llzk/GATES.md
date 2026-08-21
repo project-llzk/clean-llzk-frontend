@@ -186,11 +186,12 @@ inspection-only premise: `CopyCanon.step_preserves` proves one extension and
 remain pinned in `Test/WitnessCheck.lean`.
 
 **What G9 does not establish.** D017's reading of the emitted IR: that `felt.add`
-is `+`, `constrain.eq` is equality, `constrain.in` is membership, and
-`felt.umod`/`felt.uintdiv` read their operands as canonical representatives.
+is `+`, `constrain.eq` is equality, `constrain.in` is membership, and natural,
+bitwise, and shift operations read their operands as canonical representatives.
 Nothing in Lean settles that without a formal model of LLZK; G5–G7 are the
-empirical evidence for the `@compute` half of it, on 33 vectors and two
-independent LLZK backends. The lookup *rows* used to be listed here; since S16
+empirical evidence for the `@compute` half of it, on 45 vectors and two
+independent LLZK backends; S26 also probes every new operation spelling
+directly. The lookup *rows* used to be listed here; since S16
 they are proved — see D012 and `Clean/Backend/LLZK/TableCert.lean`.
 
 ## G10 — the LLZK analysis pipeline

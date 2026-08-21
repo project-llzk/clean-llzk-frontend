@@ -139,6 +139,14 @@ def corpus : Array Entry :=
      -- byte boundary the two recognized shapes split on.
      Entry.ofSource babybear "Decompose" (Compilable.source decompose)
        #[#[0], #[255], #[256], #[257], #[65535], #[2013265920]],
+     -- S26's lookup-free bitwise slice. The mask exercises `felt.bit_and`
+     -- across the byte boundary and at the field-representative boundary.
+     Entry.ofSource babybear "LowByte" (Compilable.source lowByte)
+       #[#[0], #[1], #[255], #[256], #[257], #[2013265920]],
+     -- A first-class `VExpr.bitsOf` block: zero, individual/set low bits, the
+     -- first discarded bit, and Babybear's largest representative.
+     Entry.ofSource babybear "Bits8" (Compilable.source bits8)
+       #[#[0], #[1], #[2], #[255], #[256], #[2013265920]],
      -- No carry, carry out of the low byte, and both extremes of the documented
      -- input range (two bytes plus a boolean carry-in) -- then three vectors
      -- *outside* the gadget's `Assumptions`, which R2's C5 recorded as untested.

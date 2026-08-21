@@ -77,6 +77,30 @@ def decompose : FormalCircuit (F pBabybear) field Parts where
   soundness := by circuit_proof_all
   completeness := by circuit_proof_all
 
+/-! ## S26 structural u64 and bit decomposition -/
+
+/-- Keep the low byte with a direct u64 `land`, without a lookup table.
+
+This is intentionally a semantics-neutral conformance circuit (`Spec := True`),
+like `decompose`: its job is to send an accepted bitwise witness operation
+through every backend gate. The D033 theorem, rather than this fixture, is what
+justifies the lowering for all inputs. -/
+def lowByte : FormalCircuit (F pBabybear) field field where
+  main x := do
+    witness (x.val &&& 255).toField
+  Assumptions _ := True
+  Spec _ _ := True
+  soundness := by circuit_proof_all
+  completeness := by circuit_proof_all
+
+/-- Emit the low eight bits as one `VExpr.bitsOf` witness block. -/
+def bits8 : FormalCircuit (F pBabybear) field (fields 8) where
+  main x := witnessVector 8 (x.bits 8)
+  Assumptions _ := True
+  Spec _ _ := True
+  soundness := by circuit_proof_all
+  completeness := by circuit_proof_all
+
 /-! ## The two shapes D008 is about
 
 D008 gives every output its own `{llzk.pub}` member and constrains it equal to

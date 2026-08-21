@@ -7,8 +7,8 @@ import Clean.Backend.LLZK.Certificate
 `Constraints.lean` does this for `@constrain`. This is the other half, and until
 S19 it was the last part of the pipeline with no check of its own: `@compute` was
 covered by G5–G7 — the two `llzk-witgen` backends agreeing with Clean's
-interpreter on the recorded input vectors (33 as of R7; the corpus has grown
-since this comment first said 27) — and by nothing else. A few dozen vectors is
+interpreter on the recorded input vectors (45 as of S26) — and by nothing else.
+A few dozen vectors is
 evidence, not a statement about all inputs.
 
 The shape is the same as the constraint side, and so are its limits:
@@ -23,8 +23,8 @@ The shape is the same as the constraint side, and so are its limits:
 ## Why a tree and not a polynomial
 
 `@constrain` is polynomial, so a normal form absorbs the difference between
-`x*y` and `y*x`. `@compute` is not: `felt.umod` and `felt.uintdiv` are the two
-non-native operations Stage 1 emits, and no polynomial normal form contains them.
+`x*y` and `y*x`. `@compute` is not: natural division/modulo, bitwise operations,
+and shifts are non-native operations with no polynomial normal form.
 The comparison is therefore syntactic on trees, which is sound but stricter — two
 computations that are equal but differently shaped would be reported as a
 mismatch. That is fail-closed, and in practice the shapes match because both
@@ -32,13 +32,12 @@ readers are structural over the same source.
 
 ## Where the LLZK reading enters
 
-`WExpr.eval`'s `umod` case *is* the assumption that `felt.umod a b` denotes
-`fromNat (val a % val b)`, and `uintdiv` likewise. That is the D011/D017 reading,
-and `eval_ofWitgen` proves Clean's `ofU64 (mod (val x) (const c))` denotes the
-same thing when field values fit in a u64. Upstream's `U64Expr.val` truncates;
-the explicit size hypothesis is therefore part of the theorem rather than a
-property the corpus can infer. `CanonicalRepr` (D019) is what makes `val` the
-representative that reading refers to.
+`WExpr.eval`'s non-field cases *are* the D017 reading: LLZK applies natural
+division/modulo, bitwise operations, and unmasked shifts to canonical felt
+representatives, then re-enters the field. `eval_ofWitgen` proves that D033's
+independent, bound-checked source reader denotes Clean's `U64Expr.eval` for
+every admitted tree. `CanonicalRepr` (D019) supplies the prime-field laws for
+u64 add/mul; the checked `.val` rule prevents UInt64 truncation.
 
 ## What this does not do
 
@@ -63,6 +62,7 @@ inductive WExpr where
   | mul (a b : WExpr)
   | uintdiv (a : WExpr) (divisor : Nat)
   | umod (a : WExpr) (divisor : Nat)
+  | u64Bin (op : U64BinOp) (a b : WExpr)
 deriving DecidableEq, Repr, Inhabited
 
 namespace WExpr
@@ -71,10 +71,10 @@ variable {F : Type} [FiniteField F]
 
 /-- The meaning of a compute expression.
 
-The `uintdiv`/`umod` cases are the reading of `felt.uintdiv`/`felt.umod`
-recorded in D017: the operands are interpreted as their canonical
-representatives, the operation is on naturals, and the result re-enters the
-field. -/
+The non-field cases are the D017 reading of the corresponding LLZK operations:
+operands are canonical representatives, the operation is on naturals, and the
+result re-enters the field. The shift cases do not mask the count modulo 64;
+D033's source reader proves it is below 64 before admitting a `U64Expr`. -/
 def eval (σ : Nat → F) : WExpr → F
   | .cell i => σ i
   | .const n => FiniteField.fromNat n
@@ -82,6 +82,15 @@ def eval (σ : Nat → F) : WExpr → F
   | .mul a b => eval σ a * eval σ b
   | .uintdiv a d => FiniteField.fromNat (FiniteField.val (eval σ a) / d)
   | .umod a d => FiniteField.fromNat (FiniteField.val (eval σ a) % d)
+  | .u64Bin op a b =>
+    let x := FiniteField.val (eval σ a)
+    let y := FiniteField.val (eval σ b)
+    FiniteField.fromNat <| match op with
+      | .bitAnd => x &&& y
+      | .bitOr => x ||| y
+      | .bitXor => x ^^^ y
+      | .shl => x <<< y
+      | .shr => x >>> y
 
 /-! ## Reading the Clean circuit
 
@@ -105,6 +114,7 @@ def rename (f : Nat → Nat) : WExpr → WExpr
   | .mul a b => .mul (rename f a) (rename f b)
   | .uintdiv a d => .uintdiv (rename f a) d
   | .umod a d => .umod (rename f a) d
+  | .u64Bin op a b => .u64Bin op (rename f a) (rename f b)
 
 /-- Evaluation depends on the assignment only pointwise. -/
 theorem eval_congr {σ τ : Nat → F} (h : ∀ i, σ i = τ i) (w : WExpr) :
@@ -116,6 +126,7 @@ theorem eval_congr {σ τ : Nat → F} (h : ∀ i, σ i = τ i) (w : WExpr) :
   | mul a b iha ihb => simp [eval, iha, ihb]
   | uintdiv a d ih => simp [eval, ih]
   | umod a d ih => simp [eval, ih]
+  | u64Bin op a b iha ihb => simp [eval, iha, ihb]
 
 /-- Renaming commutes with evaluation.
 
@@ -133,17 +144,94 @@ theorem eval_rename (σ : Nat → F) (f : Nat → Nat) (w : WExpr) :
   | mul a b iha ihb => simp [eval, rename, iha, ihb]
   | uintdiv a d ih => simp [eval, rename, ih]
   | umod a d ih => simp [eval, rename, ih]
+  | u64Bin op a b iha ihb => simp [eval, rename, iha, ihb]
 
-/-- Read a field-sorted witness expression, or fail on anything outside the
-Stage-1 subset. -/
-def ofWitgen : Witgen.FExpr F → Option WExpr
-  | .expr e => some (ofExpression e)
-  | .const c => some (.const (FiniteField.val c))
-  | .add a b => (ofWitgen a).bind fun wa => (ofWitgen b).map (WExpr.add wa)
-  | .mul a b => (ofWitgen a).bind fun wa => (ofWitgen b).map (WExpr.mul wa)
-  | .ofU64 (.mod (.val x) (.const c)) => (ofWitgen x).map (WExpr.umod · c.toNat)
-  | .ofU64 (.div (.val x) (.const c)) => (ofWitgen x).map (WExpr.uintdiv · c.toNat)
+mutual
+
+  /-- Read a field-sorted witness expression, or fail on anything outside the
+  Stage-1 subset. -/
+  def ofWitgen : Witgen.FExpr F → Option WExpr
+    | .expr e => some (ofExpression e)
+    | .const c => some (.const (FiniteField.val c))
+    | .add a b => (ofWitgen a).bind fun wa => (ofWitgen b).map (WExpr.add wa)
+    | .mul a b => (ofWitgen a).bind fun wa => (ofWitgen b).map (WExpr.mul wa)
+    | .ofU64 e => ofU64 e
+    | _ => none
+
+  /-- Independently read a u64 source expression under D033's proved bound.
+  This traverses the Clean source directly; it does not call the emitter's
+  `FieldExpr.ofU64`. -/
+  private def ofU64 (e : Witgen.U64Expr F) : Option WExpr := do
+    let bound ← LLZK.U64Expr.upperBound (FiniteField.size F) e
+    guard (bound ≤ FiniteField.size F)
+    match e with
+    | .const n => some (.const n.toNat)
+    | .val x => ofWitgen x
+    | .add a b => return .add (← ofU64 a) (← ofU64 b)
+    | .mul a b => return .mul (← ofU64 a) (← ofU64 b)
+    | .div a (.const d) => do
+      guard (d != 0 ∧ d.toNat < FiniteField.size F)
+      return .uintdiv (← ofU64 a) d.toNat
+    | .mod a (.const d) => do
+      guard (d != 0 ∧ d.toNat < FiniteField.size F)
+      return .umod (← ofU64 a) d.toNat
+    | .land a b => return .u64Bin .bitAnd (← ofU64 a) (← ofU64 b)
+    | .lor a b => return .u64Bin .bitOr (← ofU64 a) (← ofU64 b)
+    | .lxor a b => return .u64Bin .bitXor (← ofU64 a) (← ofU64 b)
+    | .shiftL a (.const amount) => do
+      guard (amount.toNat < FiniteField.size F)
+      return .u64Bin .shl (← ofU64 a) (.const amount.toNat)
+    | .shiftR a (.const amount) => do
+      guard (amount.toNat < FiniteField.size F)
+      return .u64Bin .shr (← ofU64 a) (.const amount.toNat)
+    | _ => none
+
+end
+
+/-- The structural layer of `ofU64`, named separately so the semantic proof can
+peel off the bound check without unfolding recursive calls. -/
+private def ofU64Body (e : Witgen.U64Expr F) : Option WExpr :=
+  match e with
+  | .const n => some (.const n.toNat)
+  | .val x => ofWitgen x
+  | .add a b => return .add (← ofU64 a) (← ofU64 b)
+  | .mul a b => return .mul (← ofU64 a) (← ofU64 b)
+  | .div a (.const d) => do
+    guard (d != 0 ∧ d.toNat < FiniteField.size F)
+    return .uintdiv (← ofU64 a) d.toNat
+  | .mod a (.const d) => do
+    guard (d != 0 ∧ d.toNat < FiniteField.size F)
+    return .umod (← ofU64 a) d.toNat
+  | .land a b => return .u64Bin .bitAnd (← ofU64 a) (← ofU64 b)
+  | .lor a b => return .u64Bin .bitOr (← ofU64 a) (← ofU64 b)
+  | .lxor a b => return .u64Bin .bitXor (← ofU64 a) (← ofU64 b)
+  | .shiftL a (.const amount) => do
+    guard (amount.toNat < FiniteField.size F)
+    return .u64Bin .shl (← ofU64 a) (.const amount.toNat)
+  | .shiftR a (.const amount) => do
+    guard (amount.toNat < FiniteField.size F)
+    return .u64Bin .shr (← ofU64 a) (.const amount.toNat)
   | _ => none
+
+private theorem ofU64_eq_bound_body (e : Witgen.U64Expr F) :
+    ofU64 e = (do
+      let bound ← LLZK.U64Expr.upperBound (FiniteField.size F) e
+      guard (bound ≤ FiniteField.size F)
+      ofU64Body e) := by
+  unfold ofU64
+  cases e <;> rfl
+
+private theorem body_of_ofU64 {e : Witgen.U64Expr F} {w : WExpr}
+    (h : ofU64 e = some w) : ofU64Body e = some w := by
+  rw [ofU64_eq_bound_body] at h
+  cases hb : LLZK.U64Expr.upperBound (FiniteField.size F) e with
+  | none => simp [hb] at h
+  | some bound =>
+    have hle : bound ≤ FiniteField.size F := by
+      by_contra hn
+      simp [hb, hn] at h
+    simp [hb, hle] at h
+    exact h
 
 /-! ## The readings mean what Clean means -/
 
@@ -156,19 +244,265 @@ theorem eval_ofExpression (σ : Nat → F) (env : Environment F) (hσ : ∀ i, �
   | add a b iha ihb => simp [eval, ofExpression, Expression.eval, iha, ihb]
   | mul a b iha ihb => simp [eval, ofExpression, Expression.eval, iha, ihb]
 
+/-- A successful D033 analysis really is an exclusive upper bound on the Clean
+u64 value. This theorem is independent of LLZK; it closes the source-side fact
+that recognition relies on before any felt operation is emitted. -/
+theorem eval_lt_upperBound (ctx : Witgen.Ctx F) (prime : Nat)
+    (hprime : FiniteField.size F = prime) :
+    ∀ (e : Witgen.U64Expr F) (bound : Nat),
+      LLZK.U64Expr.upperBound prime e = some bound → (e.eval ctx).toNat < bound := by
+  intro e
+  induction e using LLZK.U64Expr.upperBound.induct (prime := prime) with
+  | case1 n =>
+    intro bound h
+    cases h
+    simp [Witgen.U64Expr.eval]
+  | case2 x hwidth =>
+    intro bound h
+    rw [LLZK.U64Expr.upperBound, if_pos hwidth] at h
+    cases h
+    have hv : FiniteField.val (x.eval ctx) < prime := by
+      rw [← hprime]
+      exact FiniteField.val_lt (x.eval ctx)
+    have hv64 : FiniteField.val (x.eval ctx) < 2 ^ 64 := lt_of_lt_of_le hv hwidth.2
+    simp [Witgen.U64Expr.eval, UInt64.toNat_ofNat', hv]
+  | case3 x hwidth =>
+    intro bound h
+    rw [LLZK.U64Expr.upperBound, if_neg hwidth] at h
+    contradiction
+  | case4 a b iha ihb =>
+    intro bound h
+    cases hba : LLZK.U64Expr.upperBound prime a with
+    | none => simp [LLZK.U64Expr.upperBound, hba] at h
+    | some ba =>
+      cases hbb : LLZK.U64Expr.upperBound prime b with
+      | none => simp [LLZK.U64Expr.upperBound, hba, hbb] at h
+      | some bb =>
+        by_cases hmax : ba + bb ≤ LLZK.U64Expr.modulus
+        · simp [LLZK.U64Expr.upperBound, hba, hbb, hmax] at h
+          subst bound
+          have ha := iha ba hba
+          have hb := ihb bb hbb
+          have hsum : (a.eval ctx).toNat + (b.eval ctx).toNat < ba + bb := by omega
+          change ba + bb ≤ 2 ^ 64 at hmax
+          rw [Witgen.U64Expr.eval, UInt64.toNat_add,
+            Nat.mod_eq_of_lt (lt_of_lt_of_le hsum hmax)]
+          exact hsum
+        · simp [LLZK.U64Expr.upperBound, hba, hbb, hmax] at h
+  | case5 a b iha ihb =>
+    intro bound h
+    cases hba : LLZK.U64Expr.upperBound prime a with
+    | none => simp [LLZK.U64Expr.upperBound, hba] at h
+    | some ba =>
+      cases hbb : LLZK.U64Expr.upperBound prime b with
+      | none => simp [LLZK.U64Expr.upperBound, hba, hbb] at h
+      | some bb =>
+        by_cases hmax : ba * bb ≤ LLZK.U64Expr.modulus
+        · simp [LLZK.U64Expr.upperBound, hba, hbb, hmax] at h
+          subst bound
+          have ha := iha ba hba
+          have hb := ihb bb hbb
+          have hmul : (a.eval ctx).toNat * (b.eval ctx).toNat < ba * bb := by nlinarith
+          change ba * bb ≤ 2 ^ 64 at hmax
+          rw [Witgen.U64Expr.eval, UInt64.toNat_mul,
+            Nat.mod_eq_of_lt (lt_of_lt_of_le hmul hmax)]
+          exact hmul
+        · simp [LLZK.U64Expr.upperBound, hba, hbb, hmax] at h
+  | case6 a => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+  | case7 a d hd iha =>
+    intro bound h
+    rw [LLZK.U64Expr.upperBound, if_neg hd] at h
+    have ha := iha bound h
+    simp only [Witgen.U64Expr.eval, UInt64.toNat_div]
+    exact lt_of_le_of_lt (Nat.div_le_self _ _) ha
+  | case8 a => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+  | case9 a d hd iha =>
+    intro bound h
+    rw [LLZK.U64Expr.upperBound, if_neg hd] at h
+    have ha := iha bound h
+    simp only [Witgen.U64Expr.eval, UInt64.toNat_mod]
+    exact lt_of_le_of_lt (Nat.mod_le _ _) ha
+  | case10 a b iha ihb =>
+    intro bound h
+    cases hba : LLZK.U64Expr.upperBound prime a with
+    | none => simp [LLZK.U64Expr.upperBound, hba] at h
+    | some ba =>
+      cases hbb : LLZK.U64Expr.upperBound prime b with
+      | none => simp [LLZK.U64Expr.upperBound, hba, hbb] at h
+      | some bb =>
+        simp [LLZK.U64Expr.upperBound, hba, hbb] at h
+        subst bound
+        have ha := iha ba hba
+        exact lt_of_le_of_lt Nat.and_le_left ha
+  | case11 a b iha ihb =>
+    intro bound h
+    cases hba : LLZK.U64Expr.upperBound prime a with
+    | none => simp [LLZK.U64Expr.upperBound, hba] at h
+    | some ba =>
+      cases hbb : LLZK.U64Expr.upperBound prime b with
+      | none => simp [LLZK.U64Expr.upperBound, hba, hbb] at h
+      | some bb =>
+        simp [LLZK.U64Expr.upperBound, hba, hbb] at h
+        subst bound
+        exact UInt64.toNat_lt_size _
+  | case12 a b iha ihb =>
+    intro bound h
+    cases hba : LLZK.U64Expr.upperBound prime a with
+    | none => simp [LLZK.U64Expr.upperBound, hba] at h
+    | some ba =>
+      cases hbb : LLZK.U64Expr.upperBound prime b with
+      | none => simp [LLZK.U64Expr.upperBound, hba, hbb] at h
+      | some bb =>
+        simp [LLZK.U64Expr.upperBound, hba, hbb] at h
+        subst bound
+        exact UInt64.toNat_lt_size _
+  | case13 a amount hamount iha =>
+    intro bound h
+    cases hba : LLZK.U64Expr.upperBound prime a with
+    | none => simp [LLZK.U64Expr.upperBound, hamount, hba] at h
+    | some ba =>
+      by_cases hmax : ba * 2 ^ amount.toNat ≤ LLZK.U64Expr.modulus
+      · simp [LLZK.U64Expr.upperBound, hamount, hba, hmax] at h
+        subst bound
+        have ha := iha ba hba
+        have hmul : (a.eval ctx).toNat * 2 ^ amount.toNat < ba * 2 ^ amount.toNat := by
+          exact Nat.mul_lt_mul_of_pos_right ha (Nat.two_pow_pos _)
+        change ba * 2 ^ amount.toNat ≤ 2 ^ 64 at hmax
+        simp only [Witgen.U64Expr.eval]
+        rw [UInt64.toNat_shiftLeft, Nat.mod_eq_of_lt hamount, Nat.shiftLeft_eq,
+          Nat.mod_eq_of_lt (lt_of_lt_of_le hmul hmax)]
+        exact hmul
+      · simp [LLZK.U64Expr.upperBound, hamount, hba, hmax] at h
+  | case14 a amount hamount =>
+    intro bound h
+    simp [LLZK.U64Expr.upperBound, hamount] at h
+  | case15 a amount hamount iha =>
+    intro bound h
+    rw [LLZK.U64Expr.upperBound, if_pos hamount] at h
+    have ha := iha bound h
+    simp only [Witgen.U64Expr.eval]
+    rw [UInt64.toNat_shiftRight, Nat.mod_eq_of_lt hamount]
+    exact lt_of_le_of_lt (Nat.shiftRight_le _ _) ha
+  | case16 a amount hamount =>
+    intro bound h
+    simp [LLZK.U64Expr.upperBound, hamount] at h
+  | case17 => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+  | case18 i => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+  | case19 x y hy => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+  | case20 x y hy => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+  | case21 x y hy => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+  | case22 x y hy => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+  | case23 c t e => intro bound h; simp [LLZK.U64Expr.upperBound] at h
+
+/-- Success of the independent source reader exposes the checked root bound. -/
+private theorem upperBound_of_ofU64 {e : Witgen.U64Expr F} {w : WExpr}
+    (h : ofU64 e = some w) :
+    ∃ bound, LLZK.U64Expr.upperBound (FiniteField.size F) e = some bound ∧
+      bound ≤ FiniteField.size F := by
+  rw [ofU64_eq_bound_body] at h
+  cases hb : LLZK.U64Expr.upperBound (FiniteField.size F) e with
+  | none => simp [hb] at h
+  | some bound =>
+    by_cases hle : bound ≤ FiniteField.size F
+    · exact ⟨bound, rfl, hle⟩
+    · simp [hb, hle] at h
+
+private theorem eval_lt_size_of_ofU64 (ctx : Witgen.Ctx F)
+    {e : Witgen.U64Expr F} {w : WExpr} (h : ofU64 e = some w) :
+    (e.eval ctx).toNat < FiniteField.size F := by
+  obtain ⟨bound, hb, hbound⟩ := upperBound_of_ofU64 h
+  exact lt_of_lt_of_le
+    (eval_lt_upperBound ctx (FiniteField.size F) rfl e bound hb) hbound
+
+private theorem eval_add_lt_limits (ctx : Witgen.Ctx F) {a b : Witgen.U64Expr F}
+    {w : WExpr} (h : ofU64 (.add a b) = some w) :
+    (a.eval ctx).toNat + (b.eval ctx).toNat < FiniteField.size F ∧
+      (a.eval ctx).toNat + (b.eval ctx).toNat < LLZK.U64Expr.modulus := by
+  obtain ⟨bound, hroot, hfield⟩ := upperBound_of_ofU64 h
+  cases ha : LLZK.U64Expr.upperBound (FiniteField.size F) a with
+  | none => simp [LLZK.U64Expr.upperBound, ha] at hroot
+  | some ba =>
+    cases hb : LLZK.U64Expr.upperBound (FiniteField.size F) b with
+    | none => simp [LLZK.U64Expr.upperBound, ha, hb] at hroot
+    | some bb =>
+      by_cases hmax : ba + bb ≤ LLZK.U64Expr.modulus
+      · simp [LLZK.U64Expr.upperBound, ha, hb, hmax] at hroot
+        subst bound
+        have hea := eval_lt_upperBound ctx (FiniteField.size F) rfl a ba ha
+        have heb := eval_lt_upperBound ctx (FiniteField.size F) rfl b bb hb
+        constructor <;> omega
+      · simp [LLZK.U64Expr.upperBound, ha, hb, hmax] at hroot
+
+private theorem eval_mul_lt_limits (ctx : Witgen.Ctx F) {a b : Witgen.U64Expr F}
+    {w : WExpr} (h : ofU64 (.mul a b) = some w) :
+    (a.eval ctx).toNat * (b.eval ctx).toNat < FiniteField.size F ∧
+      (a.eval ctx).toNat * (b.eval ctx).toNat < LLZK.U64Expr.modulus := by
+  obtain ⟨bound, hroot, hfield⟩ := upperBound_of_ofU64 h
+  cases ha : LLZK.U64Expr.upperBound (FiniteField.size F) a with
+  | none => simp [LLZK.U64Expr.upperBound, ha] at hroot
+  | some ba =>
+    cases hb : LLZK.U64Expr.upperBound (FiniteField.size F) b with
+    | none => simp [LLZK.U64Expr.upperBound, ha, hb] at hroot
+    | some bb =>
+      by_cases hmax : ba * bb ≤ LLZK.U64Expr.modulus
+      · simp [LLZK.U64Expr.upperBound, ha, hb, hmax] at hroot
+        subst bound
+        have hea := eval_lt_upperBound ctx (FiniteField.size F) rfl a ba ha
+        have heb := eval_lt_upperBound ctx (FiniteField.size F) rfl b bb hb
+        constructor <;> nlinarith
+      · simp [LLZK.U64Expr.upperBound, ha, hb, hmax] at hroot
+
+private theorem eval_shiftLeft_lt_limits (ctx : Witgen.Ctx F)
+    {a : Witgen.U64Expr F} {amount : UInt64} {w : WExpr}
+    (h : ofU64 (.shiftL a (.const amount)) = some w) :
+    (a.eval ctx).toNat * 2 ^ amount.toNat < FiniteField.size F ∧
+      (a.eval ctx).toNat * 2 ^ amount.toNat < LLZK.U64Expr.modulus := by
+  obtain ⟨bound, hroot, hfield⟩ := upperBound_of_ofU64 h
+  by_cases hamount : amount.toNat < 64
+  · cases ha : LLZK.U64Expr.upperBound (FiniteField.size F) a with
+    | none => simp [LLZK.U64Expr.upperBound, hamount, ha] at hroot
+    | some ba =>
+      by_cases hmax : ba * 2 ^ amount.toNat ≤ LLZK.U64Expr.modulus
+      · simp [LLZK.U64Expr.upperBound, hamount, ha, hmax] at hroot
+        subst bound
+        have hea := eval_lt_upperBound ctx (FiniteField.size F) rfl a ba ha
+        have hpow : 0 < 2 ^ amount.toNat := Nat.two_pow_pos _
+        constructor <;> nlinarith
+      · simp [LLZK.U64Expr.upperBound, hamount, ha, hmax] at hroot
+  · simp [LLZK.U64Expr.upperBound, hamount] at hroot
+
+private theorem fromNat_add_of_lt [CanonicalRepr F] {a b : Nat}
+    (ha : a < FiniteField.size F) (hb : b < FiniteField.size F)
+    (hab : a + b < FiniteField.size F) :
+    FiniteField.fromNat (a + b) =
+      (FiniteField.fromNat a : F) + FiniteField.fromNat b := by
+  apply FiniteField.val_injective
+  rw [FiniteField.val_fromNat _ hab, CanonicalRepr.val_add,
+    FiniteField.val_fromNat _ ha, FiniteField.val_fromNat _ hb,
+    Nat.mod_eq_of_lt hab]
+
+private theorem fromNat_mul_of_lt [CanonicalRepr F] {a b : Nat}
+    (ha : a < FiniteField.size F) (hb : b < FiniteField.size F)
+    (hab : a * b < FiniteField.size F) :
+    FiniteField.fromNat (a * b) =
+      (FiniteField.fromNat a : F) * FiniteField.fromNat b := by
+  apply FiniteField.val_injective
+  rw [FiniteField.val_fromNat _ hab, CanonicalRepr.val_mul,
+    FiniteField.val_fromNat _ ha, FiniteField.val_fromNat _ hb,
+    Nat.mod_eq_of_lt hab]
+
 /-- **Reading a Clean witness expression preserves its meaning.**
 
-This is the theorem D011 wanted and could not state: the two recognized natural
-division/modulo shapes denote, in Clean, exactly what `WExpr.eval` says
-`felt.umod`/`felt.uintdiv` denote when every field representative fits in a
-u64. The hypothesis is necessary: `U64Expr.val` truncates modulo `2^64`, so the
-statement is false in general for bn254 and grumpkin. Everything else in the
-accepted subset is structural. -/
-theorem eval_ofWitgen (ctx : Witgen.Ctx F) (σ : Nat → F)
-    (hσ : ∀ i, σ i = ctx.env.get i) (hsize : FiniteField.size F ≤ 2 ^ 64) :
+The u64 cases carry D033's checked bounds. `CanonicalRepr` supplies exactly the
+prime-field law needed for admitted u64 addition and multiplication; without it
+the theorem is false for the binary fields covered by `FiniteField`. -/
+theorem eval_ofWitgen [CanonicalRepr F] (ctx : Witgen.Ctx F) (σ : Nat → F)
+    (hσ : ∀ i, σ i = ctx.env.get i) :
     ∀ (e : Witgen.FExpr F) (w : WExpr), ofWitgen e = some w → eval σ w = e.eval ctx := by
   intro e
-  induction e using ofWitgen.induct with
+  induction e using ofWitgen.induct
+      (motive_2 := fun e => ∀ w, ofU64 e = some w →
+        eval σ w = FiniteField.fromNat (e.eval ctx).toNat) with
   | case1 e => intro w h; cases h; exact eval_ofExpression σ _ hσ e
   | case2 c => intro w h; cases h; simp [eval, Witgen.FExpr.eval, FiniteField.fromNat_val]
   | case3 a b iha ihb =>
@@ -181,23 +515,251 @@ theorem eval_ofWitgen (ctx : Witgen.Ctx F) (σ : Nat → F)
     simp only [ofWitgen, Option.bind_eq_some_iff, Option.map_eq_some_iff] at h
     obtain ⟨wa, ha, wb, hb, rfl⟩ := h
     simp [eval, Witgen.FExpr.eval, iha wa ha, ihb wb hb]
-  | case5 x c ih =>
+  | case5 e ih =>
     intro w h
-    simp only [ofWitgen, Option.map_eq_some_iff] at h
-    obtain ⟨wx, hx, rfl⟩ := h
-    have hval : FiniteField.val (Witgen.FExpr.eval ctx x) < 2 ^ 64 :=
-      lt_of_lt_of_le (FiniteField.val_lt _) hsize
-    simp [eval, Witgen.FExpr.eval, Witgen.U64Expr.eval, ih wx hx,
-      UInt64.toNat_mod]
-  | case6 x c ih =>
+    exact ih w h
+  | case6 t h1 h2 h3 h4 h5 =>
     intro w h
-    simp only [ofWitgen, Option.map_eq_some_iff] at h
-    obtain ⟨wx, hx, rfl⟩ := h
-    have hval : FiniteField.val (Witgen.FExpr.eval ctx x) < 2 ^ 64 :=
-      lt_of_lt_of_le (FiniteField.val_lt _) hsize
-    simp [eval, Witgen.FExpr.eval, Witgen.U64Expr.eval, ih wx hx,
-      UInt64.toNat_div]
-  | case7 e _ => intro w h; simp [ofWitgen] at h
+    simp [ofWitgen] at h
+  | case7 t ih w h =>
+    have hbody := body_of_ofU64 h
+    cases t with
+    | const n =>
+      simp [ofU64Body] at hbody
+      cases hbody
+      rfl
+    | val x =>
+      simp [ofU64Body] at hbody
+      rw [ih _ hbody]
+      obtain ⟨bound, hb, hle⟩ := upperBound_of_ofU64 h
+      simp only [LLZK.U64Expr.upperBound] at hb
+      split at hb
+      · rename_i hwidth
+        cases hb
+        have hv : FiniteField.val (Witgen.FExpr.eval ctx x) < 2 ^ 64 := by
+          have hwidth64 := hwidth.2
+          change FiniteField.size F ≤ 2 ^ 64 at hwidth64
+          exact lt_of_lt_of_le (FiniteField.val_lt _) hwidth64
+        rw [Witgen.U64Expr.eval, UInt64.toNat_ofNat', Nat.mod_eq_of_lt hv]
+        exact (FiniteField.fromNat_val _).symm
+      · contradiction
+    | add a b =>
+      rcases ih with ⟨iha, ihb⟩
+      cases ha : ofU64 a with
+      | none => simp [ofU64Body, ha] at hbody
+      | some wa =>
+       cases hb : ofU64 b with
+       | none => simp [ofU64Body, ha, hb] at hbody
+       | some wb =>
+        simp [ofU64Body, ha, hb] at hbody
+        subst w
+        have hab := eval_add_lt_limits ctx h
+        rw [Witgen.U64Expr.eval, UInt64.toNat_add]
+        have hab64 := hab.2
+        change (a.eval ctx).toNat + (b.eval ctx).toNat < 2 ^ 64 at hab64
+        rw [Nat.mod_eq_of_lt hab64]
+        rw [eval, iha wa ha, ihb wb hb,
+          ← fromNat_add_of_lt (eval_lt_size_of_ofU64 ctx ha)
+            (eval_lt_size_of_ofU64 ctx hb) hab.1]
+    | mul a b =>
+      rcases ih with ⟨iha, ihb⟩
+      cases ha : ofU64 a with
+      | none => simp [ofU64Body, ha] at hbody
+      | some wa =>
+       cases hb : ofU64 b with
+       | none => simp [ofU64Body, ha, hb] at hbody
+       | some wb =>
+        simp [ofU64Body, ha, hb] at hbody
+        subst w
+        have hab := eval_mul_lt_limits ctx h
+        rw [Witgen.U64Expr.eval, UInt64.toNat_mul]
+        have hab64 := hab.2
+        change (a.eval ctx).toNat * (b.eval ctx).toNat < 2 ^ 64 at hab64
+        rw [Nat.mod_eq_of_lt hab64]
+        rw [eval, iha wa ha, ihb wb hb,
+          ← fromNat_mul_of_lt (eval_lt_size_of_ofU64 ctx ha)
+            (eval_lt_size_of_ofU64 ctx hb) hab.1]
+    | div a b =>
+      cases b with
+      | const d =>
+        by_cases hd : d ≠ 0 ∧ d.toNat < FiniteField.size F
+        · cases ha : ofU64 a with
+          | none => simp [ofU64Body, hd, ha] at hbody
+          | some wa =>
+            simp [ofU64Body, hd, ha] at hbody
+            subst w
+            have hva := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx ha)
+            simp [eval, Witgen.U64Expr.eval, ih wa ha, hva, UInt64.toNat_div]
+        · simp [ofU64Body, hd] at hbody
+      | val x => simp [ofU64Body] at hbody
+      | idx => simp [ofU64Body] at hbody
+      | localVar i => simp [ofU64Body] at hbody
+      | add x y => simp [ofU64Body] at hbody
+      | mul x y => simp [ofU64Body] at hbody
+      | div x y => simp [ofU64Body] at hbody
+      | mod x y => simp [ofU64Body] at hbody
+      | land x y => simp [ofU64Body] at hbody
+      | lor x y => simp [ofU64Body] at hbody
+      | lxor x y => simp [ofU64Body] at hbody
+      | shiftL x y => simp [ofU64Body] at hbody
+      | shiftR x y => simp [ofU64Body] at hbody
+      | ite c t e => simp [ofU64Body] at hbody
+    | mod a b =>
+      cases b with
+      | const d =>
+        by_cases hd : d ≠ 0 ∧ d.toNat < FiniteField.size F
+        · cases ha : ofU64 a with
+          | none => simp [ofU64Body, hd, ha] at hbody
+          | some wa =>
+            simp [ofU64Body, hd, ha] at hbody
+            subst w
+            have hva := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx ha)
+            simp [eval, Witgen.U64Expr.eval, ih wa ha, hva, UInt64.toNat_mod]
+        · simp [ofU64Body, hd] at hbody
+      | val x => simp [ofU64Body] at hbody
+      | idx => simp [ofU64Body] at hbody
+      | localVar i => simp [ofU64Body] at hbody
+      | add x y => simp [ofU64Body] at hbody
+      | mul x y => simp [ofU64Body] at hbody
+      | div x y => simp [ofU64Body] at hbody
+      | mod x y => simp [ofU64Body] at hbody
+      | land x y => simp [ofU64Body] at hbody
+      | lor x y => simp [ofU64Body] at hbody
+      | lxor x y => simp [ofU64Body] at hbody
+      | shiftL x y => simp [ofU64Body] at hbody
+      | shiftR x y => simp [ofU64Body] at hbody
+      | ite c t e => simp [ofU64Body] at hbody
+    | land a b =>
+      rcases ih with ⟨iha, ihb⟩
+      cases ha : ofU64 a with
+      | none => simp [ofU64Body, ha] at hbody
+      | some wa =>
+       cases hb : ofU64 b with
+       | none => simp [ofU64Body, ha, hb] at hbody
+       | some wb =>
+        simp [ofU64Body, ha, hb] at hbody
+        subst w
+        have hva := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx ha)
+        have hvb := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx hb)
+        simp [eval, Witgen.U64Expr.eval, iha wa ha, ihb wb hb, hva, hvb]
+    | lor a b =>
+      rcases ih with ⟨iha, ihb⟩
+      cases ha : ofU64 a with
+      | none => simp [ofU64Body, ha] at hbody
+      | some wa =>
+       cases hb : ofU64 b with
+       | none => simp [ofU64Body, ha, hb] at hbody
+       | some wb =>
+        simp [ofU64Body, ha, hb] at hbody
+        subst w
+        have hva := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx ha)
+        have hvb := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx hb)
+        simp [eval, Witgen.U64Expr.eval, iha wa ha, ihb wb hb, hva, hvb]
+    | lxor a b =>
+      rcases ih with ⟨iha, ihb⟩
+      cases ha : ofU64 a with
+      | none => simp [ofU64Body, ha] at hbody
+      | some wa =>
+       cases hb : ofU64 b with
+       | none => simp [ofU64Body, ha, hb] at hbody
+       | some wb =>
+        simp [ofU64Body, ha, hb] at hbody
+        subst w
+        have hva := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx ha)
+        have hvb := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx hb)
+        simp [eval, Witgen.U64Expr.eval, iha wa ha, ihb wb hb, hva, hvb]
+    | shiftL a b =>
+      cases b with
+      | const amount =>
+        by_cases hamountField : amount.toNat < FiniteField.size F
+        · cases ha : ofU64 a with
+          | none => simp [ofU64Body, hamountField, ha] at hbody
+          | some wa =>
+            simp [ofU64Body, hamountField, ha] at hbody
+            subst w
+            have hamount : amount.toNat < 64 := by
+              obtain ⟨bound, hroot, hfield⟩ := upperBound_of_ofU64 h
+              simp only [LLZK.U64Expr.upperBound] at hroot
+              split at hroot
+              · assumption
+              · contradiction
+            have hva := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx ha)
+            have hvamount := FiniteField.val_fromNat (F := F) _ hamountField
+            have hlimits := eval_shiftLeft_lt_limits ctx h
+            have hshift64 := hlimits.2
+            change
+              (Witgen.U64Expr.eval ctx a).toNat * 2 ^ amount.toNat <
+                18446744073709551616 at hshift64
+            simp [eval, Witgen.U64Expr.eval, ih wa ha, hva, hvamount,
+              UInt64.toNat_shiftLeft, Nat.mod_eq_of_lt hamount, Nat.shiftLeft_eq,
+              Nat.mod_eq_of_lt hshift64]
+        · simp [ofU64Body, hamountField] at hbody
+      | val x => simp [ofU64Body] at hbody
+      | idx => simp [ofU64Body] at hbody
+      | localVar i => simp [ofU64Body] at hbody
+      | add x y => simp [ofU64Body] at hbody
+      | mul x y => simp [ofU64Body] at hbody
+      | div x y => simp [ofU64Body] at hbody
+      | mod x y => simp [ofU64Body] at hbody
+      | land x y => simp [ofU64Body] at hbody
+      | lor x y => simp [ofU64Body] at hbody
+      | lxor x y => simp [ofU64Body] at hbody
+      | shiftL x y => simp [ofU64Body] at hbody
+      | shiftR x y => simp [ofU64Body] at hbody
+      | ite c t e => simp [ofU64Body] at hbody
+    | shiftR a b =>
+      cases b with
+      | const amount =>
+        by_cases hamountField : amount.toNat < FiniteField.size F
+        · cases ha : ofU64 a with
+          | none => simp [ofU64Body, hamountField, ha] at hbody
+          | some wa =>
+            simp [ofU64Body, hamountField, ha] at hbody
+            subst w
+            have hamount : amount.toNat < 64 := by
+              obtain ⟨bound, hroot, hfield⟩ := upperBound_of_ofU64 h
+              simp only [LLZK.U64Expr.upperBound] at hroot
+              split at hroot
+              · assumption
+              · contradiction
+            have hva := FiniteField.val_fromNat (F := F) _ (eval_lt_size_of_ofU64 ctx ha)
+            have hvamount := FiniteField.val_fromNat (F := F) _ hamountField
+            simp [eval, Witgen.U64Expr.eval, ih wa ha, hva, hvamount,
+              UInt64.toNat_shiftRight, Nat.mod_eq_of_lt hamount]
+        · simp [ofU64Body, hamountField] at hbody
+      | val x => simp [ofU64Body] at hbody
+      | idx => simp [ofU64Body] at hbody
+      | localVar i => simp [ofU64Body] at hbody
+      | add x y => simp [ofU64Body] at hbody
+      | mul x y => simp [ofU64Body] at hbody
+      | div x y => simp [ofU64Body] at hbody
+      | mod x y => simp [ofU64Body] at hbody
+      | land x y => simp [ofU64Body] at hbody
+      | lor x y => simp [ofU64Body] at hbody
+      | lxor x y => simp [ofU64Body] at hbody
+      | shiftL x y => simp [ofU64Body] at hbody
+      | shiftR x y => simp [ofU64Body] at hbody
+      | ite c t e => simp [ofU64Body] at hbody
+    | idx => simp [ofU64Body] at hbody
+    | localVar i => simp [ofU64Body] at hbody
+    | ite c t e => simp [ofU64Body] at hbody
+
+/-- One cell of the `bitsOf` source reading denotes Clean's corresponding low
+bit. Unlike `U64Expr.val`, this operates on the full canonical field
+representative; `hm` only makes every emitted shift-index constant canonical. -/
+theorem eval_bitsOf [CanonicalRepr F] (ctx : Witgen.Ctx F) (σ : Nat → F)
+    (hσ : ∀ i, σ i = ctx.env.get i) {m i : Nat} (hm : m ≤ FiniteField.size F)
+    (hi : i < m) {x : Witgen.FExpr F} {w : WExpr} (hw : ofWitgen x = some w) :
+    eval σ (.u64Bin .bitAnd (.u64Bin .shr w (.const i)) (.const 1)) =
+      (Witgen.VExpr.eval ctx (.bitsOf (n := m) x))[i] := by
+  have hiSize : i < FiniteField.size F := lt_of_lt_of_le hi hm
+  have hvalI := FiniteField.val_fromNat (F := F) i hiSize
+  have hx := eval_ofWitgen ctx σ hσ x w hw
+  have hshift : FiniteField.val (x.eval ctx) >>> i < FiniteField.size F :=
+    lt_of_le_of_lt (Nat.shiftRight_le _ _) (FiniteField.val_lt _)
+  have hvalShift := FiniteField.val_fromNat (F := F) _ hshift
+  simp [eval, Witgen.VExpr.eval, Vector.getElem_mapRange, hx, hvalI, hvalShift,
+    FiniteField.val_one]
 
 end WExpr
 
@@ -219,6 +781,11 @@ variable {F : Type} [FiniteField F]
 /-- Read a whole witness program: `m` expressions, or nothing. -/
 private def ofProgram {m : Nat} : Witgen.WitgenIR F m → Option (List WExpr)
   | .ir [] (.lit es) => es.toList.mapM WExpr.ofWitgen
+  | .ir [] (.bitsOf x) => do
+      guard (m ≤ FiniteField.size F)
+      let value ← WExpr.ofWitgen x
+      return (List.range m).map fun i =>
+        .u64Bin .bitAnd (.u64Bin .shr value (.const i)) (.const 1)
   | _ => none
 
 /-! ### Canonicalising copies
@@ -352,7 +919,7 @@ The exception is a cell that is a bare copy — see "Canonicalising copies" abov
 There the written value is one the body did not compute, and rebinding it would
 rename the original for the rest of `@compute`. Because `FieldExpr.lower` returns
 an existing value only in its `.var` case, and every other case emits a statement
-whose slot is a `const`/`add`/`mul`/`uintdiv`/`umod`, *the slot already holding a
+whose slot is a `const`/`add`/`mul`/non-native operation, *the slot already holding a
 bare `cell` is exactly the copy case*. That is the test used below. -/
 
 /-- What an SSA name in `@compute` can hold. -/
@@ -404,6 +971,11 @@ private def step (fieldTy : Ty) (inputSize : Nat) (r : Reader) : Stmt → Option
     | .umod => match b with
       | .const d => r.define dst (.expr (.umod a d))
       | _ => none
+    | .bitAnd => r.define dst (.expr (.u64Bin .bitAnd a b))
+    | .bitOr => r.define dst (.expr (.u64Bin .bitOr a b))
+    | .bitXor => r.define dst (.expr (.u64Bin .bitXor a b))
+    | .shl => r.define dst (.expr (.u64Bin .shl a b))
+    | .shr => r.define dst (.expr (.u64Bin .shr a b))
   | .writeMember self member value memberTy => do
     guard (memberTy = fieldTy)
     let .self ← r.slots[self.index]? | none

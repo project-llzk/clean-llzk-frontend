@@ -28,8 +28,9 @@ public documentation and hygiene
   → renderer and copy-canonicalisation assurance (A5 + A7, done)
   → S25: current upstream Clean and Lean (done locally)
   → L0: review or advance the LLZK toolchain pin (done locally)
-  → S26: structural U64, bitwise operations, and conditionals (bootstrapped)
+  → S26: bounded structural U64 and `bitsOf` (done locally)
   → S28: multi-column lookup tables and certificates
+  → witness-range contract or proved constraint-to-witness bounds for XOR
   → end-to-end Xor32 plus one composed bitwise gadget
   → frozen-candidate adversarial review
 ```
@@ -37,12 +38,14 @@ public documentation and hygiene
 This order joins the three goals that matter for publication. S25 removed the
 stale Clean foundation. L0 compared the measured 25-commit LLZK delta on one
 frozen tree and advanced the immutable pin to `25fb3740`; both exact toolchains
-and the committed new pin passed the complete matrix. S26 is now isolated from
-that final L0 evidence tip and begins with the width/field and `U64Expr.val`
-decision, not lowering code. A5 has already strengthened the one artifact
+and the committed new pin passed the complete matrix. S26 was isolated from
+that final L0 evidence tip and settled the width/field and `U64Expr.val`
+decision as D033 before lowering code. A5 has already strengthened the one
+artifact
 boundary every pinned LLZK binary accepts without checking semantic content;
 A7 removed the remaining inspection-only premise from copy canonicalisation.
-S26 plus S28 turns measured refusals into impactful examples. The release
+S26, S28, and a proved range contract turn measured refusals into impactful
+examples. The release
 candidate is reached only when those examples are in the external-tool corpus,
 not when `LLZK.compile` merely returns `some`.
 
@@ -88,16 +91,17 @@ Accept:
 - field variables, constants, addition, and multiplication;
 - assertions;
 - lookup tables resolved by an explicit export registry;
-- the two justified Addition8 u64 division/modulo forms, matched whole, with
-  a literal divisor that is non-zero and below the prime (D011).
+- bounded structural `U64Expr` add/mul/div/mod and bitwise/shift trees under
+  D033, including literal divisor and shift-count side conditions;
+- `VExpr.bitsOf` output blocks.
 
 Reject before rendering:
 
 - native or interaction witness programs;
 - unresolved tables;
 - `dataGet` and `hintGet`;
-- unrecognized u64 arithmetic;
-- witness `let`-steps, `mapRange`, `envRange`, `bitsOf`, and `append` outputs;
+- u64 trees whose result/intermediate bounds or `.val` bridge are not proved;
+- witness `let`-steps, `mapRange`, `envRange`, and `append` outputs;
 - lookup tables with arity other than 1 (D013);
 - a configured field whose prime is not the circuit's (D010);
 - a witness cell that reads another cell of its own `.witness m` block, which
@@ -128,7 +132,7 @@ ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen them):
 | `Rotation64` | compiles |
 | `Not.Not64` | compiles |
 | `Xor32` | refused — 1 × `lxor` + **4 × unregistered `ByteXorTable`** |
-| `And.And8` | refused — 1 × `land` + **1 × unregistered table** |
+| `And.And8` | refused — **1 × unregistered table** (`land` now lowers) |
 | `BLAKE3.G` | refused — 4 × `lxor` + **16 × unregistered table** |
 | `Keccak256.Theta` | refused — 50 × `lxor` + **400 × unregistered table** |
 | `IsZeroField` | refused — `ite` (and the expression also needs `inv`) |
@@ -138,24 +142,25 @@ ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen them):
 `Addition32Full` and `Rotation64` are compositions several gadgets deep. That is
 a real result and it was the surprise of the original sweep.
 
-**The bitwise half is blocked by two features, not one** (R7-05 — the first
-version of this section said "exactly two witness-IR constructors", and its own
-diagnostic counts refute that: 80–89% of them are lookup refusals summarized
-above as one word). Every byte-oriented bitwise gadget looks up `ByteXorTable`
-or a sibling — **3-column, 65536-row tables**, and this backend is
-single-column-only (D013). So:
+**The bitwise half has three distinct boundaries.** Every byte-oriented gadget
+looks up `ByteXorTable` or a sibling — **3-column, 65536-row tables**, while this
+backend is single-column-only (D013). S26 additionally proved that the witness
+syntax itself cannot justify every bitwise result:
 
-- `land`/`lor`/`lxor` + `ite` (one witness-IR increment) removes the first
-  column of refusals — and unlocks, by itself, only gadgets that use no lookup
-  tables, roughly five.
-- **Multi-column tables (D013's retirement)** removes the second, and is what
-  actually stands between this backend and Xor32/And8/Keccak/BLAKE3 — together
-  with certifying a 65536×3 table through `CertifiedConfig`, whose cost at that
-  size nobody has measured.
+- D033 removes `And8`'s `land` refusal because `x &&& y ≤ x` preserves the
+  checked Babybear bound.
+- It retains the XOR rows: their byte bounds live in `FormalCircuit.Assumptions`
+  and constraints, not in `Witgen.U64Expr`, so the witness reader cannot prove a
+  `.val`-rooted `lxor` result remains below the prime.
+- **Multi-column tables (D013's retirement)** is the remaining `And8` blocker
+  and one XOR-family blocker. It also requires certifying a 65536×3 table
+  through `CertifiedConfig`, whose cost at that size nobody has measured.
 
-Both move to the head of Stage 2, in that order; "subcircuits as named
-components" stays behind them because it is a scaling concern, not a
-capability one.
+After S28, end-to-end Xor32/Keccak/BLAKE3 still require a source-level range
+contract or a proved constraint-to-witness analysis. Treating their assumptions
+as if the witness recognizer could see them would make G9's semantic theorem
+false. Named subcomponents remain behind these capability issues because they
+are a scaling concern, not a capability one.
 
 Denominators, stated so the table cannot imply them (R7-07): this sweep is 12
 gadgets. `Clean/Gadgets/` has ~61 `FormalCircuit` tops; `Clean/Circomlib/`

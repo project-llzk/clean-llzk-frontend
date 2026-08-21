@@ -102,6 +102,11 @@ inductive FeltBinOp where
   | mul
   | uintdiv
   | umod
+  | bitAnd
+  | bitOr
+  | bitXor
+  | shl
+  | shr
 deriving DecidableEq, Repr
 
 /-- Whether an operation is a field operation in LLZK's sense. A function whose
@@ -109,7 +114,26 @@ body contains a non-native operation must declare
 `FuncAttr.allowNonNativeFieldOps`; `Builder.assemble` maintains that invariant. -/
 def FeltBinOp.isNative : FeltBinOp → Bool
   | .add | .mul => true
-  | .uintdiv | .umod => false
+  | .uintdiv | .umod | .bitAnd | .bitOr | .bitXor | .shl | .shr => false
+
+/-- The non-native felt operations used to represent bounded `U64Expr`
+bitwise and shift nodes. Keeping this separate from `FeltBinOp` prevents a
+witness recognizer from manufacturing ordinary field arithmetic through the
+u64-only constructor below. -/
+inductive U64BinOp where
+  | bitAnd
+  | bitOr
+  | bitXor
+  | shl
+  | shr
+deriving DecidableEq, Repr
+
+def U64BinOp.toFeltBinOp : U64BinOp → FeltBinOp
+  | .bitAnd => .bitAnd
+  | .bitOr => .bitOr
+  | .bitXor => .bitXor
+  | .shl => .shl
+  | .shr => .shr
 
 /-- A statement in a function body.
 
@@ -149,7 +173,8 @@ def Stmt.operands : Stmt → Array Value
 here: `llzk-opt` infers them from the function's role and adds them itself, so
 emitting them would only create a round-trip difference. -/
 inductive FuncAttr where
-  /-- `function.allow_non_native_field_ops`, required by `felt.uintdiv`/`felt.umod`. -/
+  /-- `function.allow_non_native_field_ops`, required by natural, bitwise, and
+  shift operations in the felt dialect. -/
   | allowNonNativeFieldOps
 deriving DecidableEq, Repr
 
@@ -312,7 +337,7 @@ so no caller has an out-of-range case to handle, and both allocate every
 parameter before the body runs, so body values cannot collide with parameters.
 
 `attrs` is derived per function from the statements actually emitted, so a
-function using `felt.uintdiv`/`felt.umod` cannot be rendered without
+function using a non-native felt operation cannot be rendered without
 `function.allow_non_native_field_ops`.
 
 `Except`-valued over an arbitrary error type: this module has no notion of
@@ -395,6 +420,9 @@ inductive FieldExpr where
   /-- Unsigned remainder of the canonical representative of `a` modulo the
   literal `divisor`. Witness-only; see `uintdiv`. -/
   | umod (a : FieldExpr) (divisor : Nat)
+  /-- A bounded u64 bitwise or shift operation. Witness-only: only the checked
+  `U64Expr` and `bitsOf` recognizers produce it. -/
+  | u64Bin (op : U64BinOp) (a b : FieldExpr)
 deriving DecidableEq, Repr
 
 namespace FieldExpr
@@ -411,7 +439,8 @@ recognition time rather than in the lowering. See R2-03. -/
 def firstVarAtLeast (bound : Nat) : FieldExpr → Option Nat
   | .var index => if index ≥ bound then some index else none
   | .const _ => none
-  | .add a b | .mul a b => (firstVarAtLeast bound a).orElse fun _ => firstVarAtLeast bound b
+  | .add a b | .mul a b | .u64Bin _ a b =>
+      (firstVarAtLeast bound a).orElse fun _ => firstVarAtLeast bound b
   | .uintdiv a _ | .umod a _ => firstVarAtLeast bound a
 
 /-- SSA values bound for circuit variables, indexed by circuit variable index.
@@ -456,6 +485,9 @@ def lower (context : String) (fieldTy : Ty) (env : Env) : FieldExpr → LowerM V
   | .umod a divisor => do
     Builder.feltBin .umod (← lower context fieldTy env a) (← Builder.feltConst divisor fieldTy)
       fieldTy
+  | .u64Bin op a b => do
+    Builder.feltBin op.toFeltBinOp (← lower context fieldTy env a)
+      (← lower context fieldTy env b) fieldTy
 
 end FieldExpr
 
@@ -500,14 +532,15 @@ namespace FieldExpr
 
 /-- The value an expression denotes in an algebra.
 
-`uintdiv` and `umod` are witness-only and cannot appear in a constraint, so
-`none` there is the same fail-closed answer the gate's reader gives. -/
+Natural division/modulo and the u64 bitwise/shift nodes are witness-only and
+cannot appear in a constraint, so `none` there is the same fail-closed answer
+the gate's reader gives. -/
 def denote {A : Type} (alg : ExprAlgebra A) : FieldExpr → Option A
   | .var i => some (alg.var i)
   | .const c => some (alg.const c)
   | .add a b => (denote alg a).bind fun x => (denote alg b).map (alg.add x)
   | .mul a b => (denote alg a).bind fun x => (denote alg b).map (alg.mul x)
-  | .uintdiv .. | .umod .. => none
+  | .uintdiv .. | .umod .. | .u64Bin .. => none
 
 end FieldExpr
 
@@ -609,8 +642,8 @@ bookkeeping travels with it: the index only advances, every statement defines an
 index in the range consumed, and the returned value is in scope.
 
 The reading claim is conditional on the expression *having* a denotation, which
-is what makes `uintdiv` and `umod` fall out — they are witness-only, they denote
-nothing in an `ExprAlgebra`, and the claim is vacuous for them. An unconditional
+is what makes every non-polynomial witness operation fall out — it denotes
+nothing in an `ExprAlgebra`, and the claim is vacuous for it. An unconditional
 statement would need a freshness side condition on the assignment.
 
 **Read the statement, not this docstring.** It used to open "the expression
@@ -810,5 +843,44 @@ theorem FieldExpr.lower_spec {A : Type} (alg : ExprAlgebra A) (ctx : String) (ty
             exact ⟨by omega, by omega⟩
       · rintro v hveq; cases hveq
         exact ⟨Nat.lt_succ_self _, fun p hp _ _ => by simp [denote] at hp⟩
+  | u64Bin op a b iha ihb =>
+    intro start S hbelow
+    obtain ⟨oa, na, la, hra, hlea, hda, hoka⟩ := iha start S hbelow
+    cases oa with
+    | error d =>
+      exact ⟨.error d, na, la,
+        by simp only [FieldExpr.lower, Builder.run_bind, hra], hlea, hda, by simp⟩
+    | ok va =>
+      obtain ⟨_, _⟩ := hoka va rfl
+      have hbelow' : ∀ (i : Nat) (w : Value), env[i]? = some w → w.index < na :=
+        fun i w h => Nat.lt_of_lt_of_le (hbelow i w h) hlea
+      obtain ⟨ob, nb, lb, hrb, hleb, hdb, _⟩ := ihb na (S ++ la.toArray) hbelow'
+      have hd2 : ∀ s ∈ la ++ lb, ∀ dd ∈ s.dst?, start ≤ dd ∧ dd < nb := by
+        intro s hs dd hd
+        rcases List.mem_append.1 hs with h | h
+        · exact ⟨(hda s h dd hd).1, Nat.lt_of_lt_of_le (hda s h dd hd).2 hleb⟩
+        · exact ⟨Nat.le_trans hlea (hdb s h dd hd).1, (hdb s h dd hd).2⟩
+      cases ob with
+      | error d =>
+        refine ⟨.error d, nb, la ++ lb,
+          by simp [FieldExpr.lower, Builder.run_bind, hra, hrb, Array.append_assoc],
+          Nat.le_trans hlea hleb, hd2, by simp⟩
+      | ok vb =>
+        have hsn : start ≤ nb := Nat.le_trans hlea hleb
+        refine ⟨.ok ⟨nb⟩, nb + 1,
+          la ++ lb ++ [.feltBin ⟨nb⟩ op.toFeltBinOp va vb ty], ?_,
+          Nat.le_succ_of_le hsn, ?_, ?_⟩
+        · simp [FieldExpr.lower, Builder.run_bind, hra, hrb, Builder.feltBin,
+            Array.append_assoc]
+        · intro s hs dd hd
+          rcases List.mem_append.1 hs with h | h
+          · exact ⟨(hd2 s h dd hd).1, Nat.lt_succ_of_lt (hd2 s h dd hd).2⟩
+          · simp only [List.mem_singleton] at h
+            subst h
+            simp only [Stmt.dst?, Option.mem_def, Option.some.injEq] at hd
+            exact ⟨by omega, by omega⟩
+        · rintro v hveq
+          cases hveq
+          exact ⟨Nat.lt_succ_self _, fun p hp _ _ => by simp [denote] at hp⟩
 
 end LLZK

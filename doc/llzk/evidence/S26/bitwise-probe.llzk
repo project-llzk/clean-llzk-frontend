@@ -1,0 +1,39 @@
+module attributes {llzk.lang = "clean-s26-probe", llzk.main = !struct.type<@Main>} {
+  struct.def @Main {
+    struct.member @and : !felt.type<"babybear"> {llzk.pub}
+    struct.member @or : !felt.type<"babybear"> {llzk.pub}
+    struct.member @xor : !felt.type<"babybear"> {llzk.pub}
+    struct.member @shl4 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @shr4 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @shl64 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @shr64 : !felt.type<"babybear"> {llzk.pub}
+
+    function.def @compute() -> !struct.type<@Main>
+        attributes {function.allow_non_native_field_ops} {
+      %self = struct.new : !struct.type<@Main>
+      %a = felt.const 240 : !felt.type<"babybear">
+      %b = felt.const 204 : !felt.type<"babybear">
+      %four = felt.const 4 : !felt.type<"babybear">
+      %sixty_four = felt.const 64 : !felt.type<"babybear">
+      %and = felt.bit_and %a, %b : !felt.type<"babybear">, !felt.type<"babybear">
+      %or = felt.bit_or %a, %b : !felt.type<"babybear">, !felt.type<"babybear">
+      %xor = felt.bit_xor %a, %b : !felt.type<"babybear">, !felt.type<"babybear">
+      %shl4 = felt.shl %a, %four : !felt.type<"babybear">, !felt.type<"babybear">
+      %shr4 = felt.shr %a, %four : !felt.type<"babybear">, !felt.type<"babybear">
+      %shl64 = felt.shl %a, %sixty_four : !felt.type<"babybear">, !felt.type<"babybear">
+      %shr64 = felt.shr %a, %sixty_four : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %self[@and] = %and : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@or] = %or : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@xor] = %xor : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@shl4] = %shl4 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@shr4] = %shr4 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@shl64] = %shl64 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@shr64] = %shr64 : !struct.type<@Main>, !felt.type<"babybear">
+      function.return %self : !struct.type<@Main>
+    }
+
+    function.def @constrain(%self: !struct.type<@Main>) {
+      function.return
+    }
+  }
+}

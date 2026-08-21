@@ -35,8 +35,8 @@ private def input (args : Array Value) (i : Nat) : Except Diagnostic Value :=
 
 /-- A component exercising every statement form and both parameter shapes.
 
-`@compute` uses `felt.const` and all four binary operations, two of them
-non-native, so the rendered signature must carry
+`@compute` uses `felt.const` and every binary operation, including the
+non-native natural and bitwise families, so the rendered signature must carry
 `function.allow_non_native_field_ops`; it writes both members. `@constrain` reads
 both members back, reads a global, and emits both constraint forms. One parameter
 is named and one is not. -/
@@ -53,6 +53,11 @@ def demoModule : Except Diagnostic Module := do
       let c256 ← Builder.feltConst 256 felt
       let quotient ← Builder.feltBin .uintdiv prod c256 felt
       let remainder ← Builder.feltBin .umod prod c256 felt
+      let _ ← Builder.feltBin .bitAnd lhs rhs felt
+      let _ ← Builder.feltBin .bitOr lhs rhs felt
+      let _ ← Builder.feltBin .bitXor lhs rhs felt
+      let _ ← Builder.feltBin .shl lhs rhs felt
+      let _ ← Builder.feltBin .shr lhs rhs felt
       Builder.writeMember self "w0" quotient felt
       Builder.writeMember self "out0" remainder felt)
     (fun self args => do

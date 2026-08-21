@@ -289,7 +289,7 @@ private def step (fieldTy : Ty) (inputSize numWitnesses numOutputs : Nat)
     let combined ← match op with
       | .add => some (Poly.add a b)
       | .mul => some (Poly.mul a b)
-      | .uintdiv | .umod => none
+      | .uintdiv | .umod | .bitAnd | .bitOr | .bitXor | .shl | .shr => none
     r.define dst (.poly combined)
   | .readMember dst self member memberTy => do
     guard (memberTy = fieldTy)

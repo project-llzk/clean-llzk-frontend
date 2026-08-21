@@ -43,6 +43,11 @@ def FeltBinOp.render : FeltBinOp → String
   | .mul => "felt.mul"
   | .uintdiv => "felt.uintdiv"
   | .umod => "felt.umod"
+  | .bitAnd => "felt.bit_and"
+  | .bitOr => "felt.bit_or"
+  | .bitXor => "felt.bit_xor"
+  | .shl => "felt.shl"
+  | .shr => "felt.shr"
 
 /-- The attribute name as it appears in a `function.def` attribute dictionary. -/
 def FuncAttr.render : FuncAttr → String

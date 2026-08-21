@@ -35,6 +35,11 @@ info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
       %v5 = felt.const 256 : !felt.type<"babybear">
       %v6 = felt.uintdiv %v4, %v5 : !felt.type<"babybear">, !felt.type<"babybear">
       %v7 = felt.umod %v4, %v5 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v8 = felt.bit_and %v0, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v9 = felt.bit_or %v0, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v10 = felt.bit_xor %v0, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v11 = felt.shl %v0, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v12 = felt.shr %v0, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
       struct.writem %v2[@w0] = %v6 : !struct.type<@Main>, !felt.type<"babybear">
       struct.writem %v2[@out0] = %v7 : !struct.type<@Main>, !felt.type<"babybear">
       function.return %v2 : !struct.type<@Main>

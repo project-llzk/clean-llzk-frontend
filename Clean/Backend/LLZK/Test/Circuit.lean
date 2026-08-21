@@ -46,13 +46,17 @@ is now pinned below, in this order:
 | an unrecognized `FExpr` (`ite`) | `Gadgets.IsZeroField` |
 | new `BExpr.flt` under a rejected `ite` | `fieldLessThanWitness` |
 | new `BExpr.bit` under a rejected `ite` | `bitConditionWitness` |
-| an unrecognized `U64Expr` under `ofU64` | `shiftWitness` |
+| a bitwise result whose bound exceeds the prime | `xorUnboundedWitness` |
+| a shift count at the UInt64 masking boundary | `shift64Witness` |
+| a dynamic shift count | `dynamicShiftWitness` |
+| a dynamic natural divisor | `dynamicDivisorWitness` |
+| an unscoped u64 loop index | `idxWitness` |
 | a `.native` witness closure | `nativeWitness` |
 | witness `let`-steps | `letStepWitness` |
 | a u64 witness `let`-step | `letUStepWitness` |
 | a `mapRange` witness output | `mapRangeWitness` |
 | an `envRange` witness output | `envRangeWitness` |
-| a `bitsOf` witness output | `bitsOfWitness` |
+| a `bitsOf` width above the prime | `bitsOfTooWide` |
 | an `append` witness output | `appendWitness` |
 | a witness cell reading its own block | `selfReadingBlock` |
 | an expression naming an undefined circuit variable | `undefinedVariable` |
@@ -212,6 +216,151 @@ info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
 -/
 #guard_msgs in
 #eval IO.print (emit babybear decompose)
+
+/-! ### S26: structurally lowered u64 and `bitsOf` -/
+
+/--
+info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
+  struct.def @Main {
+    struct.member @w0 : !felt.type<"babybear"> {signal}
+    struct.member @out0 : !felt.type<"babybear"> {llzk.pub}
+
+    function.def @compute(
+      %v0: !felt.type<"babybear"> {function.arg_name = "arg0"}
+    ) -> !struct.type<@Main> attributes {function.allow_non_native_field_ops} {
+      %v1 = struct.new : !struct.type<@Main>
+      %v2 = felt.const 255 : !felt.type<"babybear">
+      %v3 = felt.bit_and %v0, %v2 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w0] = %v3 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out0] = %v3 : !struct.type<@Main>, !felt.type<"babybear">
+      function.return %v1 : !struct.type<@Main>
+    }
+
+    function.def @constrain(
+      %v0: !struct.type<@Main>,
+      %v1: !felt.type<"babybear"> {function.arg_name = "arg0"}
+    ) {
+      %v2 = struct.readm %v0[@w0] : !struct.type<@Main>, !felt.type<"babybear">
+      %v3 = struct.readm %v0[@out0] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v3, %v2 : !felt.type<"babybear">, !felt.type<"babybear">
+      function.return
+    }
+  }
+}
+-/
+#guard_msgs in
+#eval IO.print (emit babybear lowByte)
+
+/--
+info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
+  struct.def @Main {
+    struct.member @w0 : !felt.type<"babybear"> {signal}
+    struct.member @w1 : !felt.type<"babybear"> {signal}
+    struct.member @w2 : !felt.type<"babybear"> {signal}
+    struct.member @w3 : !felt.type<"babybear"> {signal}
+    struct.member @w4 : !felt.type<"babybear"> {signal}
+    struct.member @w5 : !felt.type<"babybear"> {signal}
+    struct.member @w6 : !felt.type<"babybear"> {signal}
+    struct.member @w7 : !felt.type<"babybear"> {signal}
+    struct.member @out0 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @out1 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @out2 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @out3 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @out4 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @out5 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @out6 : !felt.type<"babybear"> {llzk.pub}
+    struct.member @out7 : !felt.type<"babybear"> {llzk.pub}
+
+    function.def @compute(
+      %v0: !felt.type<"babybear"> {function.arg_name = "arg0"}
+    ) -> !struct.type<@Main> attributes {function.allow_non_native_field_ops} {
+      %v1 = struct.new : !struct.type<@Main>
+      %v2 = felt.const 0 : !felt.type<"babybear">
+      %v3 = felt.shr %v0, %v2 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v4 = felt.const 1 : !felt.type<"babybear">
+      %v5 = felt.bit_and %v3, %v4 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w0] = %v5 : !struct.type<@Main>, !felt.type<"babybear">
+      %v6 = felt.const 1 : !felt.type<"babybear">
+      %v7 = felt.shr %v0, %v6 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v8 = felt.const 1 : !felt.type<"babybear">
+      %v9 = felt.bit_and %v7, %v8 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w1] = %v9 : !struct.type<@Main>, !felt.type<"babybear">
+      %v10 = felt.const 2 : !felt.type<"babybear">
+      %v11 = felt.shr %v0, %v10 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v12 = felt.const 1 : !felt.type<"babybear">
+      %v13 = felt.bit_and %v11, %v12 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w2] = %v13 : !struct.type<@Main>, !felt.type<"babybear">
+      %v14 = felt.const 3 : !felt.type<"babybear">
+      %v15 = felt.shr %v0, %v14 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v16 = felt.const 1 : !felt.type<"babybear">
+      %v17 = felt.bit_and %v15, %v16 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w3] = %v17 : !struct.type<@Main>, !felt.type<"babybear">
+      %v18 = felt.const 4 : !felt.type<"babybear">
+      %v19 = felt.shr %v0, %v18 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v20 = felt.const 1 : !felt.type<"babybear">
+      %v21 = felt.bit_and %v19, %v20 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w4] = %v21 : !struct.type<@Main>, !felt.type<"babybear">
+      %v22 = felt.const 5 : !felt.type<"babybear">
+      %v23 = felt.shr %v0, %v22 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v24 = felt.const 1 : !felt.type<"babybear">
+      %v25 = felt.bit_and %v23, %v24 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w5] = %v25 : !struct.type<@Main>, !felt.type<"babybear">
+      %v26 = felt.const 6 : !felt.type<"babybear">
+      %v27 = felt.shr %v0, %v26 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v28 = felt.const 1 : !felt.type<"babybear">
+      %v29 = felt.bit_and %v27, %v28 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w6] = %v29 : !struct.type<@Main>, !felt.type<"babybear">
+      %v30 = felt.const 7 : !felt.type<"babybear">
+      %v31 = felt.shr %v0, %v30 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v32 = felt.const 1 : !felt.type<"babybear">
+      %v33 = felt.bit_and %v31, %v32 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v1[@w7] = %v33 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out0] = %v5 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out1] = %v9 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out2] = %v13 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out3] = %v17 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out4] = %v21 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out5] = %v25 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out6] = %v29 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v1[@out7] = %v33 : !struct.type<@Main>, !felt.type<"babybear">
+      function.return %v1 : !struct.type<@Main>
+    }
+
+    function.def @constrain(
+      %v0: !struct.type<@Main>,
+      %v1: !felt.type<"babybear"> {function.arg_name = "arg0"}
+    ) {
+      %v2 = struct.readm %v0[@w0] : !struct.type<@Main>, !felt.type<"babybear">
+      %v3 = struct.readm %v0[@w1] : !struct.type<@Main>, !felt.type<"babybear">
+      %v4 = struct.readm %v0[@w2] : !struct.type<@Main>, !felt.type<"babybear">
+      %v5 = struct.readm %v0[@w3] : !struct.type<@Main>, !felt.type<"babybear">
+      %v6 = struct.readm %v0[@w4] : !struct.type<@Main>, !felt.type<"babybear">
+      %v7 = struct.readm %v0[@w5] : !struct.type<@Main>, !felt.type<"babybear">
+      %v8 = struct.readm %v0[@w6] : !struct.type<@Main>, !felt.type<"babybear">
+      %v9 = struct.readm %v0[@w7] : !struct.type<@Main>, !felt.type<"babybear">
+      %v10 = struct.readm %v0[@out0] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v10, %v2 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v11 = struct.readm %v0[@out1] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v11, %v3 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v12 = struct.readm %v0[@out2] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v12, %v4 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v13 = struct.readm %v0[@out3] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v13, %v5 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v14 = struct.readm %v0[@out4] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v14, %v6 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v15 = struct.readm %v0[@out5] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v15, %v7 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v16 = struct.readm %v0[@out6] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v16, %v8 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v17 = struct.readm %v0[@out7] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v17, %v9 : !felt.type<"babybear">, !felt.type<"babybear">
+      function.return
+    }
+  }
+}
+-/
+#guard_msgs in
+#eval IO.print (emit babybear bits8)
 
 /--
 info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
@@ -427,12 +576,35 @@ private def rawChannel : RawChannel (F pBabybear) where
   Guarantees _ _ _ := True
   Requirements _ _ _ := True
 
-/-- A u64 shift is not one of the two recognized `ofU64` shapes. The
-diagnostic names the `U64Expr` constructor rather than falling back to a generic
-message, which was one of the two places `describeFExpr`'s stated principle was
-not followed (R2 §D1). -/
+/-- A literal right shift is an accepted S26 structural u64 shape. -/
 private def shiftWitness : Source (F pBabybear) :=
   source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 (.shiftR (.val (.expr (.var ⟨0⟩))) (.const 8))]))]
+
+/-- `val` supplies only the whole Babybear range; that does not prove an xor
+result remains below the prime. -/
+private def xorUnboundedWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64
+    (.lxor (.val (.expr (.var ⟨0⟩))) (.const 1))]))]
+
+/-- Lean masks a shift count of 64 to zero; LLZK does not. -/
+private def shift64Witness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64
+    (.shiftR (.val (.expr (.var ⟨0⟩))) (.const 64))]))]
+
+/-- Dynamic shift counts cannot establish either the `< 64` or canonical-felt
+side condition. -/
+private def dynamicShiftWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64
+    (.shiftR (.val (.expr (.var ⟨0⟩))) (.val (.expr (.var ⟨0⟩))))]))]
+
+/-- Dynamic divisors cannot establish nonzero/canonical literal conditions. -/
+private def dynamicDivisorWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64
+    (.div (.val (.expr (.var ⟨0⟩))) (.val (.expr (.var ⟨0⟩))))]))]
+
+/-- A bare `idx` has no loop context and no syntactic value bound. -/
+private def idxWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 .idx]))]
 
 /-- The new field comparison has an explicit condition diagnostic even though
 all conditionals remain outside S25's accepted language. -/
@@ -466,9 +638,14 @@ private def mapRangeWitness : Source (F pBabybear) :=
 private def envRangeWitness : Source (F pBabybear) :=
   source 1 [.witness 1 (.ir [] (.envRange 0))]
 
-/-- Upstream's structural bit decomposition is S26 capability, not S25. -/
+/-- Upstream's structural bit decomposition is an accepted S26 output shape. -/
 private def bitsOfWitness : Source (F pBabybear) :=
   source 1 [.witness 1 (.ir [] (.bitsOf (.expr (.var ⟨0⟩))))]
+
+/-- `bitsOf` emits each index as a felt constant, so a width above the prime is
+not representable without reducing at least one index. -/
+private def bitsOfTooWide : Source (F pBabybear) :=
+  source 1 [.witness (pBabybear + 1) (.ir [] (.bitsOf (.expr (.var ⟨0⟩))))]
 
 /-- A witness output built by appending two vectors. -/
 private def appendWitness : Source (F pBabybear) :=
@@ -593,12 +770,42 @@ operation 0 (witness): unsupported witness expression: `ite` with `bit` (a field
 #guard_msgs in
 #eval IO.print (emitSource babybear bitConditionWitness)
 
+#guard (compileSource babybear.toConfig shiftWitness).toOption.isSome
+
 /--
 info: compilation failed:
-operation 0 (witness): unsupported witness expression: `ofU64` applied to `shiftR` (a right shift); only the two recognized division/modulo shapes are lowered
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `lxor` (bitwise exclusive or); its proved exclusive upper bound 18446744073709551616 exceeds the field prime 2013265921, so LLZK could reduce an intermediate differently
 -/
 #guard_msgs in
-#eval IO.print (emitSource babybear shiftWitness)
+#eval IO.print (emitSource babybear xorUnboundedWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `shiftR` (a right shift); no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear shift64Witness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `shiftR` (a right shift); no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear dynamicShiftWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to a u64 division without a literal divisor; no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear dynamicDivisorWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `idx` (a `mapRange` loop index); no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear idxWitness)
 
 /--
 info: compilation failed:
@@ -635,12 +842,14 @@ operation 0 (witness): witness output is an `envRange`; only literal output vect
 #guard_msgs in
 #eval IO.print (emitSource babybear envRangeWitness)
 
+#guard (compileSource babybear.toConfig bitsOfWitness).toOption.isSome
+
 /--
 info: compilation failed:
-operation 0 (witness): witness output is a `bitsOf`; structural bit decomposition is S26, not part of this compatibility bump
+operation 0 (witness): witness output is a `bitsOf` of width 2013265922, which exceeds the field prime 2013265921; an emitted shift-index constant would reduce
 -/
 #guard_msgs in
-#eval IO.print (emitSource babybear bitsOfWitness)
+#eval IO.print (emitSource babybear bitsOfTooWide)
 
 /--
 info: compilation failed:

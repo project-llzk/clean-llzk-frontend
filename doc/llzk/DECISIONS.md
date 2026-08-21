@@ -48,14 +48,13 @@ removing the binding dialect gap.
 
 ## D004 — Fail closed on source semantics
 
-**Status:** accepted; witness-arithmetic basis amended by S25/D026
+**Status:** accepted; witness-arithmetic basis amended by S25/D026 and S26/D033
 **Date:** 2026-07-31
 
 Clean's current `U64Expr` is wrapping u64 arithmetic and is not generally field
-arithmetic. The frontend recognizes only the two explicitly justified
-Addition8 division/modulo shapes and rejects other u64 expressions. D026 states
-the additional `size ≤ 2^64` boundary introduced by the new truncating `val`
-bridge; the pre-S25 decision used unbounded `NExpr` instead.
+arithmetic. The frontend accepts only recursively bounded expressions covered
+by D033's theorem and refuses the rest. D026 records the narrower bridge S25
+temporarily preserved; the pre-S25 decision used unbounded `NExpr` instead.
 
 Lookup tables use an explicit backend registry because `RawTable` does not
 retain concrete static rows.
@@ -220,8 +219,8 @@ prime — not passing a new string.
 
 ## D011 — Match the natural division/modulo shapes whole, with a literal divisor
 
-**Status:** accepted for the pre-S25 `NExpr` design; superseded by D026 for the
-current `U64Expr` bridge
+**Status:** accepted for the pre-S25 `NExpr` design; superseded by D033 for the
+current `U64Expr` lowering
 **Date:** 2026-08-01
 **Enacted by:** S05
 
@@ -653,18 +652,18 @@ for a proved `FormalCircuit` refused. "In practice the shapes match" was too
 strong: it is what stopped anyone testing the refusal branch against real emitter
 output.
 
-`WExpr.eval_ofWitgen` is the theorem: Clean's `ofNat (mod (val x) (const c))`
-denotes exactly what `WExpr.eval` says `felt.umod` denotes, and `WExpr.eval`'s
-`umod`/`uintdiv` cases *are* the D017 reading of those operations. So the two
-sides of D011's argument are connected by a theorem rather than by prose.
+At S19, `WExpr.eval_ofWitgen` proved that Clean's whole division/modulo shapes
+denoted exactly what `WExpr.eval` says `felt.umod`/`felt.uintdiv` denote. S26
+extends the same independent-reader theorem to every D033-admitted structural
+u64 tree and adds `eval_bitsOf`; the new non-field cases are the D017 reading of
+the corresponding LLZK operations.
 
-This paragraph used to add "and it is the one D011 wanted and could not state
-before D019". That misattributes it. `eval_ofWitgen` carries **no canonicity
-content**: it is stated over `FiniteField`, holds for a permuted `val`, and would
-have elaborated fine before D019 existed (R5b-5). What D019 buys is separate and
-lives in `CanonicalRepr`'s own two laws — that `val` really is the ring
-representative, which is what makes `felt.const (val c)` mean `c`. Both are
-needed; they are not the same theorem.
+The S19 theorem carried no canonicity content: it was stated over `FiniteField`
+and held for a permuted `val` (R5b-5). The S26 extension deliberately requires
+`CanonicalRepr`, because bounded u64 addition and multiplication need its
+`val_add`/`val_mul` laws. The historical correction still matters: the original
+whole-shape theorem and D019's ring-representative guarantee were separate
+claims, even though the structural theorem now consumes both.
 
 Two things this does not do:
 
@@ -973,7 +972,7 @@ built for, not against the case that was easiest to write a test for.
 
 **Status:** accepted
 **Date:** 2026-08-04
-**Enacted by:** S25; S26 and S28 remain proposed
+**Enacted by:** S25; S26 enacted the next bounded structural increment
 
 Two capability increments were about to be built at Clean `1e563b9c`: a recognizer
 for the bit-decomposition shape `ofNat (mod (div (val x) (const 2^i)) (const 2))`,
@@ -1037,7 +1036,8 @@ goes stale silently.
 
 ## D026 — Preserve the narrow u64 shapes with an explicit field-size boundary
 
-**Status:** accepted
+**Status:** accepted as the S25 compatibility boundary; superseded for current
+structural lowering by D033
 
 **Date:** 2026-08-21
 
@@ -1271,3 +1271,81 @@ same-tree comparison, and a post-pin repository run. The version string is a
 compatibility check, not revision identity. `scripts/llzk/lib.sh` therefore
 does not change, and the new WTNS/R1CS output remains outside this frontend's
 claims.
+
+## D033 — Bound every u64 value and refuse an unproved `val`
+
+**Status:** accepted
+
+**Date:** 2026-08-21
+
+**Enacted by:** S26
+
+`Witgen.U64Expr` computes modulo `2^64`; LLZK's felt operations read canonical
+representatives and return a field element modulo `p`. Neither “the field holds
+a u64” nor “the field is at most 64 bits” is a sufficient lowering rule. On a
+wide field, `U64Expr.val` truncates its field operand. On a narrow field, an
+intermediate u64 value can exceed `p`; once LLZK reduces that intermediate, a
+later bitwise, shift, division, or modulo operation sees a different integer.
+
+S26 therefore admits a u64 expression only when a checked analysis proves an
+exclusive upper bound at most the configured prime. Every emitted felt
+representative is then the same integer as the corresponding u64 value;
+addition, multiplication, and left shift also cannot have wrapped modulo
+`2^64` before reaching that bound. The semantic theorem requires the backend's
+existing `CanonicalRepr` certificate: its `val_add`/`val_mul` laws are what make
+bounded u64 addition/multiplication agree with felt arithmetic. `FiniteField`
+alone would make that claim false for binary fields.
+
+There is intentionally no special “the root may reduce once” exception.
+`FiniteField.fromNat` is specified as the inverse of `val` only for naturals
+below `FiniteField.size`; above it the class imposes no reduction law. The
+concrete `F p` instance uses `Nat.cast`, but this backend's entry points are
+generic over every `FiniteField` with `CanonicalRepr`, and `CanonicalRepr` pins
+`val` without constraining `fromNat` outside its specified range. Claiming a
+root reduction would therefore make the lowering theorem false for a legal
+instance. A future, separately scoped range annotation or stronger class may
+relax this refusal; prose knowledge that today's corpus uses `F p` may not.
+
+The analysis is total and fail-closed: unsupported constructors and an
+unprovable bound return a diagnostic, never a guessed width. The theorem owned
+by `WitnessCheck.lean` states that every expression admitted by the independent
+source reader evaluates to the same field element as Clean's witness IR. A
+separate bound theorem states that every successful nested analysis evaluates
+below the bound it reports. These are the executable form of the policy; the
+prose is not a substitute for either theorem. `eval_bitsOf` separately proves
+each directly lowered decomposition cell equals Clean's `VExpr.bitsOf` value.
+
+The `val` bridge has one deliberately narrower rule. A `.val x` leaf is admitted
+only when the configured prime is at most `2^64`. `Analyze.checkField` already
+establishes that this prime is `FiniteField.size F`, and `FiniteField.val_lt`
+then proves the representative is below `2^64`, so `UInt64.ofNat` is exact. On
+bn254 and grumpkin every `.val` leaf is refused. S26 does not infer bounds from a
+`FormalCircuit`'s assumptions or constraints, and no range annotation exists in
+the witness IR, so accepting a wide-field `.val` would turn an unstated caller
+promise into the same kind of silent semantic gap D019 closed. Pure constants
+and operations not rooted in `.val` remain eligible on wide fields when their
+own bounds pass.
+
+This exposes a contradiction in S26's original acceptance text. The existing
+XOR gadgets apply `lxor` directly to `.val` leaves and carry their boolean/byte
+bounds in `FormalCircuit.Assumptions` and constraints, not in the witness IR.
+The frontend compiles only the witness IR and cannot recover those bounds. It
+can prove arbitrary `land` safe (`x &&& y ≤ x`), but it must continue to refuse
+an `lxor` or `lor` whose syntactic upper bound can reach `p`. Consequently S26
+cannot honestly make every current XOR diagnostic disappear without adding a
+range contract to the source language or performing a new constraint analysis;
+both exceed this packet. The measured coverage must record that refusal rather
+than edit the guard to the result the packet predicted.
+
+Division and modulo additionally require a denominator proved nonzero; S26
+keeps the literal nonzero denominator rule rather than pretending an upper bound
+proves positivity. Shifts require a proved amount below 64. Lean masks a u64
+shift count modulo 64, while LLZK shifts by the felt representative, so any
+unproved count is refused; left shift also carries the non-wrapping result bound
+above. A literal shift count must also be below the field prime, so its
+`felt.const` is canonical. `idx`, `localVar`, and `ite` remain refused because
+loops, let-steps, and control flow are separate increments.
+
+`VExpr.bitsOf` is not routed through `U64Expr.val`: it means the low bits of the
+full `FiniteField.val` and is lowered directly with LLZK felt shift/bit
+operations. It therefore does not weaken the wide-field `val` refusal.

@@ -17,6 +17,8 @@ corpus on purpose: adding an artifact requires choosing how it is presented. -/
 def purpose : String → Option String
   | "Multiply" => some "Minimal proved source-to-LLZK vertical slice"
   | "Decompose" => some "Accepted `felt.umod` and `felt.uintdiv` witness shapes"
+  | "LowByte" => some "Bounded `felt.bit_and` witness lowering"
+  | "Bits8" => some "First-class `bitsOf` decomposition with felt shifts"
   | "Addition8FullCarry" => some "Headline proved byte addition with a certified lookup"
   | "Passthrough" => some "Direct public output with no witness cells"
   | "ConstOut" => some "Constant public output with no witness cells"

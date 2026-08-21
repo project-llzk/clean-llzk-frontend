@@ -173,7 +173,7 @@ and on well-formed MLIR that is not valid LLZK"
 # llzk_smt_declared_reason LOGFILE
 #
 # Echoes the declared reason --llzk-to-smt-no-cf could not lower a module, or
-# nothing if the diagnostic is not one of the three known limits of LLZK 3.0.0's
+# nothing if the diagnostic is not one of the known limits of LLZK 3.0.0's
 # SMT lowering.
 #
 # Keyed on the tool's own diagnostic rather than on what the artifact contains.
@@ -199,6 +199,10 @@ llzk_smt_declared_reason() {
     case "${line}" in
       *"failed to legalize operation 'felt.uintdiv'"*|*"failed to legalize operation 'felt.umod'"*)
         reason="felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf" ;;
+      *"failed to legalize operation 'felt.bit_and'"*|*"failed to legalize operation 'felt.bit_or'"*|\
+      *"failed to legalize operation 'felt.bit_xor'"*|*"failed to legalize operation 'felt.shl'"*|\
+      *"failed to legalize operation 'felt.shr'"*)
+        reason="felt bitwise/shift operations are marked illegal by --llzk-to-smt-no-cf" ;;
       *'no prime field specified'*)
         reason="the module declares no felt type, so the pass cannot deduce a prime field" ;;
       *) return 1 ;;

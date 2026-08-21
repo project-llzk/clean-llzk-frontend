@@ -1,0 +1,35 @@
+module attributes {llzk.lang = "clean-s26-probe", llzk.main = !struct.type<@Main>} {
+  struct.def @Main {
+    struct.member @and : !felt.type<"babybear"> {llzk.pub}
+    struct.member @or : !felt.type<"babybear"> {llzk.pub}
+    struct.member @xor : !felt.type<"babybear"> {llzk.pub}
+    struct.member @shl : !felt.type<"babybear"> {llzk.pub}
+    struct.member @shr : !felt.type<"babybear"> {llzk.pub}
+
+    function.def @compute(
+      %a: !felt.type<"babybear"> {function.arg_name = "a"},
+      %b: !felt.type<"babybear"> {function.arg_name = "b"}
+    ) -> !struct.type<@Main> attributes {function.allow_non_native_field_ops} {
+      %self = struct.new : !struct.type<@Main>
+      %and = felt.bit_and %a, %b : !felt.type<"babybear">, !felt.type<"babybear">
+      %or = felt.bit_or %a, %b : !felt.type<"babybear">, !felt.type<"babybear">
+      %xor = felt.bit_xor %a, %b : !felt.type<"babybear">, !felt.type<"babybear">
+      %shl = felt.shl %a, %b : !felt.type<"babybear">, !felt.type<"babybear">
+      %shr = felt.shr %a, %b : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %self[@and] = %and : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@or] = %or : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@xor] = %xor : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@shl] = %shl : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %self[@shr] = %shr : !struct.type<@Main>, !felt.type<"babybear">
+      function.return %self : !struct.type<@Main>
+    }
+
+    function.def @constrain(
+      %self: !struct.type<@Main>,
+      %a: !felt.type<"babybear"> {function.arg_name = "a"},
+      %b: !felt.type<"babybear"> {function.arg_name = "b"}
+    ) {
+      function.return
+    }
+  }
+}

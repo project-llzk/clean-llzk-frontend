@@ -16,47 +16,47 @@ fixture — see `doc/llzk/ROADMAP.md`.
 
 Accepted today:
 
-* programs of the form `.ir [] (.lit es)` — no `let`-steps, a literal output
-  vector;
-* within an element: `.expr`, `.const`, `.add`, `.mul`, and the two u64
-  division/modulo shapes described below.
+* step-free programs with a literal output vector, plus `VExpr.bitsOf`;
+* within a field element: `.expr`, `.const`, `.add`, `.mul`, and a structurally
+  admitted `ofU64` tree whose checked bound satisfies D033.
 
 Everything else — `.native` closures, `let`-steps,
-`mapRange`/`envRange`/`bitsOf`/`append` outputs, `inv`, `ite`, `listGet`,
-`dataGet`, `hintGet`, and any other `ofU64` shape — is rejected.
+`mapRange`/`envRange`/`append` outputs, `inv`, `ite`, `listGet`, `dataGet`,
+`hintGet`, and every u64 tree whose side conditions are not proved — is
+rejected.
 
-## The two accepted u64 shapes
+## Structural u64 lowering
 
-The upstream witness IR now uses wrapping `Witgen.U64Expr`. S25 preserves the
-accepted language by recognizing only the two shapes the old backend accepted,
-and only as a unit:
+The upstream witness IR uses wrapping `Witgen.U64Expr`; LLZK felt operations
+reduce modulo the field prime. S26 replaces S25's two whole-shape matches with a
+total bound analysis and recursive lowering:
 
 ```
-ofU64 (mod (val x) (const c))  ↦  felt.umod    ⟦x⟧, felt.const c
-ofU64 (div (val x) (const c))  ↦  felt.uintdiv ⟦x⟧, felt.const c
+add/mul/div/mod        ↦  felt.add/mul/uintdiv/umod
+land/lor/lxor          ↦  felt.bit_and/bit_or/bit_xor
+shiftL/shiftR          ↦  felt.shl/shr
 ```
 
-Matching the whole shape — rather than `val`, `mod` and `ofU64` separately — is
-what keeps the accepted bridge narrow. No intermediate `U64Expr` escapes the
-pattern; the field-size boundary needed for semantic fidelity is stated below.
+Every recursively admitted result has an exclusive bound at most `p`, and
+add/mul/left-shift additionally prove that UInt64 did not wrap. A `.val` leaf is
+accepted only when `p ≤ 2^64`; this makes its `UInt64.ofNat` exact and refuses
+bn254/grumpkin `.val` rather than silently truncating. Bounds in circuit
+assumptions or constraints are intentionally invisible here because they are
+not part of the witness expression. D033 records the full theorem-or-refusal
+policy, and `WExpr.eval_ofWitgen` is its semantic theorem.
 
-Two side conditions are checked at recognition time, which is why the divisor
-must be a literal:
+Division/modulo and shift counts retain additional literal side conditions:
 
-* `c ≠ 0`. Lean's `Nat` division and modulo by zero are total (both give `0`),
-  LLZK's are not; accepting this would be a semantic difference.
+* `c ≠ 0`. Lean's natural division and modulo by zero are total (division gives
+  `0`, modulo gives the numerator), while LLZK's are not; accepting either
+  would be a semantic difference.
 * `c < p`. `felt.const c` denotes `c mod p`, so a divisor at or above the prime
   would silently become a different number.
+* A shift count is below `64`, because Lean masks the count modulo 64 and LLZK
+  does not, and below `p`, so its emitted felt constant is canonical.
 
-Given those, the lowering is faithful when `FiniteField.size F ≤ 2^64`:
-`U64Expr.val` does not truncate any representative, and the result re-enters the
-field through `FiniteField.fromNat`. This covers babybear, koalabear,
-mersenne31, and goldilocks. On bn254 and grumpkin the source bridge truncates
-while LLZK's felt operation sees the full representative; S25 records that
-semantic boundary as D026 and `WExpr.eval_ofWitgen` requires the size bound.
-
-**That last paragraph has a side condition `FiniteField` does not carry**, and
-until S18 it was not stated anywhere. `FiniteField` abstracts over prime *and*
+**The canonical-representative reading has a side condition `FiniteField` does
+not carry**, and until S18 it was not stated anywhere. `FiniteField` abstracts over prime *and*
 binary fields, and its laws — `val_lt`, `val_injective`, `val_fromNat`,
 `val_zero`, `val_one` — do not say that `val` is the *ring* representative.
 `Analyze.checkField` pins `FiniteField.size F` only, and size `p` forces
@@ -99,9 +99,7 @@ private def describeFExpr {F : Type} : Witgen.FExpr F → String
   | .add _ _ => "an addition"
   | .mul _ _ => "a multiplication"
   | .inv _ => "`inv` (field inverse); it needs `felt.inv`, which is a later increment"
-  | .ofU64 _ =>
-    "`ofU64` on a u64 expression that is not one of the two recognized \
-     division/modulo shapes"
+  | .ofU64 _ => "`ofU64` on a u64 expression whose structural bound was not proved"
   | .ite _ _ _ => "`ite` (a conditional); it needs `scf.if`, which is a later increment"
   | .listGet _ _ => "`listGet` (a constant-list read); it needs the array dialect"
   | .dataGet _ _ _ _ => "`dataGet` (a read of committed prover data)"
@@ -117,8 +115,8 @@ private def describeU64Expr {F : Type} : Witgen.U64Expr F → String
   | .localVar _ => "`localVar` (a reference to a `let`-step)"
   | .add _ _ => "a u64 addition"
   | .mul _ _ => "a u64 multiplication"
-  | .div _ _ => "a u64 division whose shape is not `div (val x) (const c)`"
-  | .mod _ _ => "a u64 modulo whose shape is not `mod (val x) (const c)`"
+  | .div _ _ => "a u64 division without a literal divisor"
+  | .mod _ _ => "a u64 modulo without a literal divisor"
   | .land _ _ => "`land` (bitwise and)"
   | .lor _ _ => "`lor` (bitwise or)"
   | .lxor _ _ => "`lxor` (bitwise exclusive or)"
@@ -144,6 +142,56 @@ private def describeBExpr {F : Type} : Witgen.BExpr F → String
 private def describeStep {F : Type} : Witgen.Step F → String
   | .letF _ => "`letF` (a field-sorted `let`-step)"
   | .letU _ => "`letU` (a u64-sorted `let`-step)"
+
+namespace U64Expr
+
+/-- The modulus of `UInt64` arithmetic. Kept as a name because the bound
+analysis and its proof must agree on exactly this boundary. -/
+def modulus : Nat := 2 ^ 64
+
+/-- A conservative exclusive upper bound for a u64 expression, or `none` when
+the syntax does not prove one compatible with structural felt lowering.
+
+This function deliberately does not inspect circuit assumptions or constraints:
+they are not part of `Witgen.U64Expr`. `val` is therefore bounded by the field
+prime only on fields whose representatives cannot be truncated at 64 bits.
+Division/modulo and shifts retain literal right operands so nonzero and
+shift-count conditions are syntactic. D033 records the policy. -/
+def upperBound {F : Type} (prime : Nat) : Witgen.U64Expr F → Option Nat
+  | .const n => some (n.toNat + 1)
+  | .val _ => if 0 < prime ∧ prime ≤ modulus then some prime else none
+  | .add a b => do
+      let ba ← upperBound prime a
+      let bb ← upperBound prime b
+      let bound := ba + bb
+      if bound ≤ modulus then some bound else none
+  | .mul a b => do
+      let ba ← upperBound prime a
+      let bb ← upperBound prime b
+      let bound := ba * bb
+      if bound ≤ modulus then some bound else none
+  | .div a (.const d) | .mod a (.const d) =>
+      if d = 0 then none else upperBound prime a
+  | .land a b => do
+      let ba ← upperBound prime a
+      let _ ← upperBound prime b
+      some ba
+  | .lor a b | .lxor a b => do
+      let _ ← upperBound prime a
+      let _ ← upperBound prime b
+      some modulus
+  | .shiftL a (.const amount) =>
+      if amount.toNat < 64 then do
+        let ba ← upperBound prime a
+        let bound := ba * 2 ^ amount.toNat
+        if bound ≤ modulus then some bound else none
+      else none
+  | .shiftR a (.const amount) =>
+      if amount.toNat < 64 then upperBound prime a else none
+  | .idx | .localVar _ | .div _ _ | .mod _ _ | .shiftL _ _ | .shiftR _ _
+  | .ite _ _ _ => none
+
+end U64Expr
 
 namespace FieldExpr
 
@@ -194,7 +242,7 @@ def checkLowerable (prime : Nat) (context : String) :
                   message := s!"constant {c} is not below the field prime {prime}; \
                                 `felt.const` reduces its operand modulo the prime, so the \
                                 emitted module would not denote what this expression says" }
-  | .add a b | .mul a b => do
+  | .add a b | .mul a b | .u64Bin _ a b => do
     checkLowerable prime context a
     checkLowerable prime context b
   | .uintdiv a d => do
@@ -204,33 +252,70 @@ def checkLowerable (prime : Nat) (context : String) :
     checkDivisor context "modulo" prime d
     checkLowerable prime context a
 
+mutual
+
 /-- Recognize a field-sorted witness expression.
 
 `.expr` delegates to `ofExpression`, which is total, so an embedded circuit
-expression is always accepted; the arithmetic constructors recurse; the two
-u64 division/modulo shapes are matched whole; everything else is refused by
-name. -/
-def ofFExpr [CanonicalRepr F] (prime : Nat) (context : String) :
-    Witgen.FExpr F → Except Diagnostic FieldExpr
-  | .expr e => .ok (ofExpression e)
-  | .const c => .ok (.const (FiniteField.val c))
-  | .add a b => return .add (← ofFExpr prime context a) (← ofFExpr prime context b)
-  | .mul a b => return .mul (← ofFExpr prime context a) (← ofFExpr prime context b)
-  | .ite c _ _ =>
-    .error { context
-             message := "unsupported witness expression: `ite` with " ++ describeBExpr c
-                        ++ "; conditionals need `scf.if`, which is a later increment" }
-  | .ofU64 (.mod (.val x) (.const c)) => do
-    checkDivisor context "modulo" prime c.toNat
-    return .umod (← ofFExpr prime context x) c.toNat
-  | .ofU64 (.div (.val x) (.const c)) => do
-    checkDivisor context "division" prime c.toNat
-    return .uintdiv (← ofFExpr prime context x) c.toNat
-  | .ofU64 n =>
-    .error { context
-             message := "unsupported witness expression: `ofU64` applied to " ++ describeU64Expr n
-                        ++ "; only the two recognized division/modulo shapes are lowered" }
-  | e => .error { context, message := "unsupported witness expression: " ++ describeFExpr e }
+expression is always accepted; the arithmetic and admitted u64 constructors
+recurse; everything else is refused by name. -/
+  def ofFExpr [CanonicalRepr F] (prime : Nat) (context : String) :
+      Witgen.FExpr F → Except Diagnostic FieldExpr
+    | .expr e => .ok (ofExpression e)
+    | .const c => .ok (.const (FiniteField.val c))
+    | .add a b => return .add (← ofFExpr prime context a) (← ofFExpr prime context b)
+    | .mul a b => return .mul (← ofFExpr prime context a) (← ofFExpr prime context b)
+    | .ite c _ _ =>
+      .error { context
+               message := "unsupported witness expression: `ite` with " ++ describeBExpr c
+                          ++ "; conditionals need `scf.if`, which is a later increment" }
+    | .ofU64 n => ofU64 prime context n
+    | e => .error { context, message := "unsupported witness expression: " ++ describeFExpr e }
+
+  /-- Structurally lower a u64 expression after D033's bound analysis has proved
+  that every result is an unreduced field representative. -/
+  private def ofU64 [CanonicalRepr F] (prime : Nat) (context : String)
+      (e : Witgen.U64Expr F) : Except Diagnostic FieldExpr := do
+    -- Preserve D011's precise divisor diagnostics. The bound theorem is valid
+    -- for Lean's total division/modulo by zero, but LLZK's operations are not,
+    -- so this operational refusal must run before a bound failure can mask it.
+    match e with
+    | .div _ (.const d) => checkDivisor context "division" prime d.toNat
+    | .mod _ (.const d) => checkDivisor context "modulo" prime d.toNat
+    | _ => pure ()
+    let some bound := U64Expr.upperBound prime e
+      | throw { context
+                message := "unsupported witness expression: `ofU64` applied to "
+                  ++ describeU64Expr e ++ "; no safe structural u64 bound was proved" }
+    if bound > prime then
+      throw { context
+              message := "unsupported witness expression: `ofU64` applied to "
+                ++ describeU64Expr e ++ s!"; its proved exclusive upper bound {bound} exceeds "
+                ++ s!"the field prime {prime}, so LLZK could reduce an intermediate differently" }
+    match e with
+    | .const n => return .const n.toNat
+    | .val x => ofFExpr prime context x
+    | .add a b => return .add (← ofU64 prime context a) (← ofU64 prime context b)
+    | .mul a b => return .mul (← ofU64 prime context a) (← ofU64 prime context b)
+    | .div a (.const d) => do
+      checkDivisor context "division" prime d.toNat
+      return .uintdiv (← ofU64 prime context a) d.toNat
+    | .mod a (.const d) => do
+      checkDivisor context "modulo" prime d.toNat
+      return .umod (← ofU64 prime context a) d.toNat
+    | .land a b => return .u64Bin .bitAnd (← ofU64 prime context a) (← ofU64 prime context b)
+    | .lor a b => return .u64Bin .bitOr (← ofU64 prime context a) (← ofU64 prime context b)
+    | .lxor a b => return .u64Bin .bitXor (← ofU64 prime context a) (← ofU64 prime context b)
+    | .shiftL a (.const amount) =>
+      return .u64Bin .shl (← ofU64 prime context a) (.const amount.toNat)
+    | .shiftR a (.const amount) =>
+      return .u64Bin .shr (← ofU64 prime context a) (.const amount.toNat)
+    | _ =>
+      throw { context
+              message := "unsupported witness expression: `ofU64` applied to "
+                ++ describeU64Expr e ++ "; the structural side condition was not proved" }
+
+end
 
 end FieldExpr
 
@@ -262,10 +347,14 @@ private def ofVExpr [CanonicalRepr F] (prime : Nat) (context : String) :
     .error { context
              message := "witness output is an `envRange`; only literal output vectors are \
                          supported" }
-  | _, .bitsOf _ =>
-    .error { context
-             message := "witness output is a `bitsOf`; structural bit decomposition is S26, \
-                         not part of this compatibility bump" }
+  | n, .bitsOf x => do
+    if n > prime then
+      throw { context
+              message := s!"witness output is a `bitsOf` of width {n}, which exceeds the field \
+                          prime {prime}; an emitted shift-index constant would reduce" }
+    let value ← FieldExpr.ofFExpr prime context x
+    return (Array.range n).map fun i =>
+      .u64Bin .bitAnd (.u64Bin .shr value (.const i)) (.const 1)
 
 /-- Reject a cell that reads a circuit variable its own block allocates.
 

@@ -33,6 +33,17 @@ open LLZK.Examples
 
 abbrev Bab := F pBabybear
 
+/-! ## D033's width boundary
+
+These guards use a payload type with no field instance so they test the total
+syntax analysis itself, not a registry field or the emitter around it. A `.val`
+leaf is exact at the `2^64` boundary and refused immediately above it. -/
+
+private def syntheticVal : Witgen.U64Expr Nat := .val (.const 0)
+
+#guard U64Expr.upperBound (2 ^ 64) syntheticVal == some (2 ^ 64)
+#guard (U64Expr.upperBound (2 ^ 64 + 1) syntheticVal).isNone
+
 private def source (inputSize : Nat) (operations : List (FlatOperation Bab))
     (outputs : Array (Expression Bab) := #[]) : Source Bab :=
   { inputSize, operations, outputs }
@@ -48,11 +59,15 @@ private def cross (cfg : CertifiedConfig Bab) (built reference : Source Bab) : B
 
 private def mulSrc : Source Bab := Compilable.source multiply
 private def decSrc : Source Bab := Compilable.source decompose
+private def lowByteSrc : Source Bab := Compilable.source lowByte
+private def bits8Src : Source Bab := Compilable.source bits8
 private def addSrc : Source Bab :=
   Compilable.source (Gadgets.Addition8FullCarry.circuit (p := pBabybear))
 
 #guard cross babybear mulSrc mulSrc
 #guard cross babybear decSrc decSrc
+#guard cross babybear lowByteSrc lowByteSrc
+#guard cross babybear bits8Src bits8Src
 #guard cross babybear (Compilable.source passthrough) (Compilable.source passthrough)
 #guard cross babybear (Compilable.source constOut) (Compilable.source constOut)
 #guard cross withBytes addSrc addSrc
@@ -65,6 +80,8 @@ private def shape (src : Source Bab) : Option (Nat × Nat) :=
 
 #guard shape mulSrc == some (1, 1)
 #guard shape decSrc == some (2, 2)
+#guard shape lowByteSrc == some (1, 1)
+#guard shape bits8Src == some (8, 8)
 #guard shape addSrc == some (2, 2)
 #guard shape (Compilable.source passthrough) == some (0, 1)
 #guard shape (Compilable.source constOut) == some (0, 1)
@@ -81,6 +98,10 @@ private def dbl : Source Bab := source 1 [wit (.add x x)] #[.var ⟨1⟩]
 private def mod256 : Source Bab := source 1 [wit (.ofU64 (.mod (.val x) (.const 256)))] #[.var ⟨1⟩]
 private def mod128 : Source Bab := source 1 [wit (.ofU64 (.mod (.val x) (.const 128)))] #[.var ⟨1⟩]
 private def div256 : Source Bab := source 1 [wit (.ofU64 (.div (.val x) (.const 256)))] #[.var ⟨1⟩]
+private def and255 : Source Bab :=
+  source 1 [wit (.ofU64 (.land (.val x) (.const 255)))] #[.var ⟨1⟩]
+private def and127 : Source Bab :=
+  source 1 [wit (.ofU64 (.land (.val x) (.const 127)))] #[.var ⟨1⟩]
 private def twoCells : Source Bab :=
   source 1 [.witness 2 (.ir [] (.lit #v[.mul x x, .add x x]))] #[.var ⟨1⟩, .var ⟨2⟩]
 private def twoCellsSwapped : Source Bab :=
@@ -90,6 +111,7 @@ private def outConst : Source Bab := source 1 [wit (.mul x x)] #[.const 7]
 -- Baselines, so that a red below cannot be explained by everything being red.
 #guard cross babybear sq sq
 #guard cross babybear mod256 mod256
+#guard cross babybear and255 and255
 #guard cross babybear twoCells twoCells
 
 -- A wrong operation.
@@ -98,6 +120,8 @@ private def outConst : Source Bab := source 1 [wit (.mul x x)] #[.const 7]
 #guard !cross babybear mod256 mod128
 -- `umod` where `uintdiv` belongs.
 #guard !cross babybear mod256 div256
+-- A wrong bitwise operand.
+#guard !cross babybear and255 and127
 -- Cells in the wrong order.
 #guard !cross babybear twoCells twoCellsSwapped
 -- A wrong output.
