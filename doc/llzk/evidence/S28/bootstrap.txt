@@ -1,0 +1,61 @@
+S28 session bootstrap
+Date: 2026-08-21
+
+Frontend branch point:
+  91d43ffd0b4dcfd0841cc97f402b2d6006c58358
+  Record the S26 bounded U64 gates
+
+Branch:
+  clean-to-llzk/s28-multicolumn-tables
+
+Worktree ownership:
+  session S28 — S28 multi-column lookup tables bootstrap
+
+Accepted inputs inherited unchanged from S26:
+  Clean: 0e53b9f2d05f06defa2aa0a859f549b611583f10
+  LLZK:  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Prerequisite:
+  S26 implementation commit 8951f016673921c724b53b3ea3e2013345e1255c;
+  final S26 evidence tip 91d43ffd is the S28 branch point;
+  S26 G0-G12 passed at the implementation commit.
+
+Bootstrap checks:
+  scripts/llzk/check-pins.sh: PASS
+  scripts/llzk/doctor.sh --require-llzk: PASS
+  exact S26 evidence tip: PASS
+  worktree lock: held by S28
+
+Accepted LLZK tools checked by doctor:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen
+
+Boundary/backlog audit prompted during bootstrap:
+  - XOR range evidence is a real upstream Clean enhancement candidate. Clean
+    issue #429 and PR #442 moved witness naturals to u64 and discuss the range
+    question, but the resulting witness IR carries no exporter-visible bound.
+    The local controls are D033, GAPS section 8, coverage guards, and exact
+    negative fixtures. No focused follow-up upstream issue currently tracks the
+    downstream range-certificate need.
+  - Shift counts are not an upstream defect. Clean intentionally masks u64
+    counts modulo 64, while LLZK's felt shift consumes the supplied count.
+    D033 therefore owns the adapter refusal for counts at least 64 and unproved
+    dynamic counts. A future masked-lowering feature is local work if demanded.
+  - The fork alexanderlhicks/clean has GitHub Issues disabled, so it cannot be
+    the external backlog. No issue was opened by this bootstrap.
+
+The S28 packet now assigns each of those boundaries an owner and ROADMAP.md
+defines the common tracking rule: decision, executable negative fixture,
+assurance-gap entry where applicable, and roadmap owner; an external issue is
+added only when the missing capability belongs upstream.
+
+Bootstrap changed documentation and this evidence record only. It made no LLZK
+syntax or representation decision, changed no Lean source, table certificate,
+corpus entry, fixture, golden, expected gate count, pin, or CI input, ran no
+toolchain build or compatibility gate, opened no issue, and performed no push
+or other external-state mutation.
+
+The first S28 implementation action is the packet's mandatory design work:
+probe exact pinned-LLZK nested-array, array.new, and multi-dimensional
+constrain.in syntax, then settle the row-preserving IR and generic certificate
+statement before writing lowering code.

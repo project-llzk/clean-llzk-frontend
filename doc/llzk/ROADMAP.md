@@ -29,7 +29,7 @@ public documentation and hygiene
   → S25: current upstream Clean and Lean (done locally)
   → L0: review or advance the LLZK toolchain pin (done locally)
   → S26: bounded structural U64 and `bitsOf` (done locally)
-  → S28: multi-column lookup tables and certificates
+  → S28: multi-column lookup tables and certificates (bootstrapped)
   → witness-range contract or proved constraint-to-witness bounds for XOR
   → end-to-end Xor32 plus one composed bitwise gadget
   → frozen-candidate adversarial review
@@ -176,6 +176,33 @@ loop increment *and* a `goldilocks`/`bn254` instantiation.
 One smaller observation worth keeping: `Keccak256.Theta` produced 450
 diagnostics rather than stopping at the first — D009's non-cascading property
 working at a scale nothing had tested it at.
+
+## Capability-boundary tracking
+
+Starting with S28, a capability boundary carried across sessions is tracked in
+four places, each with a different job:
+
+1. `DECISIONS.md` states the semantic reason and the policy.
+2. An exact negative fixture makes its reachable refusal executable.
+3. `GAPS.md` records any assurance consequence that remains after refusal.
+4. This roadmap assigns the next owner, or records that no implementation is
+   currently scheduled.
+
+An external issue is added only when the missing capability belongs to an
+upstream project; it is a cross-reference, not a replacement for those local
+controls. The current u64-related boundaries are:
+
+| boundary | local authority | owner / issue state |
+|---|---|---|
+| XOR byte bounds are invisible to witness lowering | D033, GAPS §8, coverage and exact negative fixtures | Clean source/range-analysis enhancement; [Clean #429](https://github.com/Verified-zkEVM/clean/issues/429) and [PR #442](https://github.com/Verified-zkEVM/clean/pull/442) explain the prior u64 migration but do not provide exporter-visible evidence. A focused follow-up issue is warranted and not yet opened. |
+| shift counts at least 64 or dynamically unproved | D033 and exact shift-count fixtures | Intentional adapter refusal: Clean masks modulo 64 while LLZK consumes the felt count. Not an upstream bug; schedule a local masked-lowering increment only if needed. |
+| multi-column static lookup rows | D013 and table refusal fixtures | S28, active from S26 evidence tip `91d43ffd`. |
+| wide-field `.val` | D033 and GAPS §8 | Resolved for the current contract by refusal; general support shares the range-contract/limb-design owner above. |
+
+This register should be updated in the same commit whenever a refusal is added,
+retired, or changes owner. It prevents a sound refusal from becoming an
+unowned “later” item while keeping semantic mismatches from being mislabeled as
+upstream defects.
 
 ## Critical path
 

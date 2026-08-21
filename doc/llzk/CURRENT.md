@@ -63,8 +63,9 @@ G0-G12 with identical counts and declared diagnostics. D032 advances the
 accepted LLZK pin to `25fb3740`; the comparison and theorem audit are in
 `evidence/L0/`. The required post-pin run passed on clean commit `5fe8f465`.
 
-Current session: **S26** — bootstrapped 2026-08-21 from final L0 evidence tip
-`884d5b1c`. D033 now makes the width/field and `U64Expr.val` bridge executable:
+Latest completed capability session: **S26** — bootstrapped 2026-08-21 from
+final L0 evidence tip `884d5b1c`. D033 makes the width/field and
+`U64Expr.val` bridge executable:
 every admitted u64 value is proved below the field prime, narrow-field `.val`
 is exact, and wide-field `.val` is refused. Structural lowering and the
 independent G9 reader cover bounded add/mul/div/mod, bitwise operations, literal
@@ -75,9 +76,17 @@ sweep removes `And8`'s `land` diagnostic but retains XOR diagnostics whose byte
 bounds exist only outside witness IR. G0-G12 passed on clean implementation
 commit `8951f016`; evidence is in `evidence/S26/`.
 
+Current session: **S28** — bootstrapped 2026-08-21 from final S26 evidence tip
+`91d43ffd0b4dcfd0841cc97f402b2d6006c58358`. Its scope is to retire D013 with
+row-preserving multi-column tables and certificates, then demonstrate `And8`
+end to end. The mandatory pinned-LLZK syntax probe and row/certificate decision
+come before lowering. No S28 syntax decision, lowering, certificate change,
+corpus change, build, compatibility gate, push, or external issue creation has
+occurred.
+
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s26-witness-u64` (S26 capability work)
+Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 bootstrap)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -339,6 +348,9 @@ an explicit decision, which was given.
   measured coverage update are implemented and G0-G12 are green on `8951f016`.
 - Decision complete: D033 settles the width/field policy and `U64Expr.val`
   bridge as a recursively proved bound plus explicit refusal.
+- In progress: **S28 bootstrap only**, from final S26 evidence tip `91d43ffd`.
+  D013's row encoding, exact LLZK syntax, generic certificate statement, and
+  65536×3 scale result remain undecided; implementation has not begun.
 - Blocked: none.
 
 ## Last green gates
@@ -482,7 +494,7 @@ needs SMT-LIB that no pass in the pinned `llzk-opt` produces.
   problem" and G1 goes red on a tree that is correct. It succeeded on retry with
   nothing changed. `evidence/S24/clean-checkout.md` finding 4.
 
-## Next session
+## Active session and handoff sequence
 
 **Claim the worktree first** — `bash scripts/llzk/worktree-lock.sh claim "..."`,
 and set `LLZK_SESSION` if you are an agent session, or the claim will not survive
@@ -490,7 +502,7 @@ your next command. `e2e.sh` refuses without it. If the tree already carries a
 finished session's lock, `status` will say whether `reclaim` needs `--from`
 (D024). Three sessions collided on 2026-08-01; `CONCURRENCY.md` records the cost.
 
-## The next sessions, as R7 corrected them
+## The capability sessions, as R7 corrected them
 
 Bootstrapped 2026-08-04; **R7 falsified parts of all three packets against the
 primary sources before execution** (R7-08…11), and the corrections are written
@@ -512,8 +524,8 @@ where capability grows; S28 is where the *library* does.
 ## Roadmap after R7
 
 Stage 1 is finished, reproduced, and reviewed three times by sessions that did
-not write it. What remains sorts into five tracks. Nothing below is *in
-progress*; these are the choices.
+not write it. What remains sorts into five tracks. S28 is currently active at
+bootstrap; the rest are choices or dependent follow-ups.
 
 **The two milestones, stated in the grant's terms.** Milestone 1 — one Clean
 circuit compiled through the whole LLZK pipeline, validated end to end — is
@@ -648,9 +660,10 @@ Deliverable 2a visible as D026 rather than letting green gates hide the weakened
 theorem domain. L0 advanced the LLZK input to exact SHA `25fb3740` after the old
 and new tools passed the unchanged same-tree matrix. **S26 is implemented
 locally**: D033, structural lowering, direct `bitsOf`, proofs, corpus, and
-remeasured coverage are in place. After its committed gate/handoff come **S28**
-(multi-column tables), a witness-visible range contract for the XOR family, and
-the witness-IR loop increment. S27 remains returned for re-scoping (R7-09).
+remeasured coverage are in place. **S28 is now bootstrapped** for multi-column
+tables; after its decision, implementation, and gate/handoff come a
+witness-visible range contract for the XOR family and the witness-IR loop
+increment. S27 remains returned for re-scoping (R7-09).
 
 The assurance track's A5 renderer and A7 copy-canonicalisation items are now
 done: the on-disk constraint surface has the second line of defense R7-02 called
