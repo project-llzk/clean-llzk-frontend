@@ -51,9 +51,9 @@ pin remains an explicit decision boundary
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/publication-hygiene` (security reporting,
-pull-request evidence, and reviewed organization settings on top of the checked
-showcase; no pin, capability, or external-state change)
+Active working branch: `clean-to-llzk/l0-preflight` (read-only inventory and
+same-tree decision packet for the future LLZK tool-pin review; no pin,
+capability, Nix build, or external-state change)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -73,6 +73,12 @@ transforms, analysis, and `llzk-witgen`, not only unrelated backends. The
 3.0.0 pin remains accepted and reproducible; public readiness adds an isolated
 L0 review after S25 to decide whether to retain it or advance it and rerun the
 full compatibility matrix.
+
+L0 preflight is now complete without building or accepting a candidate. The
+25-commit delta is frozen at `25fb3740`, classified across syntax, product,
+SMT, memory, and witness-generation surfaces, and converted into a same-tree
+old-versus-candidate procedure in `sessions/L0-review-llzk-pin.md`. Its execution
+still follows S25 so both toolchains see the actual post-alignment frontend.
 
 ## Accepted pins
 

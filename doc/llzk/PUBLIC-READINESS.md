@@ -122,7 +122,7 @@ example increment.
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
 | Upstream Clean alignment | pending explicit pin decision | S25 |
-| LLZK pin review | not started | live `main` is 25 commits ahead; isolate after S25 |
+| LLZK pin review | preflight complete; execution waits for S25 | `sessions/L0-review-llzk-pin.md`; exact 25-commit risk inventory and same-tree matrix |
 | Structural bitwise witness IR | pending S25 | S26 |
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |

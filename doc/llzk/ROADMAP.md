@@ -37,6 +37,8 @@ public documentation and hygiene
 This order joins the three goals that matter for publication. S25 removes the
 stale Clean foundation; L0 decides against a measured 25-commit LLZK delta
 rather than silently treating either the old pin or moving `main` as canonical;
+a read-only L0 preflight has frozen and classified that delta in
+`sessions/L0-review-llzk-pin.md`; the compatibility matrix still runs after S25.
 A5 has already strengthened the one artifact boundary every pinned LLZK binary
 accepts without checking semantic content; A7 removed the remaining
 inspection-only premise from copy canonicalisation. S26 plus S28 turns measured

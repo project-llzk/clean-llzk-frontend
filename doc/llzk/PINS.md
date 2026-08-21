@@ -18,8 +18,10 @@ LLZK pin. The changed surface includes core transforms, analysis,
 than v2.1.2 even though the pinned build identifies itself as LLZK 3.0.0, so a
 tag comparison is not a sufficient update policy. L0 in
 `PUBLIC-READINESS.md` will either retain this known reproducible pin or advance
-it through a separate full-gate compatibility session. Until that decision,
-the table above remains authoritative.
+it through a separate full-gate compatibility session. Its read-only delta
+inventory and same-tree decision procedure are prepared in
+`sessions/L0-review-llzk-pin.md`. Until that decision, the table above remains
+authoritative.
 
 ## Clean repository
 
