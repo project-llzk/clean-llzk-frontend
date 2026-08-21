@@ -24,8 +24,8 @@ pin remains an explicit decision boundary
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/public-readiness` (documentation and
-repository hygiene only; no pin or capability change yet)
+Active working branch: `clean-to-llzk/a5-renderer-roundtrip` (A5 assurance work
+on top of the public-readiness documentation; no pin or capability change)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -265,9 +265,9 @@ an explicit decision, which was given.
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
     constraint system.
-- In progress: public-readiness P0 — root introduction, frontend document map,
-  contribution guidance, and a release-candidate acceptance contract on
-  `clean-to-llzk/public-readiness`.
+- In progress: A5 — fail-closed textual round trip for the three statement forms
+  unique to `@constrain`. Targeted Lean builds and all corpus emission pass;
+  the full G0-G12 run is the remaining acceptance evidence.
 - Decision pending: authorize S25's move of the accepted Clean base from
   `1e563b9c` / Lean 4.30.0 to `0e53b9f2` / Lean 4.32.2. This is not a technical
   blocker; the project control plane reserves pin changes for an explicit
@@ -336,14 +336,10 @@ closed): lookup table rows are asserted by the caller and not checked (D012 —
 and the `ConstraintSet.globals` conjunct that claimed to close this is a
 tautology; S24 closed the *erasure* half, so the certificate reaches the
 compiler, and R7 tied it to the table's *name*, but not to the circuit's own
-table); `Module.render` is outside every theorem, uncovered for `@constrain` —
-R6 narrowed the hazard to the three `Stmt` forms that appear only in
-`@constrain`, and R7 measured how alone the emit-time check is (an empty
-`@constrain` body passes every binary gate including the SMT lowering); and
-`FieldExpr.lower_spec` is satisfied by five grossly wrong lowerings and does
-not compose. (§4 was on this list until A1 closed it; §3 until A2 —
+table); and `FieldExpr.lower_spec` is satisfied by five grossly wrong lowerings
+and does not compose. (§4 was on this list until A1 closed it; §3 until A2 —
 `spec_of_compile`, with R7-12's correction of what its lookup hypothesis says;
-§6 until A4.)
+§6 until A4; §2 until A5's checked textual constraint-surface round trip.)
 
 The lookup side, which R4a-6 found had no semantic theorem, has one:
 `Lookups.ofSource_lookups_iff`, the counterpart of `ofSource_eqs_iff`. This
@@ -491,11 +487,11 @@ order they are written in there.
    going red. It shook out one real defect in the tests: a `#guard` checked every
    corpus module against a hard-coded babybear, which is wrong for five of the six
    `Square_*` entries — `Corpus.Entry` now carries its `FieldSpec`.
-5. **§2 — the renderer.** R6 narrowed it: `readMember`, `constrainEq` and
-   `constrainIn` are the three `Stmt` forms emitted only into `@constrain`, so
-   they are the only ones no gate covers, and both verified mutations are in
-   them. A parser back to `Module` over just those three, with a round-trip
-   theorem, would close it — with the usual question of what checks the parser.
+5. **§2 — done (A5).** The supported renderer parses `readMember`,
+   `constrainEq` and `constrainIn` back from the concrete `@constrain` function,
+   compares them with the typed module, and refuses mismatches before text is
+   returned. The theorem and five red controls are in `Print.lean` and
+   `Test/Print.lean`. D017 remains separate.
 6. **§5 / D021 — the preservation theorem.** Turning D018's translation
    validation into a verified translator. R5a-4's three obstructions say the
    *reader* has to be restated before `lower_spec` can be lifted through the
@@ -564,7 +560,7 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1, A2, A4 and B are done, and R7 revalidated all of it.** The next thing is
+**A1, A2, A4, A5 and B are done; R7 revalidated everything through A4.** The next thing is
 still **S25**, the upstream alignment — the pin is now five weeks stale, the
 witness IR underneath us has been rebuilt (D025), and upstream has not moved
 past `0e53b9f2` (checked 2026-08-09) — but execute it *as R7 corrected it*:

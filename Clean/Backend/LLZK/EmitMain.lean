@@ -46,8 +46,13 @@ private def emitEntry (directory : System.FilePath) (entry : Corpus.Entry) : IO 
     return true
   | .ok m =>
     let path := directory / (entry.name ++ ".llzk")
-    IO.FS.writeFile path m.render
-    IO.println s!"wrote {path}"
+    match m.render with
+    | .error d =>
+      IO.eprintln s!"error: {entry.name} did not pass the renderer round-trip check: {d.render}"
+      return true
+    | .ok text =>
+      IO.FS.writeFile path text
+      IO.println s!"wrote {path}"
   for ((inputs, expected), i) in entry.vectors.zipIdx do
     match expected with
     | .error d =>
@@ -70,9 +75,14 @@ private def emitSyntaxFixture (directory : System.FilePath)
     return true
   | .ok m =>
     let path := directory / (name ++ ".llzk")
-    IO.FS.writeFile path m.render
-    IO.println s!"wrote {path}"
-    return false
+    match m.render with
+    | .error d =>
+      IO.eprintln s!"error: renderer fixture {name} failed its round-trip check: {d.render}"
+      return true
+    | .ok text =>
+      IO.FS.writeFile path text
+      IO.println s!"wrote {path}"
+      return false
 
 /-- Write the whole corpus, or report every entry that failed. -/
 def emitCorpus (directory : System.FilePath) : IO UInt32 := do

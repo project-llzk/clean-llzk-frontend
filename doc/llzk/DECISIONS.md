@@ -1049,3 +1049,33 @@ Prefer the descriptive repository unless preserving the GitHub fork relation is
 explicitly required. Creating the repository, changing remotes, pushing,
 transferring, and organization settings remain reserved for a separate explicit
 publication decision under `ORCHESTRATION.md` section 11.
+
+## D028 — Fail closed after reading the rendered constraint surface back
+
+**Status:** accepted
+
+**Date:** 2026-08-21
+
+**Enacted by:** A5
+
+G9 compares the typed `Module` with the Clean source before rendering. R6 and R7
+demonstrated the remaining seam: the renderer could redirect a member read,
+drop every `constrain.eq`, or emit an empty `@constrain`, and every pinned LLZK
+binary gate would remain green. The toolchain checks well-formedness, not that
+the concrete constraint program is the typed one G9 approved.
+
+The supported renderer now reads back exactly the three statement forms unique
+to that surface: `struct.readm`, `constrain.eq`, and `constrain.in`. The reader
+extracts SSA indices, the member name, operand order, and complete rendered type
+syntax from inside the concrete `@constrain` function. The type reader rebuilds
+`Ty` rather than sharing `Ty.render`, so a field-name or nested-array rendering
+bug does not affect both sides of the comparison. `Module.render` returns an
+`Except` and releases text only when the extracted sequence equals the typed
+projection; `EmitMain` and `renderResult` both go through it.
+
+The theorem `Module.render_constraintSurface` states the enforced round trip.
+Direct parser controls and five mutations make its success premise non-vacuous
+and its failure direction visible. This closes GAPS section 2 at the backend's
+concrete-text seam without claiming a formal LLZK semantics: D017 remains, and a
+future constraint-only statement constructor must extend this reader or reopen
+the claim.

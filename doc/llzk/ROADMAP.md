@@ -260,10 +260,11 @@ file.
   D022) — but the caller picks both sides of `Certifies`, because `Table.toRaw`
   erased which `Table` a `RawTable` came from. GAPS.md item 1's second half; the
   fix is upstream in Clean's core.
-- **Nothing proves the renderer.** GAPS.md item 2, with the counterexample R6
-  verified. R7 sharpened why this matters: the toolchain gates certify nothing
-  about `@constrain` content (a module with an *empty* `@constrain` body passes
-  G3–G6 and both G10 halves), so the emit-time Lean comparison is the artifact's
-  only line of defense, and a parser back to `Module` would be its second.
+- **The protected renderer surface now reads back (A5).** R6 and R7 showed why
+  this mattered: the toolchain gates certify nothing about `@constrain` content.
+  `RenderCheck.parse` is now the second line of defense, and
+  `Module.render_constraintSurface` ties every successfully returned text to the
+  typed module's `readMember`, `constrainEq`, and `constrainIn` sequence. This
+  closes GAPS item 2 without closing D017's assumption about LLZK semantics.
 - **The corpus is chosen, not exhaustive.** `Addition8FullCarry` is now tested
   outside its `Assumptions` (three of its nine vectors, S19).

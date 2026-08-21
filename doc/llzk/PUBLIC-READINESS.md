@@ -109,13 +109,13 @@ miss.
 | Area | State | Evidence or next action |
 |---|---|---|
 | Stage-1 vertical slice | complete locally | `CURRENT.md`, R7, G0-G12; fork CI is seven commits behind |
-| Public landing page and document map | in progress | this branch |
+| Public landing page and document map | complete locally | commit `109083ab`; final review still required |
 | Upstream Clean alignment | pending explicit pin decision | S25 |
 | LLZK pin review | not started | live `main` is 25 commits ahead; isolate after S25 |
 | Structural bitwise witness IR | pending S25 | S26 |
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |
-| Renderer round-trip assurance | not started | A5 / `GAPS.md` section 2 |
+| Renderer round-trip assurance | implemented; full gates pending | A5 / `Module.render_constraintSurface` |
 | Final frozen-tree review | not started | R8 |
 | Organization access | available | active `project-llzk` admin verified 2026-08-21 |
 | Publication | not authorized | separate final action |

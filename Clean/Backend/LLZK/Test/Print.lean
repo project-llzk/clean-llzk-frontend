@@ -81,4 +81,72 @@ info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
 #guard_msgs in
 #eval IO.print (renderResult (RendererFixture.emptyModule.mapError (#[·])))
 
+/-! ## A5 — the rendered constraint surface reads back
+
+The three direct parser controls make the concrete grammar visible here rather
+than trusting only the renderer's own output. The module controls then pin both
+directions a gate needs: the real fixture succeeds, while each mutation R6/R7
+showed the LLZK binaries accept is refused by the Lean-side round trip.
+-/
+
+#guard RenderCheck.parseStmt
+    "%v3 = struct.readm %v0[@w0] : !struct.type<@Main>, !felt.type<\"babybear\">" =
+  some (.readMember 3 0 "w0" (.struct "Main") (.felt "babybear"))
+
+#guard RenderCheck.parseStmt
+    "constrain.eq %v4, %v1 : !felt.type<\"babybear\">, !felt.type<\"babybear\">" =
+  some (.constrainEq 4 1 (.felt "babybear") (.felt "babybear"))
+
+#guard RenderCheck.parseStmt
+    "constrain.in %v5, %v3 : !array.type<4 x !felt.type<\"babybear\">>, \
+      !felt.type<\"babybear\">" =
+  some (.constrainIn 5 3 (.array 4 (.felt "babybear")) (.felt "babybear"))
+
+#guard RenderCheck.parseTy
+  "!array.type<2 x !array.type<4 x !felt.type<\"babybear\">>>" =
+    some (.array 2 (.array 4 (.felt "babybear")))
+
+private def renderedDemo : Option (Module × String) := do
+  let m ← RendererFixture.demoModule.toOption
+  let text ← m.render.toOption
+  return (m, text)
+
+#guard renderedDemo.isSome
+
+private def rejectsMutation (old replacement : String) : Bool :=
+  match renderedDemo with
+  | none => false
+  | some (m, text) =>
+    let changed := text.replace old replacement
+    if changed = text then false
+    else match RenderCheck.check m changed with | .error _ => true | .ok _ => false
+
+-- R6's same-typed member-alias mutation.
+#guard rejectsMutation
+  "%v4 = struct.readm %v0[@out0]"
+  "%v4 = struct.readm %v0[@w0]"
+
+-- R2's empty/deleted-equation control, reached through the renderer.
+#guard rejectsMutation
+  "      constrain.eq %v4, %v1 : !felt.type<\"babybear\">, !felt.type<\"babybear\">\n"
+  ""
+
+-- A dropped lookup constraint, the third constraint-only statement form.
+#guard rejectsMutation
+  "      constrain.in %v5, %v3 : !array.type<4 x !felt.type<\"babybear\">>, \
+    !felt.type<\"babybear\">\n"
+  ""
+
+-- The reader also ties the surface to the `@constrain` function, not merely to
+-- the sequence of protected lines somewhere in the module.
+#guard rejectsMutation
+  "function.def @constrain("
+  "function.def @not_constrain("
+
+-- A type-rendering mutation must not share `Ty.render` on both sides of the
+-- check. The textual reader reconstructs the original typed AST independently.
+#guard rejectsMutation
+  "constrain.eq %v4, %v1 : !felt.type<\"babybear\">, !felt.type<\"babybear\">"
+  "constrain.eq %v4, %v1 : !felt.type<\"bn254\">, !felt.type<\"bn254\">"
+
 end LLZK.Test.Print

@@ -72,15 +72,15 @@ certify a table the circuit does not look into, and `Gadgets.ByteTable`'s
 certificate is the reason to believe the corpus is not doing that, not a proof
 that no caller could.
 
-## 2. Nothing says the renderer is faithful
+## 2. Nothing said the renderer was faithful — **closed by A5**
 
-`emit = renderResult (compile …)`. Every theorem in this backend stops at the
-`Module`. `Module.render` is outside all of them.
+Before A5, `emit = renderResult (compile …)`: every semantic theorem stopped at
+the `Module`, and `Module.render` was outside all of them.
 
-For `@compute` this is covered empirically: G5–G7 execute the rendered text
+For `@compute` this was covered empirically: G5–G7 execute the rendered text
 through two independent LLZK backends and compare against Clean, so a renderer
-bug there shows up as a differential failure. **For `@constrain` nothing covers
-it.**
+bug there shows up as a differential failure. **For `@constrain` nothing
+covered it.**
 
 **R5e's counterexample for this was wrong, and R6 ran it.** It said a
 `Stmt.render` that swapped `constrain.in`'s operands would pass G3 and G4. It
@@ -104,10 +104,10 @@ where the differential lives. R6 verified two, again on
   reached through the renderer rather than through the lowering, and G9 cannot
   see it because G9 compares `Module`s.
 
-So the closing conditions are unchanged: either a parser back to `Module` (a
+The closing condition was therefore a parser back from the protected text (a
 second reader, with the usual question of what checks *it*) or a semantic account
-of the concrete syntax, which is item 3. What changed is that the entry now names
-a hazard the toolchain demonstrably does not catch, rather than one it does.
+of the concrete syntax, which is item 7. The entry names a hazard the toolchain
+demonstrably does not catch, rather than one it does.
 
 R7 measured how alone this leaves the emit-time comparison: a module whose
 `@constrain` body is *empty*, one with a constraint deleted, and one demanding
@@ -123,10 +123,30 @@ content and field correctness each rest on a *single* Lean-side check with no
 independent downstream confirmation, which is the strongest argument this file
 has for the parser.
 
-The renderer is a deterministic fold, so equal modules trivially render to
-equal strings — nothing in `Print.lean` proves anything, and an earlier version
-of this entry said it did (R7-16). The hazard is unequal modules rendering to
-equal text, or text LLZK reads differently from how the `Module` meant it.
+**A5 closes the internal renderer gap.** `RenderCheck.parse` reads
+`struct.readm`, `constrain.eq`, and `constrain.in` from the concrete text inside
+the rendered `@constrain` function and compares their SSA indices, member names,
+operand order, and types reconstructed independently from the concrete syntax
+with a projection of the typed IR. It also checks the function boundary, so
+moving the same lines into
+`@compute` is not an agreement. `Module.render` now returns `Except`; no
+supported artifact path receives text unless this comparison succeeds, and
+`EmitMain` reports a diagnostic rather than writing a partial artifact.
+
+`Module.render_constraintSurface` proves that every successfully returned text
+parses to exactly the typed module's protected surface. `Test/Print.lean` makes
+success non-vacuous on both renderer fixtures and makes the check go red for a
+same-typed member substitution, a dropped equality, a dropped lookup, a renamed
+`@constrain` function, and a changed field type. The full corpus also passes
+through the checked renderer before G3-G10 see it.
+
+What this does **not** close is D017: the parser establishes what concrete text
+the backend wrote, not that LLZK's implementation gives that text the semantics
+Clean assumes. It is deliberately not a general LLZK parser either; the
+`@compute` surface retains its two-backend differential evidence, while every
+other rendered form remains covered by typed construction, goldens, and
+`llzk-opt` well-formedness. A new constraint-only statement constructor must be
+added to `RenderCheck.ConstraintStmt` or the assurance claim must be reopened.
 
 ## 3. The chain from the emitted constraints to a gadget's `Spec` — **closed by A2**
 

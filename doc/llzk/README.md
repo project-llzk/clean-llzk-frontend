@@ -14,8 +14,10 @@ has four assurance layers:
    specifications.
 2. The frontend compares the typed module's constraints and witness program
    with the flattened Clean circuit before returning it.
-3. `llzk-opt` parses, verifies, round-trips, and analyzes each emitted artifact.
-4. Both `llzk-witgen` backends are checked against Clean's witness interpreter
+3. The rendered `@constrain` surface is parsed back and compared with the typed
+   module before artifact text is returned.
+4. `llzk-opt` parses, verifies, round-trips, and analyzes each emitted artifact.
+5. Both `llzk-witgen` backends are checked against Clean's witness interpreter
    over a boundary-oriented input corpus.
 
 Stage 1 demonstrates that chain on `Addition8FullCarry`. The conformance corpus
@@ -74,6 +76,7 @@ artifacts, so its output is attributable only when one session owns the tree.
 
 The strongest established generic result is that, subject to the named lookup
 hypothesis and the gadget's assumptions, satisfaction of the compiled typed
-module's constraints implies the gadget's `Spec`. The renderer and LLZK's
-concrete semantics remain outside that Lean theorem. `GAPS.md` is authoritative
-if a summary and a boundary ever disagree.
+module's constraints implies the gadget's `Spec`. A separate renderer theorem
+ties its protected constraint surface to the typed module. LLZK's concrete
+semantics remain outside both Lean theorems. `GAPS.md` is authoritative if a
+summary and a boundary ever disagree.

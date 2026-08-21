@@ -7,7 +7,7 @@ accumulated gates from a clean checkout.
 |---|---|
 | G0 — State | Correct worktree/branch, exact pins, clean or documented status |
 | G1 — Lean | Targeted Lean compilation/tests; broader build when required |
-| G2 — Golden | Deterministic text equals the reviewed fixture |
+| G2 — Renderer | Deterministic text equals the reviewed fixture; the protected constraint surface parses back to the typed IR |
 | G3 — LLZK verify | Pinned `llzk-opt` parses and verifies |
 | G4 — Round trip | Pinned `llzk-opt --verify-roundtrip` succeeds |
 | G5 — Interpreter | Pinned witgen interpreter produces the expected witness |
@@ -62,6 +62,14 @@ The emitter also writes `<output-directory>/syntax/`: the renderer fixtures from
 them and no input vectors. G3/G4 run over them. That is the repair for R2-04 —
 the renderer golden had never been shown to a tool and was in fact invalid LLZK,
 while its own docstring claimed `e2e.sh` fed it to `llzk-opt`.
+
+Since A5, `Module.render` is itself fail-closed. It parses `struct.readm`,
+`constrain.eq`, and `constrain.in` from the rendered `@constrain` function and
+compares them with the typed module before returning text. The round-trip
+theorem is `Module.render_constraintSurface`; `Test/Print.lean` pins direct
+parses and five red mutations, including the member-alias and dropped-constraint
+changes the LLZK binaries accept. Thus G2 now covers semantic constraint-surface
+drift as well as byte drift.
 
 There is deliberately no `#emit_llzk` macro. `#eval IO.print (LLZK.emit cfg
 "Name" circuit)` already does that job — the golden tests use exactly that form —
