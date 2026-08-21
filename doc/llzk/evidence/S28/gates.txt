@@ -1,0 +1,59 @@
+S28 multi-column lookup-table gate evidence
+Date: 2026-08-22
+
+Clean committed tree under test:
+  03bf2f9b57cee9fae66d9ada2c8460101040ebe2
+  Implement S28 multi-column lookup tables
+
+Base evidence tip:
+  91d43ffd0b4dcfd0841cc97f402b2d6006c58358
+
+Repository-accepted LLZK source:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Nix output:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+Worktree:
+  clean; held by LLZK_SESSION=S28
+
+Command:
+  LLZK_SESSION=S28 \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result: exit 0
+
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+    15 circuit(s), 51 input vector(s), both witgen backends.
+    2 renderer fixture(s), syntax only.
+    G9: 9 source-backed modules; 6 registry modules not applicable.
+    G10a: all 15 + 2 module(s) admitted by --llzk-product-program.
+    G10b: 10 module(s) lowered to SMT, 7 out of scope for a declared reason.
+
+The new And8 module parsed, verified, round-tripped, entered the product-program
+pipeline, and matched Clean on all six recorded vectors through both
+llzk-witgen backends. Its SMT failure was the exact pinned-tool diagnostic that
+the bitwise operation is illegal under --llzk-to-smt-no-cf.
+
+G9 reconstructed and compared ordered lookup-polynomial rows and nested static
+table rows for every source-backed module. Its split-row, swapped-column, and
+regrouped-global controls remained red. G2 independently read back global.def,
+array.new, and the constraint surface; malformed row construction and wrong
+field types remained red. G11 exercised all 53 harness error paths.
+
+The only Lean warnings were the ten inherited upstream
+Clean/Utils/Test/TestCircuitProofStart.lean sorries already documented by S25.
+G0 proved Clean core byte-identical to the accepted upstream base.
+
+Committed theorem command:
+  lake env lean doc/llzk/evidence/S28/probe.lean
+
+Result: exit 0. The generic row/certificate and renderer theorems use only:
+  [propext, Classical.choice, Quot.sound]
+
+The concrete And8 lookup/spec chain additionally inherits the existing
+Babybear native_decide field facts and And8's upstream bv_decide identity. No
+probed theorem depends on sorryAx, and no S28 theorem introduces a new
+unrecorded axiom.

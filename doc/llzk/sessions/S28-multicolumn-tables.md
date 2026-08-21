@@ -221,7 +221,7 @@ contributes six.
 
 All changed backend test targets pass with `--wfail`. Direct scale measurements
 are in `evidence/S28/scale.md`; the coverage delta is in
-`evidence/S28/coverage.md`. The remaining acceptance sequence is deliberately
-separate: commit this implementation/evidence tree, run the theorem probe and
-full pinned G0-G12 suite on that clean commit, record `gates.txt`, then perform
-the requested adversarial review against the frozen result.
+`evidence/S28/coverage.md`. The implementation was frozen as `03bf2f9b`; the
+committed theorem probe and full pinned G0-G12 suite both passed on that clean
+tree, as recorded in `evidence/S28/gates.txt`. The requested post-completion
+adversarial review now runs against that frozen result.

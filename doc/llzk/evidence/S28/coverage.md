@@ -29,4 +29,5 @@ entries to 15 / 51 / 9. The new `And8` vectors are:
 
 The last two lie outside the gadget assumptions and therefore test compute
 agreement only; the first four cover byte boundaries. Both LLZK witness
-backends are required to match Clean on all six by the final G0-G12 run.
+backends matched Clean on all six in the final G0-G12 run recorded in
+`gates.txt`.

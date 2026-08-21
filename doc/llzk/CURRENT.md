@@ -1,6 +1,6 @@
 # Clean → LLZK current state
 
-Updated: 2026-08-21
+Updated: 2026-08-22
 
 Active milestone: **public-ready Clean to LLZK release candidate** — make the
 repository suitable for an organization-owned home under `project-llzk`, with a
@@ -76,7 +76,7 @@ sweep removes `And8`'s `land` diagnostic but retains XOR diagnostics whose byte
 bounds exist only outside witness IR. G0-G12 passed on clean implementation
 commit `8951f016`; evidence is in `evidence/S26/`.
 
-Current session: **S28** — bootstrapped 2026-08-21 from final S26 evidence tip
+Latest completed capability session: **S28** — bootstrapped 2026-08-21 from final S26 evidence tip
 `91d43ffd0b4dcfd0841cc97f402b2d6006c58358`. Its scope is to retire D013 with
 row-preserving multi-column tables and certificates, then demonstrate `And8`
 end to end. The mandatory pinned-LLZK syntax probe and row/certificate decision
@@ -86,13 +86,14 @@ wide-field `.val` refusal fixture; its targeted warning-free build passed, with
 evidence in `evidence/S28/pre-implementation-review.txt`. D034 is now
 implemented: the IR, renderer, recognizer, G9 readers, and certificate chain all
 preserve ordered rows; the full `ByteXorTable` is certified; and `And8` is the
-fifteenth corpus artifact with six vectors. Targeted warning-free Lean builds
-and direct pinned-tool scale probes pass. Final G0-G12 acceptance remains; no
-push or external issue creation has occurred.
+fifteenth corpus artifact with six vectors. G0-G12 passed on clean
+implementation commit `03bf2f9b`; scale and theorem evidence are in
+`evidence/S28/`. The requested post-completion adversarial review is in
+progress; no push or external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 acceptance pending)
+Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 accepted; adversarial review in progress)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -176,9 +177,9 @@ commands with `LLZK_SESSION=<label>`** — each command there is its own POSIX
 session, so the default identity does not survive from the claim to the run.
 `doc/llzk/CONCURRENCY.md` has the why.
 
-Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 14 circuits, 45
+Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 15 circuits, 51
 input vectors, both witgen backends, and 2 renderer fixtures. G10a must admit all
-16 modules; G10b's exact accepted/refused split is recorded by the latest gate
+17 modules; G10b's exact accepted/refused split is recorded by the latest gate
 evidence rather than inferred from the corpus count.
 
 CI is *configured* to run G0, G11 and G12 on every pull request, and G1–G10 in
@@ -355,41 +356,41 @@ an explicit decision, which was given.
   measured coverage update are implemented and G0-G12 are green on `8951f016`.
 - Decision complete: D033 settles the width/field policy and `U64Expr.val`
   bridge as a recursively proved bound plus explicit refusal.
-- In progress: **S28 acceptance**, from final S26 evidence tip `91d43ffd`. D034
-  settles the exact syntax and row/certificate model; implementation, the full
-  65536×3 certificate, `And8` corpus entry, targeted tests, and direct scale
-  probes are complete. A clean implementation commit, full G0-G12 run, and
-  post-completion adversarial review remain.
+- Completed locally: **S28**, from final S26 evidence tip `91d43ffd`. D034,
+  row-preserving multi-column lowering/readback, the full 65536×3 certificate,
+  and the six-vector `And8` corpus entry are green on `03bf2f9b`.
+- In progress: the requested post-completion adversarial review of that frozen
+  S28 result.
 - Blocked: none.
 
 ## Last green gates
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete run: S26, clean implementation commit
-`8951f016673921c724b53b3ea3e2013345e1255c`; see `evidence/S26/gates.txt`.
-All G0-G12 passed. The S26 axiom probe covers the bound, structural witness,
-direct `bitsOf`, IR-lowering, and verified-compile agreement theorems with no
-`sorryAx`.
+Latest complete run: S28, clean implementation commit
+`03bf2f9b57cee9fae66d9ada2c8460101040ebe2`; see `evidence/S28/gates.txt`.
+All G0-G12 passed. The S28 axiom probe covers row injectivity, generic and
+concrete certificates, renderer readback, and the And8 lookup/spec chain with
+no `sorryAx`.
 
 | Gate | Result |
 |---|---|
 | G0 state and pins | PASS — and since R6 it also fails on any change to Clean's core outside `Clean/Backend/LLZK/`, `Clean.lean` and `Clean/Test.lean` |
 | G1 lint + `lake build --wfail Clean` + `lake build CleanTests` | PASS |
-| G2 renderer: goldens plus checked constraint-surface round trip | PASS — 2 renderer fixtures, 14 corpus modules, 5 red mutations |
-| G3 `llzk-opt` parse and verify | PASS — 14 modules + 2 fixtures |
-| G4 `llzk-opt --verify-roundtrip` | PASS — 14 modules + 2 fixtures |
-| G5 `llzk-witgen` interpreter | PASS — 45 vectors |
-| G6 `llzk-witgen` execution engine | PASS — 45 vectors |
+| G2 renderer: goldens plus checked constraint-surface round trip | PASS — 2 renderer fixtures, 15 corpus modules, including nested-table red mutations |
+| G3 `llzk-opt` parse and verify | PASS — 15 modules + 2 fixtures |
+| G4 `llzk-opt --verify-roundtrip` | PASS — 15 modules + 2 fixtures |
+| G5 `llzk-witgen` interpreter | PASS — 51 vectors |
+| G6 `llzk-witgen` execution engine | PASS — 51 vectors |
 | G7 both backends vs Clean's own interpreter | PASS — carried by `--check-output` |
 | G8 fail closed | PASS — exact negative fixtures include the new bound, shift-count, dynamic-operand, index, and oversized-`bitsOf` refusals, plus tool-version rejection |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
-| G10a LLZK analysis pipeline admits the module | PASS — all 16 |
+| G10a LLZK analysis pipeline admits the module | PASS — all 17 |
 | G11 the harness's own error paths | PASS — 53 exercised, including the worktree lock's opaque-owner branches, R7's uncommitted-core-edit branch of G0 (R7-01), and ten CI dependency/permission/benchmark/cache policy controls |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |
-| G10b SMT lowering | PASS — 10 lowered, 6 out of scope for a declared reason |
+| G10b SMT lowering | PASS — 10 lowered, 7 out of scope for a declared reason |
 
 Every gate is checked to be falsifiable, and the checks are part of the gate
 rather than notes about it:
@@ -454,7 +455,7 @@ toolchain, and no formal LLZK semantics in Lean, so the assumption that
 `constrain.eq` is equality and `constrain.in` is membership has no empirical
 check and cannot acquire one here. Closing it means formalising LLZK, which is
 VeIR's project (D003). The `@compute` half of the same reading *does* have
-evidence: 45 vectors across two independent LLZK backends (39 with a Clean
+evidence: 51 vectors across two independent LLZK backends (45 with a Clean
 circuit behind them), plus S26's direct bitwise/shift probes.
 
 **S20 — the preservation theorem — exists, and is much smaller than this section
@@ -533,8 +534,8 @@ where capability grows; S28 is where the *library* does.
 ## Roadmap after R7
 
 Stage 1 is finished, reproduced, and reviewed three times by sessions that did
-not write it. What remains sorts into five tracks. S28 is currently at final
-acceptance; the rest are choices or dependent follow-ups.
+not write it. What remains sorts into five tracks. S28 is accepted and under
+its requested post-completion review; the rest are choices or dependent follow-ups.
 
 **The two milestones, stated in the grant's terms.** Milestone 1 — one Clean
 circuit compiled through the whole LLZK pipeline, validated end to end — is
@@ -623,8 +624,8 @@ one negative fixture):
   exact; `bitsOf` lowers directly. This removes `And8`'s `land` refusal and adds
   lookup-free `LowByte`/`Bits8` corpus entries, while correctly retaining XOR
   rows whose range evidence is outside witness IR.
-- **Multi-column tables** (D013 superseded by D034) — **S28, implemented; final
-  acceptance pending**. Ordered `array.new` rows, multi-dimensional
+- **Multi-column tables** (D013 superseded by D034) — **S28, accepted locally**.
+  Ordered `array.new` rows, multi-dimensional
   `constrain.in`, row-preserving G9, and certification at 65536×3 unlock `And8`.
 - **A range contract visible to witness lowering** before claiming end-to-end
   Xor32/Keccak/BLAKE3: either source annotations or a proved constraint
@@ -668,8 +669,8 @@ Deliverable 2a visible as D026 rather than letting green gates hide the weakened
 theorem domain. L0 advanced the LLZK input to exact SHA `25fb3740` after the old
 and new tools passed the unchanged same-tree matrix. **S26 is implemented
 locally**: D033, structural lowering, direct `bitsOf`, proofs, corpus, and
-remeasured coverage are in place. **S28 is now bootstrapped** for multi-column
-tables; after its decision, implementation, and gate/handoff come a
+remeasured coverage are in place. **S28 is green on its clean implementation
+commit**; after its post-completion review come a
 witness-visible range contract for the XOR family and the witness-IR loop
 increment. S27 remains returned for re-scoping (R7-09).
 

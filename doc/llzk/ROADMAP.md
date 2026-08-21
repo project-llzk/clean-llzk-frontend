@@ -29,7 +29,7 @@ public documentation and hygiene
   → S25: current upstream Clean and Lean (done locally)
   → L0: review or advance the LLZK toolchain pin (done locally)
   → S26: bounded structural U64 and `bitsOf` (done locally)
-  → S28: multi-column lookup tables and certificates (bootstrapped)
+  → S28: multi-column lookup tables and certificates (complete locally)
   → witness-range contract or proved constraint-to-witness bounds for XOR
   → end-to-end Xor32 plus one composed bitwise gadget
   → frozen-candidate adversarial review

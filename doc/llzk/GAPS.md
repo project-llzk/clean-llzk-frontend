@@ -308,8 +308,8 @@ bitwise/shift operations, `constrain.eq`, and `constrain.in` *mean* is a reading
 of LLZK's documentation and its tools' behaviour, not a theorem. There is no
 formal semantics of LLZK in Lean; producing one is VeIR's project (D003).
 
-The `@compute` half has real evidence: 45 vectors across two independent LLZK
-backends (39 with a Clean circuit behind them, 6 on the `Square_*` registry
+The `@compute` half has real evidence: 51 vectors across two independent LLZK
+backends (45 with a Clean circuit behind them, 6 on the `Square_*` registry
 entries whose expected values are computed in Lean), plus S26's direct probes
 of every exact bitwise/shift spelling and R5c's all-field confirmation of the
 `umod`/`uintdiv` reading. **The `@constrain` half has none**, and cannot acquire
