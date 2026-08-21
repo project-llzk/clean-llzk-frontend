@@ -1,6 +1,6 @@
 # S25 — Align with upstream Clean and Lean 4.32.2
 
-Status: in progress; authorized and merged 2026-08-21, full gates pending
+Status: complete locally on 2026-08-21; not pushed or integrated
 Depends on: R7 (landed, `97390fac`); nothing else
 Base public-readiness commit: `805f2a07`
 Worktree: `/home/alh/LLZK/clean-llzk-frontend`
@@ -259,9 +259,23 @@ Also re-run the axiom check; the bump must not add axioms:
 
 ## Handoff
 
-- Changes made:
-- Decisions made:
-- Deviations:
-- Blockers:
-- Resulting commit:
-- Exact next action: `doc/llzk/sessions/S26-witness-u64.md`
+- Changes made: fetched and conflict-free merged upstream `0e53b9f2`; moved to
+  Lean 4.32.2; adapted the backend from `NExpr`/`ofNat`/`letN` to
+  `U64Expr`/`ofU64`/`letU`; made `flt`, `bit`, `envRange`, `bitsOf`, and `letU`
+  explicit red paths; repaired the 4.32 overlapping-instance linter finding
+  without suppression; rechecked the VeIR seam.
+- Decisions made: D026 preserves the narrow accepted syntax and adds
+  `FiniteField.size F ≤ 2^64` to `WExpr.eval_ofWitgen`. The theorem covers the
+  four small registry fields, not bn254/grumpkin `val`-rooted div/mod witnesses.
+  D003 remains non-blocking because its measured dialect gap remains even though
+  Clean's toolchain mismatch lapsed.
+- Deviations: none from the capability boundary. The packet's old direct S26
+  handoff is superseded by the public-readiness roadmap's prepared L0 LLZK-pin
+  review.
+- Blockers: none.
+- Resulting implementation commit:
+  `6ccca6f862f3fdb13c8d418849aacb98e9841287`.
+- Evidence: `doc/llzk/evidence/S25/`; G0-G12 passed, 12 circuits, 33
+  vectors on both witgen backends, 2 renderer fixtures, G10a 14/14, G10b 10/4,
+  G11 53; the theorem audit has no `sorryAx`.
+- Exact next action: `doc/llzk/sessions/L0-review-llzk-pin.md`.

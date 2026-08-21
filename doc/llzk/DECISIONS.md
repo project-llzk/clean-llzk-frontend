@@ -48,12 +48,14 @@ removing the binding dialect gap.
 
 ## D004 — Fail closed on source semantics
 
-**Status:** accepted  
+**Status:** accepted; witness-arithmetic basis amended by S25/D026
 **Date:** 2026-07-31
 
-Clean's `NExpr` denotes unbounded natural arithmetic and is not generally field
-arithmetic. Stage 1 recognizes only the explicitly justified Addition8
-division/modulo shapes and rejects other natural expressions.
+Clean's current `U64Expr` is wrapping u64 arithmetic and is not generally field
+arithmetic. The frontend recognizes only the two explicitly justified
+Addition8 division/modulo shapes and rejects other u64 expressions. D026 states
+the additional `size ≤ 2^64` boundary introduced by the new truncating `val`
+bridge; the pre-S25 decision used unbounded `NExpr` instead.
 
 Lookup tables use an explicit backend registry because `RawTable` does not
 retain concrete static rows.
@@ -1080,11 +1082,13 @@ builds a release candidate. The intended public destination is an
 organization-owned repository under `project-llzk`, where it can be listed with
 the Circom, Halo2/PLONKish, Airbender, and Noir frontends.
 
-Moving early would make repository ownership look settled while the code still
-rests on a stale Clean base, has only one proved headline example in the full
-external-tool corpus, and leaves the renderer's constraint-only statements with
-one line of defense. Repository transfer is therefore an exit action, not a way
-to create the milestone.
+Moving early would have made repository ownership look settled while the code
+still rested on a stale Clean base, had only one proved headline example in the
+full external-tool corpus, and left the renderer's constraint-only statements
+with one line of defense. S25 and A5 have since closed the first and third
+conditions; the impactful-example and final-review requirements remain.
+Repository transfer is therefore still an exit action, not a way to create the
+milestone.
 
 The release candidate must satisfy `PUBLIC-READINESS.md`: current upstream
 Clean alignment, an explicit review of the moving LLZK pin, an end-to-end

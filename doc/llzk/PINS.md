@@ -72,7 +72,8 @@ checker rejects a history that no longer contains it. S25 fetched
 `Verified-zkEVM/clean` on 2026-08-21 and confirmed `upstream/main` still resolved
 to this exact 2026-08-04 merge commit before accepting it; the prior
 `1e563b9c27991b3795eb440c1ee0757edb4ce8b1` base remains provenance, not an
-accepted input.
+accepted input. Fetch, merge, constructor-diff, and full-gate evidence are in
+`evidence/S25/`.
 
 ## LLZK tools
 

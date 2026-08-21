@@ -1,0 +1,26 @@
+S25 dependency provenance
+Checked: 2026-08-21
+
+Fetch command:
+  git fetch upstream --prune
+
+Remote:
+  git@github.com:Verified-zkEVM/clean.git
+
+Fetched upstream/main:
+  0e53b9f2d05f06defa2aa0a859f549b611583f10
+  2026-08-04T18:10:28+02:00
+  Merge pull request #443 from Verified-zkEVM/bump-lean-4.32.2
+
+Distance from previous accepted base:
+  70 commits after 1e563b9c27991b3795eb440c1ee0757edb4ce8b1
+
+Merge:
+  conflict-free merge into clean-to-llzk/bump-4.32.2
+  c862ad159c5c01d3e7c0590d55f55b62baa4d3f0
+
+Compatibility implementation:
+  6ccca6f862f3fdb13c8d418849aacb98e9841287
+
+No push, repository transfer, remote mutation, LLZK pin change, or organization
+setting change was performed.

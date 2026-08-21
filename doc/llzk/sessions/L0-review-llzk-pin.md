@@ -1,10 +1,10 @@
 # L0 — Review or advance the LLZK toolchain pin
 
-Status: preflight complete; execution is next after S25's evidence commit
+Status: ready to execute; S25 completed locally on 2026-08-21
 
 Depends on: S25 landed with G0-G12 green
 
-Base integration commit: S25's resulting commit
+Base frontend commit: `6ccca6f862f3fdb13c8d418849aacb98e9841287`
 
 Branch: a new `clean-to-llzk/l0-llzk-pin` branch from the post-S25 tree
 

@@ -1,0 +1,58 @@
+S25 upstream-alignment gate evidence
+Date: 2026-08-21
+Implementation commit under test: 6ccca6f862f3fdb13c8d418849aacb98e9841287
+Merged upstream base: 0e53b9f2d05f06defa2aa0a859f549b611583f10
+Lean toolchain: leanprover/lean4:v4.32.2
+LLZK source pin: 5db6f8f9baaa40787a1a40625796497445f2da36
+LLZK tool version: 3.0.0
+
+Command:
+  LLZK_SESSION=S25 \
+  LLZK_OPT=<accepted-nix-output>/bin/llzk-opt \
+  LLZK_WITGEN=<accepted-nix-output>/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+The captured run was made from the clean implementation commit and completed in
+20.7 seconds with exit status 0.
+
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  12 circuit(s), 33 input vector(s), both witgen backends.
+  2 renderer fixture(s), syntax only.
+  G10a: all 12 + 2 module(s) admitted by --llzk-product-program.
+  G10b: 10 module(s) lowered to SMT, 4 out of scope for a declared reason.
+
+Additional results from that run:
+  G0: Clean core byte-identical to 0e53b9f2 outside the backend and the two
+      registration files; exact upstream remote and Lean toolchain accepted.
+  G1: `lake build --wfail Clean` and `lake build CleanTests` passed.
+  G2: 12 corpus modules, 33 vectors, and 2 renderer fixtures emitted.
+  G3/G4: all 14 modules parsed, verified, and round-tripped.
+  G5/G6/G7: both llzk-witgen backends matched Clean on every vector.
+  G8: 34 exact negative fixtures compile, including explicit rejections for
+      letU, envRange, bitsOf, BExpr.flt, and BExpr.bit.
+  G9: both source readers agree with every emitted source-backed module.
+  G11: 53 harness error paths exercised.
+  G12: every gate-skipping entry point remains confined.
+  CI input policy: 15 immutable action references accepted.
+
+`CleanTests` replays ten `sorry` warnings from upstream's
+`Clean/Utils/Test/TestCircuitProofStart.lean`. G0 proves that file is
+byte-identical to the accepted upstream base; the frontend did not add or edit
+those declarations. The warning-free production target, `lake build --wfail
+Clean`, passed.
+
+Axiom audit, run with a temporary uncommitted probe and then removed:
+
+  'LLZK.spec_of_compile' depends on axioms:
+    [propext, Classical.choice, Quot.sound]
+  'LLZK.ofSource_lookups_iff' depends on axioms:
+    [propext, Classical.choice, Quot.sound]
+  'LLZK.WExpr.eval_ofWitgen' depends on axioms:
+    [propext, Classical.choice, Quot.sound]
+
+No theorem above depends on `sorryAx`. The printed witness theorem includes:
+
+  (hsize : FiniteField.size F <= 2 ^ 64)
+
+That premise is the deliberate D026 boundary; green executable gates do not
+erase it.

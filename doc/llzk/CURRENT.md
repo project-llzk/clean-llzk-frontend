@@ -11,13 +11,14 @@ three times, and reproduced by R7; all gates were green against the pinned tools
 and in CI, and the pipeline milestone (a Clean circuit compiled, validated, and
 its emitted constraints proved to imply the gadget's `Spec`) stands.
 
-Last accepted session: R7 — a five-surface adversarial review of the finished
-Stage 1 *and of the plan*. The formal chain held; the coverage headline
-(R7-05), two of the three bootstrapped session packets (R7-08, R7-09), and G0's
-blindness to the working tree (R7-01) did not. All findings repaired in the
-same session; the coverage sweep is now a checked test
-(`Test/Coverage.lean`), `CertifiedTable` carries a name tie, and S28
-(multi-column tables) joined the critical path  
+Last accepted session: **S25** — upstream Clean was fetched and accepted at
+`0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
+Compatibility commit `6ccca6f8` preserves the accepted frontend subset, makes
+all new witness-IR constructors fail closed with named diagnostics, and records
+the real `U64Expr.val` truncation boundary as D026. G0-G12 passed; evidence
+is in `evidence/S25/`. No branch was pushed and the integration branch remains
+untouched.
+
 Latest completed assurance session: **A7** — copy canonicalisation is now an
 explicit `CopyCanon.run` used by `WitnessSet.ofSource`.
 `CopyCanon.step_preserves` proves the single-cell update and `run_preserves`
@@ -55,11 +56,10 @@ including ten controls for these policies. Full G0-G12 passed on clean commit
 `9b809e32`; evidence is in `evidence/P0/ci-hardening.txt`. The workflows have
 not run remotely at this commit, and no external state changed.
 
-Current session: **S25** — authorized 2026-08-21. The exact fetched upstream
-head remains `0e53b9f2` / Lean 4.32.2. The merge is isolated on the bump branch;
-the backend and `CleanTests` compile, the new constructors have explicit red
-paths, and D026 records the `U64Expr.val` theorem boundary. Full G0-G12 evidence
-is still required before the session is complete.
+Next session: **L0** — `sessions/L0-review-llzk-pin.md`. Its read-only preflight
+is complete and its same-tree compatibility procedure now has the frozen S25
+frontend commit `6ccca6f8` as its baseline. L0 must separately decide whether to
+retain the accepted LLZK 3.0 tool pin or advance it; S25 did neither.
 
 Integration branch: `clean-to-llzk/integration`
 
@@ -81,15 +81,14 @@ Dependency state, also verified 2026-08-21: Clean upstream remains exactly
 `0e53b9f2`, now S25's accepted base. LLZK `main` is `25fb3740`, 25 commits
 ahead of the accepted `5db6f8f9` tool pin. The delta touches LLZK core
 transforms, analysis, and `llzk-witgen`, not only unrelated backends. The
-3.0.0 pin remains accepted and reproducible; public readiness adds an isolated
-L0 review after S25 to decide whether to retain it or advance it and rerun the
-full compatibility matrix.
+3.0.0 pin remains accepted and reproducible. The isolated L0 review now decides
+whether to retain it or advance it and rerun the full compatibility matrix.
 
 L0 preflight is complete without building or accepting a candidate. The
 25-commit delta is frozen at `25fb3740`, classified across syntax, product,
 SMT, memory, and witness-generation surfaces, and converted into a same-tree
 old-versus-candidate procedure in `sessions/L0-review-llzk-pin.md`. Its execution
-is the next critical-path session after S25 closes.
+is the next critical-path session.
 
 ## Accepted pins
 
@@ -301,7 +300,8 @@ an explicit decision, which was given.
     upstream `U64Expr.val` truncates (R7-08); S27's premises were false three
     ways — GF(2) not bn254, no bitwise ops, real blocker `letF` (R7-09); G0
     never looked at the working tree it certified (R7-01, fixed + G11 case);
-    three refusal paths had no fixture (fixed, 29 now); `CertifiedTable` had no
+    three refusal paths had no fixture (fixed, 29 before S25 and 34 now);
+    `CertifiedTable` had no
     name tie, leaving `spec_of_compile`'s lookup hypothesis incomparable with
     module satisfaction under swapped names (R7-12, fixed with
     `name_certifies`); the coverage sweep was unreproducible (fixed —
@@ -317,8 +317,8 @@ an explicit decision, which was given.
     reconstructed types and the function boundary, before releasing an
     artifact. `Module.render_constraintSurface` states the generic round trip;
     five mutations make it red. G0-G12 passed on clean commit `28132f64`.
-- In progress: **S25**, authorized and merged; compatibility implementation and
-  focused builds are green, with the committed full G0-G12 run still pending.
+- In progress: none. S25 is complete locally on implementation commit
+  `6ccca6f8`; its evidence-only handoff commit does not change executable code.
 - Decision pending: none for the Clean pin. L0 will make the separate LLZK pin
   decision on the frozen post-S25 tree.
 - Blocked: none.
@@ -327,11 +327,11 @@ an explicit decision, which was given.
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete run: public showcase, clean commit
-`b16bb83ead9d9fc8dabfcda4a2d9da2db2e765a5`; see
-`evidence/P0/showcase.txt`. The A7 theorem probe remains part of the same tree
-and reports only `propext` and `Quot.sound` for both copy-canonicalisation
-invariants.
+Latest complete run: S25, clean implementation commit
+`6ccca6f862f3fdb13c8d418849aacb98e9841287`; see `evidence/S25/gates.txt`.
+All G0-G12 passed. The S25 axiom probe reports only `propext`,
+`Classical.choice`, and `Quot.sound` for `spec_of_compile`,
+`ofSource_lookups_iff`, and `WExpr.eval_ofWitgen`, with no `sorryAx`.
 
 | Gate | Result |
 |---|---|
@@ -621,11 +621,11 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1, A2, A4, A5, A7, B, and the S25 implementation are done.** S25 fetched and
-merged the unchanged `0e53b9f2` head, preserved the narrow accepted subset, and
-made Deliverable 2a visible as D026 rather than letting green gates hide the
-weakened theorem domain. After its full gate evidence is committed, the next
-thing is **L0**, the prepared same-tree LLZK pin review. Then come **S26**
+**A1, A2, A4, A5, A7, B, and S25 are done.** S25 fetched and merged the
+unchanged `0e53b9f2` head, preserved the narrow accepted subset, and made
+Deliverable 2a visible as D026 rather than letting green gates hide the weakened
+theorem domain. The next thing is **L0**, the prepared same-tree LLZK pin review.
+Then come **S26**
 (bitwise + `ite`, with the val bridge in its decision entry), **S28**
 (multi-column tables and the actual library unlock), and the witness-IR loop
 increment. S27 remains returned for re-scoping (R7-09).

@@ -124,8 +124,8 @@ example increment.
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
 | CI supply-chain policy | complete locally | commit `9b809e32`; immutable action SHAs, fixed Ubuntu/Rust/Nix-cache inputs, 53 G11 controls; organization CI still required on the frozen SHA |
-| Upstream Clean alignment | implementation complete; full evidence pending | S25; `0e53b9f2` / Lean 4.32.2, D026 recorded |
-| LLZK pin review | preflight complete; next after S25 evidence | `sessions/L0-review-llzk-pin.md`; exact 25-commit risk inventory and same-tree matrix |
+| Upstream Clean alignment | complete locally | S25; G0-G12 on `6ccca6f8`, `evidence/S25/`; `0e53b9f2` / Lean 4.32.2, D026 recorded |
+| LLZK pin review | preflight complete; ready to execute | `sessions/L0-review-llzk-pin.md`; exact 25-commit risk inventory and same-tree matrix |
 | Structural bitwise witness IR | pending L0 | S26 |
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |
