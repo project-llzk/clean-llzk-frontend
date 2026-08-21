@@ -72,11 +72,22 @@ run on an older staging-fork commit is not publication evidence.
 - Enable GitHub private vulnerability reporting before announcing the
   repository; `SECURITY.md` directs reporters to it.
 - Enable dependency-graph and Dependabot security alerts.
-- Set the default `GITHUB_TOKEN` permission to read-only. Workflows that need
-  more already declare job-level permissions.
-- Keep Actions restricted to GitHub-authored and explicitly reviewed actions;
-  pinning third-party actions by digest is a later hardening decision, not
-  silently implied here.
+- Keep the default `GITHUB_TOKEN` permission read-only. The main CI workflow
+  declares that default in-repository; opt-in workflows declare their minimal
+  job-level writes.
+- Preserve the full action commit SHAs recorded in `PINS.md`, the
+  `ubuntu-24.04` hosted-runner label, and Rust `1.98.0`.
+- Preserve the LLZK job's exact public substituter/key and `--max-jobs 0`; the
+  frozen organization run must prove it can download the accepted output
+  anonymously rather than fall back to a source build.
+- Run `scripts/llzk/check-actions-pinned.sh` after any workflow change. A release
+  label in a comment is not a dependency pin.
+- Leave the repository variable `CLEAN_BENCH_ENABLED` unset. The two self-hosted
+  benchmark jobs execute pull-request code in a Docker container with network
+  access and persistent caches; their Docker base and elan bootstrap also need
+  immutable provenance. Enable them only after a named runner owner reviews the
+  container image, network, cache isolation, cleanup, and host exposure. They
+  are not required release checks.
 - Preserve secret scanning if it is available to the organization.
 
 ## Publication procedure
@@ -88,8 +99,9 @@ Only after S25, L0, S26, S28, promoted headline examples, and R8 are complete:
 3. Create or transfer the repository and apply the metadata above.
 4. Push the frozen history and make `main` the protected default branch.
 5. Enable private vulnerability reporting and the security features above.
-6. Run all four required CI jobs on the frozen SHA in the organization
-   repository; do not reuse staging-fork status.
+6. With self-hosted benchmarking still disabled, run all four required CI jobs
+   on the frozen SHA in the organization repository; do not reuse staging-fork
+   status.
 7. Add the organization-profile link and verify the README, security form,
    contribution links, badges, and generated showcase anonymously.
 8. Record the resulting repository URL, protection state, CI run, and release

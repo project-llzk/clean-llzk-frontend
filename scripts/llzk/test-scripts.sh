@@ -133,6 +133,128 @@ expect "happy path" 0 "pin check:  PASS" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
 echo
+echo "== check-actions-pinned.sh =="
+
+mkdir -p "${workdir}/actions-mutable"
+cat > "${workdir}/actions-mutable/ci.yml" <<'YAML'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+YAML
+expect "a mutable action tag is caught" 1 "mutable action reference" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-mutable"
+
+mkdir -p "${workdir}/actions-pinned"
+cat > "${workdir}/actions-pinned/ci.yml" <<'YAML'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: ./local-action
+YAML
+expect "immutable and local actions are accepted" 0 "2 immutable action reference" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-pinned"
+
+mkdir -p "${workdir}/actions-moving-runner"
+cat > "${workdir}/actions-moving-runner/ci.yml" <<'YAML'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+YAML
+expect "a moving hosted runner label is caught" 1 "moving hosted runner label" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-moving-runner"
+
+mkdir -p "${workdir}/actions-self-hosted"
+cat > "${workdir}/actions-self-hosted/bench.yml" <<'YAML'
+jobs:
+  bench:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+YAML
+expect "an implicit self-hosted job is caught" 1 "not opt-in gated" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-self-hosted"
+
+mkdir -p "${workdir}/actions-self-hosted-gated"
+cat > "${workdir}/actions-self-hosted-gated/bench.yml" <<'YAML'
+jobs:
+  bench:
+    if: vars.CLEAN_BENCH_ENABLED == 'true'
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+YAML
+expect "an explicitly gated self-hosted job is accepted" 0 "1 immutable action reference" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-self-hosted-gated"
+
+mkdir -p "${workdir}/actions-hosted-bench"
+cat > "${workdir}/actions-hosted-bench/bench-command.yml" <<'YAML'
+permissions:
+  contents: read
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+YAML
+expect "a hosted benchmark entry point also requires opt-in" 1 "benchmark entry point is not opt-in gated" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-hosted-bench"
+
+mkdir -p "${workdir}/actions-token-write"
+cat > "${workdir}/actions-token-write/ci.yml" <<'YAML'
+permissions:
+  contents: write
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+YAML
+expect "a non-read-only workflow token is caught" 1 "workflow-level token permissions are not explicitly read-only" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-token-write"
+
+mkdir -p "${workdir}/actions-moving-rust"
+cat > "${workdir}/actions-moving-rust/ci.yml" <<'YAML'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: dtolnay/rust-toolchain@4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+YAML
+expect "a moving Rust toolchain is caught" 1 "does not request a fixed Rust release" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-moving-rust"
+
+mkdir -p "${workdir}/actions-untrusted-nix"
+cat > "${workdir}/actions-untrusted-nix/ci.yml" <<'YAML'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: cachix/install-nix-action@ba0dd844c9180cbf77aa72a116d6fbc515d0e87b
+      - run: nix build --no-link example#package
+YAML
+expect "an LLZK CI build without the trusted binary-cache boundary is caught" 1 "not locked to the trusted public substituter" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-untrusted-nix"
+
+expect "the repository workflows satisfy the action policy" 0 "action pin check: PASS" \
+  -- bash "${script_dir}/check-actions-pinned.sh" "${repo_root}/.github/workflows"
+
+echo
 echo "== check-confinement.sh =="
 
 # G12 is a grep, which is the kind of check that silently stops matching. Each

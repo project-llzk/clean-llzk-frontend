@@ -19,6 +19,10 @@ the [upstream Clean repository](https://github.com/Verified-zkEVM/clean).
   silently close a documented gap.
 - Preserve upstream attribution and avoid unrelated edits outside
   `Clean/Backend/LLZK/`; G0 checks the allowed Clean-core delta.
+- Keep GitHub Actions on the immutable commits recorded in `doc/llzk/PINS.md`,
+  preserve fixed runner/toolchain inputs, and do not enable self-hosted
+  benchmarking implicitly. Run `bash scripts/llzk/check-actions-pinned.sh` for
+  every workflow change.
 - Report suspected vulnerabilities through [`SECURITY.md`](SECURITY.md), never
   in a public pull request or issue with technical details.
 

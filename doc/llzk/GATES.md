@@ -258,10 +258,18 @@ silently weaken everything below it.
 
 Each case asserts an exit status **and** a message substring. Status alone would
 have passed the defect that motivated the gate — exit 127 is non-zero. Two of
-the thirteen cases are the negative direction of
+the cases are the negative direction of
 `require_llzk_opt_discriminates` and `require_llzk_witgen_discriminates`, whose
 positive direction ran on the real tools every time while the direction that
 matters ran never.
+
+There are now 53 cases. Ten enforce the public CI policy in
+`check-actions-pinned.sh`: mutable action tags, moving hosted-runner or Rust
+inputs, writable default tokens, and implicitly enabled hosted or self-hosted
+benchmark entry points go red. An LLZK job without the exact trusted public
+substituter and source-build refusal also goes red. Full-SHA/local actions,
+release-pinned inputs, and explicitly opt-in self-hosted jobs go green. The
+repository's real workflows are checked as the final positive control.
 
 It needs no LLZK tools and no Lean build: `lib.sh`'s helpers are called
 directly and `check-pins.sh` is driven against throwaway `--shared` clones, so

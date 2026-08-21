@@ -121,6 +121,7 @@ example increment.
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
+| CI supply-chain policy | complete locally | immutable action SHAs, fixed Ubuntu/Rust/Nix-cache inputs, 53 G11 controls; organization CI still required on the frozen SHA |
 | Upstream Clean alignment | pending explicit pin decision | S25 |
 | LLZK pin review | preflight complete; execution waits for S25 | `sessions/L0-review-llzk-pin.md`; exact 25-commit risk inventory and same-tree matrix |
 | Structural bitwise witness IR | pending S25 | S26 |

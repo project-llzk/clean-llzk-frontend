@@ -51,9 +51,9 @@ pin remains an explicit decision boundary
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/l0-preflight` (read-only inventory and
-same-tree decision packet for the future LLZK tool-pin review; no pin,
-capability, Nix build, or external-state change)
+Active working branch: `clean-to-llzk/ci-hardening` (immutable CI dependencies,
+fixed hosted-runner/toolchain inputs, and default-disabled self-hosted benchmark
+jobs; no application pin, capability, Nix build, or external-state change)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -168,7 +168,7 @@ It is the same lesson as R6-2 and R6-3, in the place hardest to see: **a claim
 about the world outside the repository has to be checked against the world, and
 the control plane is not evidence about itself.**
 
-**What it costs, which nobody had measured either.** `llzk-e2e` took **4h23m** on
+**What it cost, which nobody had measured either.** `llzk-e2e` took **4h23m** on
 2026-08-02 (03:22:08 → 07:45:45) and the 2026-08-04 run is on the same step at
 the same pace. Essentially all of it is step 6, `nix build …#llzk`, building LLZK
 from source because the runner has no substituter for it; `llzk-harness` by
@@ -181,11 +181,12 @@ from a real one. And every push to the PR spends four and a half hours of runner
 time, which makes `llzk-e2e` something to trigger deliberately rather than a
 check you get on each commit.
 
-The fix is a binary cache for the pinned LLZK — `PINS.md` already records a
-substituter and cache key for the local build; pointing `cachix/install-nix-action`
-at the same one would cut step 6 to a download. Not done here: it needs a cache
-the fork can read, which is a decision about infrastructure rather than a change
-to this repository.
+The CI-hardening branch now installs the exact public substituter and key from
+`PINS.md` and passes `--max-jobs 0`. S01 established that the accepted output is
+in that cache, so CI now downloads it or fails instead of silently building LLVM
+from source. This configuration has not yet run remotely at its own commit, so
+the expected duration reduction is not evidence; organization CI on the frozen
+candidate must establish anonymous cache access and the actual runtime.
 
 What is still true: every gate in the table below is green on one machine *and*
 on a runner, but only G0–G12 are gated in CI; §11 still reserves publishing for
@@ -335,7 +336,7 @@ invariants.
 | G8 fail closed | PASS — 29 negative fixtures, plus tool-version rejection. Not "one per rejection path": R5 found three reachable paths with none, and R7 found three more (R7-04); each round's were added and the general claim is not reinstated |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 14 |
-| G11 the harness's own error paths | PASS — 43 exercised, including the worktree lock's opaque-owner branches, which R6 found were the ones that mattered and the ones nothing covered, and since R7 the uncommitted-core-edit branch of G0 (R7-01) |
+| G11 the harness's own error paths | PASS — 53 exercised, including the worktree lock's opaque-owner branches, R7's uncommitted-core-edit branch of G0 (R7-01), and ten CI dependency/permission/benchmark/cache policy controls |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |

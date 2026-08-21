@@ -37,6 +37,10 @@ echo "== G11: harness error paths =="
 bash "${script_dir}/test-scripts.sh"
 echo
 
+echo "== CI dependency pins =="
+bash "${script_dir}/check-actions-pinned.sh"
+echo
+
 echo "== G12: the gate-skipping entry points are confined =="
 bash "${script_dir}/check-confinement.sh"
 echo

@@ -112,7 +112,7 @@ scoped session rather than making L0's matrix compare different frontends.
    - all six field-registry probes remain green;
    - the 10-lowered/4-declared-out-of-scope SMT split either remains or is
      changed by a separately justified improvement;
-   - every discriminator and 43 harness error paths still go red as intended;
+   - every discriminator and 53 harness error paths still go red as intended;
    - `EXAMPLES.md` still regenerates byte-identically.
 8. Run the documented theorem/axiom probes on the unchanged Lean tree. Tool
    compatibility does not justify a weaker theorem closure.

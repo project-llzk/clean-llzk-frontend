@@ -1136,3 +1136,41 @@ the page and requires byte equality, while `Test/Showcase.lean` pins the corpus
 ordering, denominator, vector total, source-backed count, and purpose coverage.
 The prose remains intentionally honest about D017, the caller-to-circuit table
 identity gap, and selected rather than exhaustive coverage.
+
+## D031 — Pin CI dependencies and make self-hosted benchmarking opt-in
+
+**Status:** accepted
+
+**Date:** 2026-08-21
+
+**Enacted by:** public CI hardening increment
+
+The inherited workflows selected action code through moving release tags,
+selected hosted images through `ubuntu-latest`, and let the Plonky3 job follow
+Rust `stable`. That is inconsistent with a frontend whose source, theorem
+environment, external verifier, and evidence are otherwise tied to exact
+inputs. It also made workflow review transient: the same repository commit
+could execute different third-party code later.
+
+Every external action reference is now a reviewed 40-character commit SHA,
+hosted jobs name Ubuntu 24.04, Plonky3 names Rust 1.98.0, and the main workflow's
+token default is explicitly read-only. `check-actions-pinned.sh` fails closed on
+regressions and G11 exercises both its negative and positive directions; merely
+adding a checker without red controls would repeat the harness failure that
+motivated G11.
+
+The LLZK job also installs the public substituter and trusted key already
+accepted in `PINS.md`, with `--max-jobs 0`. The staging run's 4h23m source build
+was both an availability risk and an uncontrolled fallback. The new rule is
+cache hit or explicit failure; the organization run remains responsible for
+proving anonymous access and measuring the actual improvement.
+
+The inherited self-hosted benchmarks are a different trust boundary. They run
+pull-request code in a networked container and use persistent caches, while the
+container base and elan bootstrap are not yet immutable. Deleting the benchmark
+machinery would erase useful prior work, but enabling it in a public
+organization repository would overstate its readiness. All benchmark entry
+points therefore require the repository variable `CLEAN_BENCH_ENABLED` to equal
+`true`, and publication keeps it unset. A later enablement requires an explicit
+runner-owner and threat-review decision; it is not part of the four release
+checks.

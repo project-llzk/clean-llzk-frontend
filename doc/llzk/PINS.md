@@ -23,6 +23,41 @@ inventory and same-tree decision procedure are prepared in
 `sessions/L0-review-llzk-pin.md`. Until that decision, the table above remains
 authoritative.
 
+## CI execution environment
+
+Workflow dependencies are repository inputs too. `scripts/llzk/check-actions-pinned.sh`
+rejects mutable action tags, moving `ubuntu-latest` runners, an implicitly enabled
+self-hosted workflow, or a non-read-only token default. The reviewed action commits
+are:
+
+| Action | Commit | Reviewed release line |
+|---|---|---|
+| `actions/checkout` | `11d5960a326750d5838078e36cf38b85af677262` | v4 |
+| `leanprover/lean-action` | `38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9` | v1 |
+| `cachix/install-nix-action` | `ba0dd844c9180cbf77aa72a116d6fbc515d0e87b` | v27 |
+| `actions/upload-artifact` | `ea165f8d65b6e75b540449e92b4886f43607fa02` | v4 |
+| `actions/github-script` | `f28e40c7f34bde8b3046d885e986cb6290c5673b` | v7 |
+| `actions/cache` | `0057852bfaa89a56745cba8c7296529d2fc39830` | v4 |
+| `dtolnay/rust-toolchain` | `4360b52568e2003a75bf9bc1d59f33a8e3fc893c` | stable action |
+
+GitHub's commit API reported a verified signature for each commit when reviewed
+on 2026-08-21. Release names in comments are review labels; the full commit SHA
+is the executable authority. Hosted jobs use `ubuntu-24.04`. The Plonky3 job
+requests Rust `1.98.0`, the stable release in the official 2026-08-20 manifest,
+rather than following the action's moving `stable` default.
+
+The LLZK job installs the exact `veridise-public.cachix.org` substituter and key
+recorded below, then builds with `--max-jobs 0`. The accepted output was present
+in that public cache during S01, so CI downloads it or fails; it cannot silently
+turn a missing substitute into a multi-hour LLVM source build. The first run of
+the frozen candidate in the organization repository must still demonstrate
+that the cache remains anonymously readable there.
+
+The self-hosted benchmark workflows are deliberately excluded from the normal
+release gates and require `CLEAN_BENCH_ENABLED == 'true'`. Keep that repository
+variable unset until the runner boundary described in `PUBLICATION.md` has a
+named owner and a separate threat review.
+
 ## Clean repository
 
 - Development staging fork: `git@github.com:alexanderlhicks/clean.git` (not the
