@@ -1,0 +1,25 @@
+L0 session bootstrap
+Date: 2026-08-21
+
+Frontend branch point:
+  f4ffaf053c3356c2f3683d1e5d80a8cffb4b5ad0
+  Record the upstream alignment gates
+
+Branch:
+  clean-to-llzk/l0-llzk-pin
+
+Worktree ownership:
+  session L0 — L0 review LLZK toolchain pin
+
+Accepted LLZK source/tool pin (unchanged):
+  5db6f8f9baaa40787a1a40625796497445f2da36
+
+Candidate resolved read-only from project-llzk/llzk-lib refs/heads/main:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+The candidate is unchanged from `preflight.md`, so its 25-commit risk inventory
+remains the execution input. Bootstrap performed no Nix build, pin edit,
+frontend/corpus/golden change, push, or external-state mutation.
+
+Next command sequence is the exact accepted-versus-candidate materialization
+and same-tree matrix in `doc/llzk/sessions/L0-review-llzk-pin.md`.

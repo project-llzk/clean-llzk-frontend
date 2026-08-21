@@ -56,15 +56,16 @@ including ten controls for these policies. Full G0-G12 passed on clean commit
 `9b809e32`; evidence is in `evidence/P0/ci-hardening.txt`. The workflows have
 not run remotely at this commit, and no external state changed.
 
-Next session: **L0** — `sessions/L0-review-llzk-pin.md`. Its read-only preflight
-is complete and its same-tree compatibility procedure now has the frozen S25
-frontend commit `6ccca6f8` as its baseline. L0 must separately decide whether to
-retain the accepted LLZK 3.0 tool pin or advance it; S25 did neither.
+Current session: **L0** — bootstrapped 2026-08-21 from the complete S25 evidence
+tip `f4ffaf05`. The worktree is isolated on the L0 branch and the live candidate
+was re-resolved as `25fb3740`, unchanged from the read-only preflight. No LLZK
+pin has moved and no candidate build or compatibility run has started. The
+procedure and decision rule are in `sessions/L0-review-llzk-pin.md`.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/bump-4.32.2` (S25 compatibility only; no
-new accepted constructor, LLZK pin change, push, or external-state change)
+Active working branch: `clean-to-llzk/l0-llzk-pin` (L0 toolchain comparison
+only; no frontend capability, corpus, golden, or example change)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -317,10 +318,11 @@ an explicit decision, which was given.
     reconstructed types and the function boundary, before releasing an
     artifact. `Module.render_constraintSurface` states the generic round trip;
     five mutations make it red. G0-G12 passed on clean commit `28132f64`.
-- In progress: none. S25 is complete locally on implementation commit
-  `6ccca6f8`; its evidence-only handoff commit does not change executable code.
-- Decision pending: none for the Clean pin. L0 will make the separate LLZK pin
-  decision on the frozen post-S25 tree.
+- In progress: **L0**, bootstrapped from S25 evidence tip `f4ffaf05`; accepted
+  LLZK pin `5db6f8f9` and live candidate `25fb3740` are frozen for the same-tree
+  comparison. No toolchain has been built or accepted in L0 yet.
+- Decision pending: retain or advance the LLZK tool pin after both exact SHAs
+  complete the unchanged compatibility matrix.
 - Blocked: none.
 
 ## Last green gates
