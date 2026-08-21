@@ -32,7 +32,8 @@ earlier docstring said otherwise; that is withdrawn, and
 a protection.
 
 What exists instead: `ExportTable.Certifies`, a proof obligation tying an export
-table to a Clean `Table`, discharged for `Gadgets.ByteTable` and demanded by
+table's name, arity, and ordered rows to a Clean `RawTable`, discharged for
+`Gadgets.ByteTable` and `Gadgets.Xor.ByteXorTable` and demanded by
 `CertifiedConfig`. `Config`'s constructor is private and
 `Config.unsafeWithTables` is the only other way in, confined by G12.
 
@@ -58,11 +59,12 @@ closed the first:
    the caller picks *both* sides of `Certifies`, so it can certify a table the
    circuit does not look into. Closing that needs the `Table` to survive into
    `Lookup` instead of being erased to a `RawTable`, which *is* a change to
-   Clean's core. R7 closed a *sub*-gap here that was this backend's own:
-   `Certifies` constrains values only, so a certificate could pair rows exported
+   Clean's core. R7 closed a *sub*-gap here that was this backend's own. Before
+   S28, `Certifies` constrained values only, so a certificate could pair rows exported
    under one name with a Clean table named another, making `spec_of_compile`'s
    lookup hypothesis incomparable with what the module asserts (R7-12).
-   `CertifiedTable.name_certifies` now demands `exported.name = table.name`.
+   `ExportTable.Certifies` now demands `exported.name = table.name` and matching
+   arity as part of the same row certificate.
    The caller still picks both sides; what it can no longer do is have them
    speak about different globals.
 
@@ -124,9 +126,9 @@ independent downstream confirmation, which is the strongest argument this file
 has for the parser.
 
 **A5 closes the internal renderer gap.** `RenderCheck.parse` reads
-`struct.readm`, `constrain.eq`, and `constrain.in` from the concrete text inside
-the rendered `@constrain` function and compares their SSA indices, member names,
-operand order, and types reconstructed independently from the concrete syntax
+`global.def`, `struct.readm`, `array.new`, `constrain.eq`, and `constrain.in`
+from the concrete text and compares their names, dimensions, row-major values,
+SSA indices, member names, operand order, and independently reconstructed types
 with a projection of the typed IR. It also checks the function boundary, so
 moving the same lines into
 `@compute` is not an agreement. `Module.render` now returns `Except`; no
@@ -136,8 +138,9 @@ supported artifact path receives text unless this comparison succeeds, and
 `Module.render_constraintSurface` proves that every successfully returned text
 parses to exactly the typed module's protected surface. `Test/Print.lean` makes
 success non-vacuous on both renderer fixtures and makes the check go red for a
-same-typed member substitution, a dropped equality, a dropped lookup, a renamed
-`@constrain` function, and a changed field type. The full corpus also passes
+same-typed member substitution, dropped equality/lookup/row construction,
+changed global shape or row ordering, malformed row construction, renamed
+`@constrain` function, and changed field type. The full corpus also passes
 through the checked renderer before G3-G10 see it.
 
 What this does **not** close is D017: the parser establishes what concrete text
@@ -145,7 +148,7 @@ the backend wrote, not that LLZK's implementation gives that text the semantics
 Clean assumes. It is deliberately not a general LLZK parser either; the
 `@compute` surface retains its two-backend differential evidence, while every
 other rendered form remains covered by typed construction, goldens, and
-`llzk-opt` well-formedness. A new constraint-only statement constructor must be
+`llzk-opt` well-formedness. A new table/constraint-surface constructor must be
 added to `RenderCheck.ConstraintStmt` or the assurance claim must be reopened.
 
 ## 3. The chain from the emitted constraints to a gadget's `Spec` — **closed by A2**
@@ -161,8 +164,8 @@ R5e called it the statement a user most likely assumes the project has.
 > take any assignment of the emitted component's cells — `env` for the circuit
 > variables, `outs` for the `@out{j}` members D008 adds — that satisfies every
 > polynomial the reader extracts from `@constrain`, **and every lookup of the
-> source, in certified-values form** (for each source lookup into a certified
-> table, the queried value is `fromNat` of one of the exported values); assume
+> source, in certified-row form** (for each source lookup into a certified
+> table, the ordered queried row is `fromNat` of one exported row); assume
 > the gadget's own `Assumptions` of the input; then the gadget's own `Spec`
 > holds of that input and the corresponding output.
 
@@ -171,9 +174,9 @@ The bolded half is R7-12's finding: the lookup hypothesis is stated over the
 reader extracts from the module — an earlier version of this blockquote said
 "every lookup it extracts", which is the statement a user would want and not the
 one the theorem has. Under D017 the module's assertion is membership in the
-global *named* `l.table.name`; equating that with the certified-values form
-needs `exported.name = table.name`, which `CertifiedTable.name_certifies`
-demands since R7 — so the bridging lemma is now *provable*, but it is not
+global *named* `l.table.name`; equating that with the certified-row form needs
+equal names and arities, which `ExportTable.Certifies` demands — so the bridging
+lemma is now *provable*, but it is not
 *proved*, and until it is, a caller holding a satisfying assignment of the
 module discharges `hlookups` by that (unproved, routine) step. The theorem also
 carries the caller-supplied `resolve` hypothesis — that every source lookup is
@@ -282,8 +285,9 @@ field the module is read in is the field the *configuration* names rather than
 one the module asserts about itself.
 
 Array types are checked **exactly**, against the global being read: element type
-and length both, so `global.read @Bytes : !array.type<255 x …>` is a mismatch
-here rather than something only `llzk-opt` notices.
+and every dimension, so `global.read @Bytes : !array.type<255 x …>` or a
+multi-column row with the wrong suffix shape is a mismatch here rather than
+something only `llzk-opt` notices.
 
 `Test/Constraints.lean` pins that it can go red — R5e's own counterexample, both
 readers, on `Multiply` and on `Addition8FullCarry` (which exercises the array
@@ -354,7 +358,7 @@ These were attacked directly across R2–R5 and held:
 - the `Poly` normal form and every one of its evaluation homomorphisms;
 - `WExpr.eval_lt_upperBound`, structural `WExpr.eval_ofWitgen`, and
   `WExpr.eval_bitsOf` under D033's checked bounds,
-  `ofStatic_certifies`, `byteTable_certifies`,
+  `ofStatic_certifies`, `byteTable_certifies`, `byteXorTable_certifies`,
   `certified_membership`, `values_lt_prime_of_diagnose`;
 - `CanonicalRepr`'s enforcement at every entry point, and that its two laws
   really do pin `val` for a prime field;

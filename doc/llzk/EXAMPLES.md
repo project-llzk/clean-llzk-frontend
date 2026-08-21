@@ -28,8 +28,8 @@ program even where `llzk-witgen` ignores `@constrain`.
 
 ## Checked conformance corpus
 
-The current corpus contains 14 emitted modules and 45 input vectors.
-8 modules come from a flattened Clean circuit and pass both halves of G9; the
+The current corpus contains 15 emitted modules and 51 input vectors.
+9 modules come from a flattened Clean circuit and pass both halves of G9; the
 remaining 6 are independent field-registry probes,
 so source agreement is deliberately reported as not applicable rather than passing.
 
@@ -39,6 +39,7 @@ so source agreement is deliberately reported as not applicable rather than passi
 | `Decompose` | `babybear` | yes — constraints and witnesses agree | 6 | Accepted `felt.umod` and `felt.uintdiv` witness shapes |
 | `LowByte` | `babybear` | yes — constraints and witnesses agree | 6 | Bounded `felt.bit_and` witness lowering |
 | `Bits8` | `babybear` | yes — constraints and witnesses agree | 6 | First-class `bitsOf` decomposition with felt shifts |
+| `And8` | `babybear` | yes — constraints and witnesses agree | 6 | Three-column certified ByteXor row membership |
 | `Addition8FullCarry` | `babybear` | yes — constraints and witnesses agree | 9 | Headline proved byte addition with a certified lookup |
 | `Passthrough` | `babybear` | yes — constraints and witnesses agree | 3 | Direct public output with no witness cells |
 | `ConstOut` | `babybear` | yes — constraints and witnesses agree | 2 | Constant public output with no witness cells |
@@ -60,7 +61,7 @@ requires the typed `@constrain` and `@compute` readers to agree with the circuit
 | Layer | Repository evidence |
 |---|---|
 | Gadget semantics | Clean soundness/completeness proofs; specific compiled implication for `Addition8FullCarry` |
-| Lookup values | `byteTable_certified` proves the exported byte values |
+| Lookup values | `byteTable_certified` and `byteXorTable_certified` prove the exported rows |
 | Typed translation | G9 independently reads source and module constraints and witnesses |
 | Concrete constraint text | A5 parses the protected rendered surface back before returning text |
 | Copy handling | A7 proves canonicalisation stepwise and across the witness-program list |

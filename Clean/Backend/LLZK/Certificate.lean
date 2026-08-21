@@ -10,12 +10,11 @@ that these rows are the table's rows.*
 
 That is true of the compiler, and it stops mattering once the obligation is
 written down and proved. `ExportTable.Certifies` below is the obligation, stated
-over `rows.flatten` because that is exactly the value list `Circuit.lower` puts
-into the emitted `global.def const`. `certified_membership` is the payoff: for a
-certified table whose values are canonical — which `ExportTable.diagnose` checks
-since S08 — Clean's `Contains` holds of a value exactly when that value is one of
-the field elements the emitted array holds, which is what the emitted
-`constrain.in` asserts.
+over ordered rows at `RawTable`, the heterogeneous representation a `Lookup`
+actually carries. `certified_membership` is the payoff: for a certified table
+whose values are canonical — which `ExportTable.diagnose` checks since S08 —
+Clean's `Contains` holds of a row exactly when that row is one of the field rows
+the emitted array holds, which is what the emitted `constrain.in` asserts.
 
 What remains assumed is a different and much smaller thing than D012 was: that
 `constrain.in %table, %value` means membership. That is part of D017 and nothing
@@ -35,34 +34,60 @@ namespace LLZK
 
 variable {F : Type} [FiniteField F]
 
-/-- The obligation D012 records: `e`'s values are exactly the canonical
-representatives of the elements the single-column Clean table `table` contains.
+/-- The ordered canonical representatives of a raw lookup row. -/
+def canonicalRow {n : Nat} (row : Vector F n) : Array Nat :=
+  (row.map FiniteField.val).toArray
 
-Quantified over the `Array` argument of `Contains` because a Clean table's
+/-- The obligation D012 records: the exported and raw tables have the same
+identity and arity, and `e.rows` is exactly the ordered canonical-row image of
+the rows `table.Contains` accepts.
+
+Quantified over the first `Contains` argument because a Clean table's
 containment may in general depend on a concrete instantiation; every table
 Stage 1 accepts is one for which it does not. -/
-def ExportTable.Certifies (e : ExportTable) (table : Table F field) : Prop :=
-  ∀ (t : Array F) (x : F), table.Contains t x ↔ FiniteField.val x ∈ e.values
+def ExportTable.Certifies (e : ExportTable) (table : RawTable F) : Prop :=
+  e.name = table.name ∧ e.arity = table.arity ∧
+    ∀ (t : Array (Vector F table.arity)) (row : Vector F table.arity),
+      table.Contains t row ↔ canonicalRow row ∈ e.rows
+
+/-- Canonical rows are injective because `FiniteField.val` is. -/
+theorem canonicalRow_injective {n : Nat} {a b : Vector F n}
+    (h : canonicalRow a = canonicalRow b) : a = b := by
+  apply Vector.ext
+  intro i hi
+  apply FiniteField.val_injective
+  have hget := congrArg (fun xs : Array Nat => xs[i]?) h
+  simpa [canonicalRow, hi] using hget
 
 /-- `ofStatic` exports exactly the canonical representatives of the table's rows. -/
-theorem mem_ofStatic_values (st : StaticTable F field) (n : Nat) :
-    n ∈ (ExportTable.ofStatic st).values ↔ ∃ i : Fin st.length, n = FiniteField.val (st.row i) := by
-  simp [ExportTable.values, ExportTable.ofStatic, explicit_provable_type]
+theorem mem_ofStatic_rows {Row : TypeMap} [ProvableType Row]
+    (st : StaticTable F Row) (row : Array Nat) :
+    row ∈ (ExportTable.ofStatic st).rows ↔
+      ∃ i : Fin st.length,
+        row = ((toElements (M := Row) (st.row i)).map FiniteField.val).toArray := by
+  simp [ExportTable.ofStatic, eq_comm]
 
-/-- Values derived from a `StaticTable` are the table's values.
+/-- Rows derived from any `StaticTable` certify its raw table.
 
-`ofStatic` computes them from the table's own `row` function, so the only content
-is that passing through `FiniteField.val` loses nothing — `val_injective`. -/
-theorem ofStatic_certifies (st : StaticTable F field) :
-    (ExportTable.ofStatic st).Certifies (Table.fromStatic st) := by
-  intro t x
-  rw [mem_ofStatic_values]
-  show (∃ i, x = st.row i) ↔ _
+`ofStatic` computes them from the table's own `row` function. Passing through
+`FiniteField.val` loses nothing because canonical rows are injective. -/
+theorem ofStatic_certifies {Row : TypeMap} [ProvableType Row] (st : StaticTable F Row) :
+    (ExportTable.ofStatic st).Certifies (Table.fromStatic st).toRaw := by
+  refine ⟨rfl, rfl, ?_⟩
+  intro t row
+  change (∃ i, fromElements (M := Row) row = st.row i) ↔
+    canonicalRow (show Vector F (size Row) from row) ∈ (ExportTable.ofStatic st).rows
+  rw [mem_ofStatic_rows]
   constructor
-  · rintro ⟨i, rfl⟩
-    exact ⟨i, rfl⟩
   · rintro ⟨i, hi⟩
-    exact ⟨i, FiniteField.val_injective hi⟩
+    refine ⟨i, ?_⟩
+    have hrow := congrArg (toElements (M := Row)) hi
+    simpa only [ProvableType.toElements_fromElements, canonicalRow] using
+      congrArg (fun v => (v.map FiniteField.val).toArray) hrow
+  · rintro ⟨i, hi⟩
+    refine ⟨i, ?_⟩
+    rw [ProvableType.fromElements_eq_iff]
+    exact canonicalRow_injective (by simpa [canonicalRow] using hi)
 
 /-! ## What a certificate buys
 
@@ -71,23 +96,46 @@ elements. This is the bridge, and it is where the range check `diagnose` has
 performed since S08 (R2-02) does its work: without it `fromNat` would not invert
 `val` on the declared values, and the emitted table would be a different set. -/
 
-/-- For a certified table with canonical values, Clean's `Contains` holds of `x`
-exactly when `x` is one of the field elements the emitted array holds.
+/-- `fromNat` reconstructs a field element from its canonical representative. -/
+private theorem fromNat_val (x : F) : FiniteField.fromNat (FiniteField.val x) = x :=
+  FiniteField.val_injective (FiniteField.val_fromNat _ (FiniteField.val_lt x))
 
-The right-hand side is the meaning of the emitted `constrain.in %table, %x`, so
+/-- For a certified table with canonical values, Clean's `Contains` holds of a
+row exactly when it is one of the ordered field rows the emitted array holds.
+
+The right-hand side is the meaning of the emitted row-valued `constrain.in`, so
 this says the emitted lookup constraint *is* Clean's lookup constraint. -/
-theorem certified_membership {e : ExportTable} {table : Table F field}
+theorem certified_membership {e : ExportTable} {table : RawTable F}
     (hcert : e.Certifies table)
     (hcanonical : ∀ n ∈ e.values, n < FiniteField.size F)
-    (t : Array F) (x : F) :
-    table.Contains t x ↔ ∃ n ∈ e.values, FiniteField.fromNat n = x := by
-  rw [hcert t x]
+    (t : Array (Vector F table.arity)) (row : Vector F table.arity) :
+    table.Contains t row ↔
+      ∃ values ∈ e.rows, values.map FiniteField.fromNat = row.toArray := by
+  rw [hcert.2.2 t row]
   constructor
   · intro hmem
-    exact ⟨FiniteField.val x, hmem,
-      FiniteField.val_injective (FiniteField.val_fromNat _ (FiniteField.val_lt x))⟩
-  · rintro ⟨n, hn, rfl⟩
-    rwa [FiniteField.val_fromNat n (hcanonical n hn)]
+    refine ⟨canonicalRow row, hmem, ?_⟩
+    apply Array.ext
+    · simp [canonicalRow]
+    · intro i hi₁ hi₂
+      simp [canonicalRow, fromNat_val]
+  · rintro ⟨values, hvalues, heq⟩
+    have hrow : canonicalRow row = values := by
+      calc
+        canonicalRow row = row.toArray.map FiniteField.val := by
+          simp [canonicalRow]
+        _ = (values.map FiniteField.fromNat).map FiniteField.val :=
+          (congrArg (Array.map FiniteField.val) heq).symm
+        _ = values := by
+          apply Array.ext
+          · simp
+          · intro i hi₁ hi₂
+            simp only [Array.getElem_map]
+            rw [FiniteField.val_fromNat]
+            have hiv : i < values.size := by simpa using hi₁
+            exact hcanonical values[i] (Array.mem_flatten.mpr
+              ⟨values, hvalues, by exact Array.getElem_mem hiv⟩)
+    rwa [hrow]
 
 /-! ## Carrying the certificate — and what that is *not*
 
@@ -117,23 +165,20 @@ plus a `grep`. `CertifiedConfig` carries it to the entry point instead. See
 `sessions/S23-x1-closure.md` and D022.
 -/
 
-/-- An export table together with the proof that its values are the Clean
-table's — and that it is exported under that table's own name.
+/-- An export table together with the proof that its ordered rows are the Clean
+raw table's, with the same arity and exported name.
 
-The name field is R7-12. `Certifies` constrains values only, so without it a
-configuration could pair exported rows named "Bytes" with a Clean table named
-"Foo" and vice versa; everything would compile (lookups resolve by *name*), and
-then `spec_of_compile`'s lookup hypothesis — stated over the Clean table via
-`Certifies` — would be incomparable with what the emitted module asserts, which
-is membership in the global *named* `l.table.name`. The tie makes the two speak
-about the same global. It does **not** close `GAPS.md` item 1's second half:
-the caller still picks both sides of `Certifies`, and a `selfTable` can be
-given any name at all. -/
+The name conjunct is R7-12. Without it a configuration could pair rows exported
+under "Bytes" with a raw table named "Foo" and vice versa; everything would
+compile (lookups resolve by *name*), while `spec_of_compile`'s lookup hypothesis
+would be incomparable with what the emitted module asserts. `Certifies` now
+makes the names, arities, and ordered row semantics agree. It does **not** close
+`GAPS.md` item 1's second half: the caller still picks both sides of `Certifies`,
+and a self-referential raw table can be given any name at all. -/
 structure CertifiedTable (F : Type) [FiniteField F] where
   exported : ExportTable
-  table : Table F field
+  table : RawTable F
   certificate : exported.Certifies table
-  name_certifies : exported.name = table.name
 
 /-- A configuration whose tables carry their certificates.
 
@@ -154,10 +199,10 @@ def CertifiedConfig.forField (field : FieldSpec) : CertifiedConfig F :=
 
 /-- The `Config` the rest of the compiler already understands.
 
-Total, and deliberately so: a certificate constrains a table's *rows*, never its
-shape, so there is nothing here that can fail. The registry diagnostics that can
-fail — malformed names, arity mismatches, non-canonical values, duplicates — run
-where they ran before, in `Analyze`.
+Total, and deliberately so: equal name/arity and row semantics are proof fields,
+so erasing them into the compiler's plain registry has no dynamic failure. The
+registry diagnostics that can fail — malformed names, lookup-arity mismatches,
+row widths, non-canonical values, duplicates — still run in `Analyze`.
 
 This names `Config.unsafeWithTables`, and `scripts/llzk/check-confinement.sh`
 allows it here for that reason: it is the one place where dropping to the

@@ -73,7 +73,9 @@ as `!felt.type<"">`, and the point of this IR is that nothing downstream has to
 re-check what the lowering built. -/
 inductive Ty where
   | felt (field : String)
-  | array (size : Nat) (elem : Ty)
+  /-- A true LLZK array: one nonempty ordered dimension vector and one scalar
+  element type. LLZK rejects recursively nested array element types. -/
+  | array (dimensions : Array Nat) (elem : Ty)
   | struct (name : String)
 deriving DecidableEq, Repr
 
@@ -146,6 +148,7 @@ inductive Stmt where
   | readMember (dst : Value) (self : Value) (member : String) (memberTy : Ty)
   | writeMember (self : Value) (member : String) (value : Value) (memberTy : Ty)
   | globalRead (dst : Value) (name : String) (ty : Ty)
+  | arrayNew (dst : Value) (elements : Array Value) (elemTy : Ty)
   | constrainEq (lhs rhs : Value) (ty : Ty)
   | constrainIn (array : Value) (arrayTy : Ty) (element : Value) (elementTy : Ty)
 deriving Repr
@@ -164,6 +167,7 @@ def Stmt.operands : Stmt → Array Value
   | .readMember _ self _ _ => #[self]
   | .writeMember self _ value _ => #[self, value]
   | .globalRead .. => #[]
+  | .arrayNew _ elements _ => elements
   | .constrainEq lhs rhs _ => #[lhs, rhs]
   | .constrainIn array _ element _ => #[array, element]
 
@@ -226,18 +230,35 @@ structure Member where
   visibility : Visibility
 deriving Repr
 
-/-- A module-level constant array, used to materialize a lookup table:
-`global.def const @name : !array.type<n x elem> = [...]`.
+/-- A module-level constant lookup table.
 
-The rendered length comes from `values.size`, so the declared type and the
-initializer cannot disagree. Elements must be canonical representatives in
-`[0, p)`; `ExportTable.diagnose` is what checks that, because this module has no
-notion of a prime. -/
+Rows remain nested here. Rendering alone flattens them into LLZK's required
+row-major initializer, and derives the declared dimensions from `rows.size` and
+`arity`. `ExportTable.diagnose` establishes that every row has exactly that
+arity and every value is canonical. -/
 structure ConstArray where
   name : String
   elemTy : Ty
-  values : Array Nat
+  arity : Nat
+  rows : Array (Array Nat)
 deriving Repr
+
+namespace ConstArray
+
+/-- The flat row-major initializer required by `global.def const`. -/
+def values (g : ConstArray) : Array Nat := g.rows.flatten
+
+/-- The emitted global type. A one-column table keeps LLZK's scalar degenerate
+surface; wider tables use true `[row-count, arity]` dimensions. -/
+def ty (g : ConstArray) : Ty :=
+  if g.arity = 1 then .array #[g.rows.size] g.elemTy
+  else .array #[g.rows.size, g.arity] g.elemTy
+
+/-- The type of one queried row. -/
+def rowTy (g : ConstArray) : Ty :=
+  if g.arity = 1 then g.elemTy else .array #[g.arity] g.elemTy
+
+end ConstArray
 
 /-- The component: state plus the `@compute`/`@constrain` pair.
 
@@ -318,6 +339,13 @@ def writeMember (self : Value) (member : String) (value : Value) (memberTy : Ty)
 /-- `%dst = global.read @name : ty` -/
 def globalRead (name : String) (ty : Ty) : BuilderM Value :=
   emitValue (.globalRead · name ty)
+
+/-- `%dst = array.new %x, ... : !array.type<n x elemTy>`.
+
+The result dimension is derived from the operand count, so the builder cannot
+construct the malformed count/type pair that LLZK rejects. -/
+def arrayNew (elements : Array Value) (elemTy : Ty) : BuilderM Value :=
+  emitValue (.arrayNew · elements elemTy)
 
 /-- `constrain.eq %lhs, %rhs : ty, ty` -/
 def constrainEq (lhs rhs : Value) (ty : Ty) : BuilderM Unit :=
@@ -554,7 +582,7 @@ def Assign.set {A : Type} (σ : Assign A) (i : Nat) (a : A) : Assign A :=
 /-- The index a statement defines, if it defines one. -/
 def Stmt.dst? : Stmt → Option Nat
   | .feltConst dst _ _ | .feltBin dst _ _ _ _ | .structNew dst
-  | .readMember dst _ _ _ | .globalRead dst _ _ => some dst.index
+  | .readMember dst _ _ _ | .globalRead dst _ _ | .arrayNew dst _ _ => some dst.index
   | .writeMember .. | .constrainEq .. | .constrainIn .. => none
 
 /-- Read one statement. Only the two forms the expression lowering emits are
@@ -655,7 +683,7 @@ appends a bogus `constrain.eq %v, 0` for every subexpression, one that emits jun
 `struct.writem`s, and one that redefines an already-allocated SSA index.
 
 They all pass because `readStmt` is the identity on `structNew`, `readMember`,
-`writeMember`, `globalRead`, `constrainEq` and `constrainIn`, and `Stmt.dst?` is
+`writeMember`, `globalRead`, `arrayNew`, `constrainEq` and `constrainIn`, and `Stmt.dst?` is
 `none` for three of those — so a lowering may emit arbitrarily many of them
 invisibly — and because the reading conjunct sits entirely under `out = .ok v`,
 so refusing everything satisfies it.

@@ -116,8 +116,8 @@ structure ConstraintSet (F : Type) where
   inputs : Nat
   /-- Each polynomial must evaluate to zero. -/
   eqs : List (Poly F)
-  /-- Each queried polynomial must be a row of the table of that name. -/
-  lookups : List (String × Poly F)
+  /-- Each ordered polynomial row must be a row of the table of that name. -/
+  lookups : List (String × Array (Poly F))
   /-- The lookup tables the module materializes, name and values.
 
   **This does not check that the rows are the Clean table's rows.** Both sides
@@ -131,7 +131,7 @@ structure ConstraintSet (F : Type) where
   table is `ExportTable.Certifies`, demanded by `CertifiedConfig` — which the
   public entry points take, so the proof reaches the compiler rather than being
   erased at a wrapper (S24) — and confined by G12. -/
-  globals : List (String × Array Nat)
+  globals : List (String × Array (Array Nat))
 deriving Repr
 
 namespace ConstraintSet
@@ -154,8 +154,8 @@ def ofSource (cfg : Config) (src : Source F) : ConstraintSet F where
     (FlatOperation.constraints src.operations).map Expression.toPoly
     ++ outputEqs src.outputs.toList
   lookups :=
-    (FlatOperation.lookups src.operations).flatMap
-      fun l => (l.entry.toArray.map fun e => (l.table.name, Expression.toPoly e)).toList
+    (FlatOperation.lookups src.operations).map
+      fun l => (l.table.name, l.entry.toArray.map Expression.toPoly)
   -- The tables the circuit actually looks into, found by walking the operations
   -- rather than by asking the emitter which ones it kept.
   --
@@ -174,7 +174,7 @@ def ofSource (cfg : Config) (src : Source F) : ConstraintSet F where
   globals :=
     (cfg.tables.filter fun table =>
       (FlatOperation.lookups src.operations).any (·.table.name = table.name)).toList.map
-        fun table => (table.name, table.rows.flatten)
+        fun table => (table.name, table.rows)
 
 /-- **The Clean side is exactly `ConstraintsHoldFlat`, plus the output
 definitions.**
@@ -220,6 +220,7 @@ never a silently ignored statement. -/
 private inductive Slot (F : Type) where
   | poly (p : Poly F)
   | table (name : String)
+  | row (values : Array (Poly F))
   /-- `%self`. Only legal as the first operand of a member read. -/
   | self
 
@@ -246,7 +247,7 @@ private def memberVar (inputSize numWitnesses numOutputs : Nat) (declared : Arra
 private structure Reader (F : Type) where
   slots : Array (Slot F)
   eqs : List (Poly F)
-  lookups : List (String × Poly F)
+  lookups : List (String × Array (Poly F))
 
 private def Reader.get (r : Reader F) (v : Value) : Option (Slot F) := r.slots[v.index]?
 
@@ -298,20 +299,30 @@ private def step (fieldTy : Ty) (inputSize numWitnesses numOutputs : Nat)
     r.define dst (.poly (Poly.var cell))
   | .globalRead dst name ty => do
     let some g := globals.find? (·.name = name) | none
-    guard (ty = Ty.array g.values.size fieldTy)
+    guard (ty = g.ty)
     r.define dst (.table name)
+  | .arrayNew dst elements elemTy => do
+    guard (elemTy = fieldTy)
+    let values ← elements.mapM r.poly
+    r.define dst (.row values)
   | .constrainEq lhs rhs ty => do
     guard (ty = fieldTy)
     let a ← r.poly lhs
     let b ← r.poly rhs
     return { r with eqs := r.eqs ++ [Poly.sub a b] }
   | .constrainIn array arrayTy element elementTy => do
-    guard (elementTy = fieldTy)
     let .table name ← r.get array | none
     let some g := globals.find? (·.name = name) | none
-    guard (arrayTy = Ty.array g.values.size fieldTy)
-    let value ← r.poly element
-    return { r with lookups := r.lookups ++ [(name, value)] }
+    guard (arrayTy = g.ty)
+    guard (elementTy = g.rowTy)
+    let values ← if g.arity = 1 then
+        pure #[← r.poly element]
+      else
+        match r.get element with
+        | some (.row values) => pure values
+        | _ => none
+    guard (values.size = g.arity)
+    return { r with lookups := r.lookups ++ [(name, values)] }
   -- `struct.new` and `struct.writem` belong to `@compute`. Reaching one here
   -- means the module is not the shape this reader models.
   | .structNew _ | .writeMember _ _ _ _ => none
@@ -340,6 +351,8 @@ def ofModule (fieldTy : Ty) (m : Module) : Option (ConstraintSet F) := do
   -- global in another field is a mismatch here rather than only in `llzk-opt`.
   guard (m.root.members.all fun mem => mem.ty = fieldTy)
   guard (m.globals.all fun g => g.elemTy = fieldTy)
+  guard (m.globals.all fun g => g.arity > 0 && !g.rows.isEmpty &&
+    g.rows.all (·.size = g.arity))
   let declared := m.root.members.map (·.name)
   let mut reader : Reader F := { slots, eqs := [], lookups := [] }
   for stmt in m.root.constrain.body do
@@ -347,7 +360,7 @@ def ofModule (fieldTy : Ty) (m : Module) : Option (ConstraintSet F) := do
       | none
     reader := next
   return { inputs := inputSize, eqs := reader.eqs, lookups := reader.lookups
-           globals := (m.globals.map fun g => (g.name, g.values)).toList }
+           globals := (m.globals.map fun g => (g.name, g.rows)).toList }
 
 /-! ## The comparison -/
 

@@ -97,9 +97,8 @@ def diagnose (prime : Nat) (table : ExportTable) : Array Diagnostic :=
     ++ when (table.name = rootComponent)
       s!"has the same name as the component; the module's symbol table cannot hold a \
          `global.def` and a `struct.def` called '{rootComponent}'"
-    ++ when (table.arity ≠ 1)
-      s!"arity is {table.arity}; only single-column tables are supported, because a wider one \
-         needs an `array.new` query and a multi-dimensional `constrain.in`"
+    ++ when (table.arity = 0)
+      "has arity zero; a lookup row must contain at least one field element"
     ++ when table.rows.isEmpty
       "has no rows; an empty table makes every lookup unsatisfiable, which is never intended"
     ++ table.rows.zipIdx.filterMap (fun (row, i) =>

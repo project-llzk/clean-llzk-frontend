@@ -74,9 +74,10 @@ theorem add8_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognize
     (env : Environment Bab) (outs : Nat → Bab)
     (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
     (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source add8).operations,
-      ∀ ct ∈ withBytes.tables, ∀ entry : Vector (Expression Bab) ct.table.toRaw.arity,
-        l = ⟨ct.table.toRaw, entry⟩ →
-          ∃ n ∈ ct.exported.values, FiniteField.fromNat n = fromElements (entry.map env))
+      ∀ ct ∈ withBytes.tables, ∀ entry : Vector (Expression Bab) ct.table.arity,
+        l = ⟨ct.table, entry⟩ →
+          ∃ values ∈ ct.exported.rows,
+            values.map FiniteField.fromNat = (entry.map env).toArray)
     (input : Gadgets.Addition8FullCarry.Inputs Bab)
     (hinput : eval env
       (varFromOffset Gadgets.Addition8FullCarry.Inputs 0 :
@@ -110,5 +111,62 @@ theorem add8_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recogniz
         (size Gadgets.Addition8FullCarry.Inputs))) :=
   add8_spec_of_compile hcompile hm hrec env outs heqs
     ((add8_lookup_iff hrec env).mp hlookups) input hinput hassm
+
+/-! ## S28: the same chain instantiated at three-column `And8` -/
+
+private abbrev and8 : FormalCircuit Bab Gadgets.And.And8.Inputs field :=
+  Gadgets.And.And8.circuit (p := pBabybear)
+
+#guard (compile withBytesAndXor and8).toOption.isSome
+#guard (recognize withBytesAndXor.toConfig (Compilable.source and8)).isOk
+
+theorem and8_no_interactions :
+    ((and8.main (varFromOffset Gadgets.And.And8.Inputs 0)).operations
+      (size Gadgets.And.And8.Inputs)).interactions = [] := by
+  simp [circuit_norm, Gadgets.And.And8.circuit, Gadgets.And.And8.main,
+    Operations.interactions]
+
+/-- **The emitted multi-column `@ByteXor` membership plus the emitted
+equalities imply `And8.Spec`.** This is the generic lookup-to-`spec_of_compile`
+chain instantiated at the capability S28 adds. -/
+theorem and8_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognized}
+    (hcompile : compile withBytesAndXor and8 = .ok m)
+    (hm : ConstraintSet.ofModule (F := Bab) (Ty.felt withBytesAndXor.field.name) m = some C)
+    (hrec : recognize withBytesAndXor.toConfig (Compilable.source and8) = .ok r)
+    (env : Environment Bab) (outs : Nat → Bab)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+    (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source and8).operations,
+      ∀ ct ∈ withBytesAndXor.tables, ∀ entry : Vector (Expression Bab) ct.table.arity,
+        l = ⟨ct.table, entry⟩ →
+          ∃ values ∈ ct.exported.rows,
+            values.map FiniteField.fromNat = (entry.map env).toArray)
+    (input : Gadgets.And.And8.Inputs Bab)
+    (hinput : eval env
+      (varFromOffset Gadgets.And.And8.Inputs 0 : Var Gadgets.And.And8.Inputs Bab) = input)
+    (hassm : and8.Assumptions input) :
+    and8.Spec input
+      (eval env (and8.output (varFromOffset Gadgets.And.And8.Inputs 0)
+        (size Gadgets.And.And8.Inputs))) :=
+  spec_of_compile hcompile hm hrec and8_resolve and8_no_interactions env outs heqs hlookups
+    input hinput hassm
+
+/-- The `And8` instantiation with its lookup premise in Clean's own form. -/
+theorem and8_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recognized}
+    (hcompile : compile withBytesAndXor and8 = .ok m)
+    (hm : ConstraintSet.ofModule (F := Bab) (Ty.felt withBytesAndXor.field.name) m = some C)
+    (hrec : recognize withBytesAndXor.toConfig (Compilable.source and8) = .ok r)
+    (env : Environment Bab) (outs : Nat → Bab)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+    (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source and8).operations,
+      l.Contains env)
+    (input : Gadgets.And.And8.Inputs Bab)
+    (hinput : eval env
+      (varFromOffset Gadgets.And.And8.Inputs 0 : Var Gadgets.And.And8.Inputs Bab) = input)
+    (hassm : and8.Assumptions input) :
+    and8.Spec input
+      (eval env (and8.output (varFromOffset Gadgets.And.And8.Inputs 0)
+        (size Gadgets.And.And8.Inputs))) :=
+  and8_spec_of_compile hcompile hm hrec env outs heqs
+    ((and8_lookup_iff hrec env).mp hlookups) input hinput hassm
 
 end LLZK.Test.Soundness

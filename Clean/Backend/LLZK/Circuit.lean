@@ -113,9 +113,28 @@ private def constrainBody (fieldTy : Ty) (r : Recognized) (self : Value) (inputs
   for k in Array.range r.witnesses.size do
     env := env.push (← Builder.readMember self (witnessMember k) fieldTy)
   for lookup in r.lookups do
-    let table ← Builder.globalRead lookup.tableName (Ty.array lookup.tableRows fieldTy)
-    let value ← FieldExpr.lower s!"lookup into '{lookup.tableName}'" fieldTy env lookup.entry
-    Builder.constrainIn table (Ty.array lookup.tableRows fieldTy) value fieldTy
+    if lookup.tableArity = 0 then
+      throw { context := s!"lookup into '{lookup.tableName}'"
+              message := "the recognized table has arity zero" }
+    if lookup.entry.size ≠ lookup.tableArity then
+      throw { context := s!"lookup into '{lookup.tableName}'"
+              message := s!"the recognized row has {lookup.entry.size} value(s), but the table \
+                            has arity {lookup.tableArity}" }
+    let tableTy := if lookup.tableArity = 1 then
+        Ty.array #[lookup.tableRows] fieldTy
+      else Ty.array #[lookup.tableRows, lookup.tableArity] fieldTy
+    let rowTy := if lookup.tableArity = 1 then fieldTy
+      else Ty.array #[lookup.tableArity] fieldTy
+    let table ← Builder.globalRead lookup.tableName tableTy
+    let values ← lookup.entry.mapM fun entry =>
+      FieldExpr.lower s!"lookup into '{lookup.tableName}'" fieldTy env entry
+    let value ← if lookup.tableArity = 1 then
+        match values[0]? with
+        | some value => pure value
+        | none => throw { context := s!"lookup into '{lookup.tableName}'"
+                          message := "the recognized one-column row has no value" }
+      else Builder.arrayNew values fieldTy
+    Builder.constrainIn table tableTy value rowTy
   unless r.asserts.isEmpty do
     let zero ← Builder.feltConst 0 fieldTy
     for (expr, i) in r.asserts.zipIdx do
@@ -136,9 +155,8 @@ The circuit's own name survives as the artifact's file name, which is where
 `Builder.component` takes `inputSpecs` once and hands it to both functions, so
 the two parameter lists cannot disagree (R2-04).
 
-Each used table becomes one `global.def const`. Only single-column tables reach
-here — `ExportTable.diagnose` rejects wider ones — so flattening the rows is the
-identity on their shape and the emitted array length is the row count. -/
+Each used table becomes one `global.def const`. Rows remain nested in the IR;
+the renderer alone forms LLZK's flat row-major initializer. -/
 private def lower (cfg : Config) (r : Recognized) : Except Diagnostic Module := do
   -- Below every door, not beside one of them: `recognize` establishes these
   -- conditions for the circuits it accepts, but `lowerRecognized` takes a
@@ -149,7 +167,8 @@ private def lower (cfg : Config) (r : Recognized) : Except Diagnostic Module := 
   let globals := r.tables.map fun table => {
     name := table.name
     elemTy := fieldTy
-    values := table.rows.flatten : ConstArray }
+    arity := table.arity
+    rows := table.rows : ConstArray }
   match ← Builder.component (members r fieldTy) (inputSpecs r fieldTy)
       (computeBody fieldTy r) (constrainBody fieldTy r) with
   | some root => return { globals, root }

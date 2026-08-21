@@ -1,6 +1,7 @@
 import Clean.Utils.Primes
 import Clean.Gadgets.Equality
 import Clean.Gadgets.Addition8.Addition8FullCarry
+import Clean.Gadgets.And.And8
 import Clean.Utils.Tactics.ProvableStructDeriving
 import Clean.Utils.Tactics.CircuitProofStart
 import Clean.Backend.LLZK.Circuit
@@ -178,7 +179,7 @@ With `certified_membership`, and the range check `ExportTable.diagnose` performs
 this gives: the emitted `constrain.in` against `@Bytes` holds of a value exactly
 when Clean's `ByteTable.Contains` does. -/
 theorem byteTable_certified :
-    byteTable.Certifies (Gadgets.ByteTable (p := pBabybear)) :=
+    byteTable.Certifies (Gadgets.ByteTable (p := pBabybear)).toRaw :=
   byteTable_certifies
 
 /-- The configuration `Addition8FullCarry` is compiled under.
@@ -189,6 +190,19 @@ type, so D012's obligation is a *precondition of emission* rather than a fact
 recorded next to one. What it still does not establish is `GAPS.md` item 1's
 second half — the caller picks both sides of `Certifies`. -/
 def withBytes : CertifiedConfig (F pBabybear) :=
-  ⟨.babybear, #[⟨byteTable, Gadgets.ByteTable, byteTable_certified, rfl⟩]⟩
+  ⟨.babybear, #[⟨byteTable, Gadgets.ByteTable.toRaw, byteTable_certified⟩]⟩
+
+/-- The concrete ByteXor certificate at the corpus field. -/
+theorem byteXorTable_certified :
+    byteXorTable.Certifies (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw :=
+  LLZK.byteXorTable_certifies
+
+/-- A heterogeneous certified registry: one arity-one table and one arity-three
+table coexist in the public carrier. `And8` uses only `ByteXor`; retaining both
+here makes the carrier property executable rather than merely generic. -/
+def withBytesAndXor : CertifiedConfig (F pBabybear) :=
+  ⟨.babybear,
+    #[⟨byteTable, Gadgets.ByteTable.toRaw, byteTable_certified⟩,
+      ⟨byteXorTable, Gadgets.Xor.ByteXorTable.toRaw, byteXorTable_certified⟩]⟩
 
 end LLZK.Examples

@@ -35,7 +35,7 @@ site: a module that came out of `compile` carries all three.
 
 It does not close `GAPS.md` item 1's second half, and it cannot. Every theorem
 here needs to know *which* Clean `Table` a lookup's `RawTable` came from, and
-`Table.toRaw` has erased that. So the hypothesis `l.table = ct.table.toRaw` is
+`Table.toRaw` has erased that. So the hypothesis `l.table = ct.table` is
 supplied by the caller — for the corpus, by `Test/Lookups.lean`, where it holds
 by `rfl` on a concrete circuit. Making the compiler *demand* it is a change to
 Clean's core.
@@ -51,7 +51,7 @@ variable {F : Type} [FiniteField F]
 
 /-! ## The canonicity hypothesis, discharged -/
 
-/-- **A recognized circuit's exported table values are canonical.**
+/-- **Every value in a recognized circuit's exported table rows is canonical.**
 
 The bound `certified_membership` needs, from the checks the compiler runs rather
 than from the call site. R4a-6's finding was precisely that this composition did
@@ -84,20 +84,21 @@ certificate can say anything about it. -/
 
 The left-hand side is Clean's own lookup constraint, the conjunct
 `ConstraintsHoldFlat` contributes for a `.lookup` operation. The right-hand side
-is membership in the value list the emitted `global.def const` holds, which is
-what `constrain.in %table, %value` asserts under D017.
+is membership in the ordered rows the emitted `global.def const` holds, which is
+what row-valued `constrain.in` asserts under D017.
 
-Stated for a `Lookup` built from `T.toRaw` rather than for one whose `table`
-field merely *equals* it, because `Lookup.entry`'s type depends on
-`table.arity`; a caller with `l.table = T.toRaw` destructures `l` and substitutes. -/
-theorem certified_lookup_contains_iff {T : Table F field} {e : ExportTable}
+Stated for a `Lookup` built from the certified raw table rather than for one
+whose `table` field merely equals it, because `Lookup.entry`'s type depends on
+`table.arity`; a caller with that equality destructures `l` and substitutes. -/
+theorem certified_lookup_contains_iff {T : RawTable F} {e : ExportTable}
     (hcert : e.Certifies T) (hcanon : ∀ n ∈ e.values, n < FiniteField.size F)
-    (entry : Vector (Expression F) T.toRaw.arity) (env : Environment F) :
-    Lookup.Contains ⟨T.toRaw, entry⟩ env
-      ↔ ∃ n ∈ e.values, FiniteField.fromNat n = fromElements (entry.map env) :=
+    (entry : Vector (Expression F) T.arity) (env : Environment F) :
+    Lookup.Contains ⟨T, entry⟩ env
+      ↔ ∃ values ∈ e.rows,
+          values.map FiniteField.fromNat = (entry.map env).toArray :=
   certified_membership hcert hcanon _ _
 
-/-- The queried value, for the single-column tables Stage 1 accepts (D013): the
+/-- The queried value for the retained one-column compatibility path: the
 lookup's one expression, evaluated.
 
 `fromElements` for `field` is the first component, so this is the value
@@ -128,12 +129,13 @@ module's are a permutation of these. -/
 theorem ofSource_lookups_iff [CanonicalRepr F] {cfg : CertifiedConfig F} {src : Source F}
     {r : Recognized} (hrec : recognize cfg.toConfig src = .ok r) (env : Environment F)
     (resolve : ∀ l ∈ FlatOperation.lookups src.operations,
-      ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.toRaw.arity,
-        l = ⟨ct.table.toRaw, entry⟩) :
+      ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.arity,
+        l = ⟨ct.table, entry⟩) :
     (∀ l ∈ FlatOperation.lookups src.operations, l.Contains env)
       ↔ (∀ l ∈ FlatOperation.lookups src.operations, ∀ ct ∈ cfg.tables,
-          ∀ entry : Vector (Expression F) ct.table.toRaw.arity, l = ⟨ct.table.toRaw, entry⟩ →
-            ∃ n ∈ ct.exported.values, FiniteField.fromNat n = fromElements (entry.map env)) := by
+          ∀ entry : Vector (Expression F) ct.table.arity, l = ⟨ct.table, entry⟩ →
+            ∃ values ∈ ct.exported.rows,
+              values.map FiniteField.fromNat = (entry.map env).toArray) := by
   constructor
   · intro hall l hl ct hct entry heq
     have := hall l hl

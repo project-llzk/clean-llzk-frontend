@@ -20,9 +20,9 @@ import Clean.Gadgets.IsZeroField
 and committed as prose (`89a6f4e8`) — R7-06 found nothing in the repository
 could re-run it, and R7-05 found its headline was wrong in a way the raw
 diagnostics would have shown: the counts it summarized as "`lxor`" were mostly
-**unregistered-multi-column-table refusals**. `ByteXorTable` is a 3-column,
-65536-row table, and this backend is single-column-only (D013), so
-`land`/`lor`/`lxor` + `ite` alone do not unlock the bitwise gadgets.
+**unregistered-multi-column-table refusals**. S28 registers the 3-column,
+65536-row `ByteXorTable` and retires that refusal, while preserving the
+independent D033 range refusals.
 
 This file is the sweep, decomposed. Every verdict in the ROADMAP table is a
 `#guard` here, and the refusals are counted *by kind*, so the next coverage
@@ -48,13 +48,13 @@ blockers are witness-IR features anyway (`let`-steps, `mapRange` outputs,
 
 namespace LLZK.Test.Coverage
 
-open Examples (withBytes)
+open Examples (withBytes withBytesAndXor)
 
 private instance : Fact (pBabybear > 2 ^ 16 + 2 ^ 8) := ⟨by decide⟩
 
-/-- How many diagnostics mention `sub`. The decompositions below are what R7-05
-established: a refusal summarized as "the gadget needs `lxor`" was mostly
-lookups into a table D013 cannot register. -/
+/-- How many diagnostics mention `sub`. The decompositions below make the S28
+boundary executable: table refusals disappear while justified witness refusals
+remain. -/
 private def count (sub : String) (ds : Array Diagnostic) : Nat :=
   ds.foldl (fun n d => if (d.message.splitOn sub).length > 1 then n + 1 else n) 0
 
@@ -63,8 +63,9 @@ private def registryRefusal : String := "not in the export registry"
 /-- `.error` diagnostics of a compile, or `#[]` on success — so the guards can
 say "refused for exactly these reasons, in these numbers". -/
 private def diags {Input Output : TypeMap} [ProvableType Input] [ProvableType Output]
+    (cfg : CertifiedConfig (F pBabybear))
     (c : FormalCircuit (F pBabybear) Input Output) : Array Diagnostic :=
-  match compile withBytes c with
+  match compile cfg c with
   | .ok _ => #[]
   | .error ds => ds
 
@@ -85,20 +86,19 @@ diagnostic because `x &&& y ≤ x` proves the result remains below Babybear.
 It deliberately retains the `lxor` diagnostics: the source IR contains only
 `.val` operands, while the byte bounds live in assumptions/constraints that the
 witness recognizer cannot inspect. Treating those hidden bounds as available
-would violate D033's theorem-or-refusal rule. The lookup half remains one per
-`.lookup` operation and awaits D013's retirement (multi-column tables, S28). -/
+would violate D033's theorem-or-refusal rule. S28 supplies the certified
+three-column table, so no registry refusal remains. -/
 
-private def xor32 := diags (Gadgets.Xor32.circuit (p := pBabybear))
-#guard xor32.size = 5 ∧ count "lxor" xor32 = 1 ∧ count registryRefusal xor32 = 4
+private def xor32 := diags withBytesAndXor (Gadgets.Xor32.circuit (p := pBabybear))
+#guard xor32.size = 1 ∧ count "lxor" xor32 = 1 ∧ count registryRefusal xor32 = 0
 
-private def and8 := diags (Gadgets.And.And8.circuit (p := pBabybear))
-#guard and8.size = 1 ∧ count "land" and8 = 0 ∧ count registryRefusal and8 = 1
+#guard (compile withBytesAndXor (Gadgets.And.And8.circuit (p := pBabybear))).toOption.isSome
 
-private def blake3g := diags (Gadgets.BLAKE3.G.circuit (p := pBabybear) 0 1 2 3)
-#guard blake3g.size = 20 ∧ count "lxor" blake3g = 4 ∧ count registryRefusal blake3g = 16
+private def blake3g := diags withBytesAndXor (Gadgets.BLAKE3.G.circuit (p := pBabybear) 0 1 2 3)
+#guard blake3g.size = 4 ∧ count "lxor" blake3g = 4 ∧ count registryRefusal blake3g = 0
 
-private def theta := diags (Gadgets.Keccak256.Theta.circuit (p := pBabybear))
-#guard theta.size = 450 ∧ count "lxor" theta = 50 ∧ count registryRefusal theta = 400
+private def theta := diags withBytesAndXor (Gadgets.Keccak256.Theta.circuit (p := pBabybear))
+#guard theta.size = 50 ∧ count "lxor" theta = 50 ∧ count registryRefusal theta = 0
 
 /-! ## The inverse row: `ite` is not the whole story
 
@@ -107,7 +107,7 @@ because recognition stops there, but the expression also contains `inv`, a
 separate later increment — so the ROADMAP's promised bitwise+`ite` increment
 does not unlock this row either (R7-07). -/
 
-private def isZero := diags (Gadgets.IsZeroField.circuit (F := F pBabybear))
+private def isZero := diags withBytes (Gadgets.IsZeroField.circuit (F := F pBabybear))
 #guard isZero.size = 1 ∧ count "ite" isZero = 1
 
 end LLZK.Test.Coverage

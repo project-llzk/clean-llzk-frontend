@@ -1,5 +1,6 @@
 import Clean.Backend.LLZK.Certificate
 import Clean.Gadgets.ByteLookup
+import Clean.Gadgets.Xor.ByteXorTable
 
 /-!
 # D012, discharged for the tables the corpus uses
@@ -10,7 +11,7 @@ import Clean.Gadgets.ByteLookup
 that one — imports the gadgets the tables belong to:
 
 * `ofStatic_certifies`, there, covers every table a caller can *derive* rather
-  than assert: for any single-column `StaticTable`, the values
+  than assert: for any `StaticTable`, the ordered rows
   `ExportTable.ofStatic` produces are exactly the ones the table contains.
 * `byteTable_certifies`, here, covers `Gadgets.ByteTable`, which *cannot* use
   `ofStatic` because it inlines its `StaticTable` into `Table.fromStatic`, and
@@ -24,7 +25,7 @@ variable {F : Type} [FiniteField F]
 
 /-! ## `Gadgets.ByteTable`
 
-The one table the corpus uses, and the one `ofStatic` cannot reach. -/
+The original one-column corpus table, and the one `ofStatic` cannot reach. -/
 
 section ByteTable
 
@@ -42,15 +43,28 @@ def byteRows : Array (Array Nat) := (Array.range 256).map (#[·])
 /-- **`Gadgets.ByteTable` contains exactly the field elements whose canonical
 representative is a byte, which is exactly what `byteRows` lists.** -/
 theorem byteTable_certifies :
-    (⟨"Bytes", 1, byteRows⟩ : ExportTable).Certifies (Gadgets.ByteTable (p := p)) := by
-  intro t x
-  rw [mem_byteRows_values]
+    (⟨"Bytes", 1, byteRows⟩ : ExportTable).Certifies
+      (Gadgets.ByteTable (p := p)).toRaw := by
+  refine ⟨rfl, rfl, ?_⟩
+  intro t row
+  let x : F p := fromElements (M := field) row
+  have hrow : canonicalRow row = #[FiniteField.val x] := by
+    calc
+      canonicalRow row = canonicalRow (toElements (M := field) x) := by
+        apply congrArg canonicalRow
+        exact (ProvableType.toElements_fromElements row).symm
+      _ = #[FiniteField.val x] := by simp [canonicalRow, explicit_provable_type]
+  rw [hrow]
+  have hmem : #[FiniteField.val x] ∈ byteRows ↔ FiniteField.val x < 256 := by
+    simp [byteRows]
+  rw [hmem]
   show (∃ i : Fin 256, x = Gadgets.fromByte i) ↔ _
   constructor
-  · rintro ⟨i, rfl⟩
+  · rintro ⟨i, hi⟩
     have : ZMod.val (Gadgets.fromByte (p := p) i) = i.val :=
       FieldUtils.natToField_eq _ rfl
-    show ZMod.val (Gadgets.fromByte (p := p) i) < 256
+    rw [hi]
+    change ZMod.val (Gadgets.fromByte (p := p) i) < 256
     rw [this]
     exact i.is_lt
   · intro h
@@ -93,12 +107,83 @@ that the lookup half of `ConstraintsHoldFlat` has no *composed* semantic
 theorem; this is the piece that would go in it. -/
 theorem byteTable_lookup_iff
     (hdiag : ExportTable.diagnose (FiniteField.size (_root_.F p)) ⟨"Bytes", 1, byteRows⟩ = #[])
-    (t : Array (_root_.F p)) (x : _root_.F p) :
-    (Gadgets.ByteTable (p := p)).Contains t x
-      ↔ ∃ n ∈ (⟨"Bytes", 1, byteRows⟩ : ExportTable).values, FiniteField.fromNat n = x :=
+    (t : Array (Vector (_root_.F p) 1)) (row : Vector (_root_.F p) 1) :
+    (Gadgets.ByteTable (p := p)).toRaw.Contains t row
+      ↔ ∃ values ∈ (⟨"Bytes", 1, byteRows⟩ : ExportTable).rows,
+          values.map FiniteField.fromNat = row.toArray :=
   certified_membership byteTable_certifies
-    (ExportTable.values_lt_prime_of_diagnose hdiag) t x
+    (ExportTable.values_lt_prime_of_diagnose hdiag) t row
 
 end ByteTableEndToEnd
+
+/-! ## `Gadgets.Xor.ByteXorTable` -/
+
+section ByteXorTable
+
+open ByteUtils
+
+variable {p : ℕ} [Fact p.Prime] [Fact (p > 512)]
+
+/-- The independent natural row at index `i`: the two bytes followed by their
+bitwise XOR, in the same row-major order the LLZK global uses. -/
+def byteXorRow (i : Fin (256 * 256)) : Array Nat :=
+  let (x, y) := splitTwoBytes i
+  #[x.val, y.val, (x ^^^ y).val]
+
+/-- All 65,536 ByteXor rows, retained as ordered triples. -/
+def byteXorRows : Array (Array Nat) :=
+  ((List.finRange (256 * 256)).map byteXorRow).toArray
+
+/-- The concrete export entry used by S28. -/
+def byteXorTable : ExportTable := ⟨"ByteXor", 3, byteXorRows⟩
+
+@[simp] theorem mem_byteXorRows (row : Array Nat) :
+    row ∈ byteXorRows ↔ ∃ i : Fin (256 * 256), row = byteXorRow i := by
+  simp [byteXorRows, eq_comm]
+
+/-- Converting the gadget's field-valued row to canonical representatives gives
+the independent natural row above. -/
+theorem canonical_byteXorRow (i : Fin (256 * 256)) :
+    let (x, y) := splitTwoBytes i
+    canonicalRow (toElements (M := fieldTriple)
+      (Gadgets.fromByte (p := p) x, Gadgets.fromByte (p := p) y,
+        Gadgets.fromByte (p := p) (x ^^^ y))) = byteXorRow i := by
+  rcases hxy : splitTwoBytes i with ⟨x, y⟩
+  simp [byteXorRow, hxy, canonicalRow, explicit_provable_type,
+    Gadgets.fromByte, FieldUtils.natToField_val]
+
+/-- **The 65,536 ordered triples exported under `@ByteXor` are exactly
+`Gadgets.Xor.ByteXorTable`'s rows.** -/
+theorem byteXorTable_certifies :
+    byteXorTable.Certifies (Gadgets.Xor.ByteXorTable (p := p)).toRaw := by
+  refine ⟨rfl, rfl, ?_⟩
+  intro t row
+  let row3 : Vector (F p) 3 := row
+  change (∃ i : Fin (256 * 256), fromElements (M := fieldTriple) row3 =
+      (let (x, y) := splitTwoBytes i
+       (Gadgets.fromByte x, Gadgets.fromByte y, Gadgets.fromByte (x ^^^ y)))) ↔
+    canonicalRow row3 ∈ byteXorRows
+  rw [mem_byteXorRows]
+  constructor
+  · rintro ⟨i, hi⟩
+    refine ⟨i, ?_⟩
+    have hrow := congrArg (toElements (M := fieldTriple)) hi
+    have hvec : row3 = (toElements (M := fieldTriple)
+        (let (x, y) := splitTwoBytes i
+         (Gadgets.fromByte x, Gadgets.fromByte y,
+           Gadgets.fromByte (x ^^^ y))) : Vector (F p) 3) := by
+      simpa only [ProvableType.toElements_fromElements] using hrow
+    exact (congrArg canonicalRow hvec).trans (canonical_byteXorRow (p := p) i)
+  · rintro ⟨i, hi⟩
+    refine ⟨i, ?_⟩
+    rw [ProvableType.fromElements_eq_iff]
+    have hvec : row3 = (toElements (M := fieldTriple)
+        (let (x, y) := splitTwoBytes i
+         (Gadgets.fromByte x, Gadgets.fromByte y,
+           Gadgets.fromByte (x ^^^ y))) : Vector (F p) 3) :=
+      canonicalRow_injective (hi.trans (canonical_byteXorRow (p := p) i).symm)
+    simpa only [explicit_provable_type] using hvec
+
+end ByteXorTable
 
 end LLZK

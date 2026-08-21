@@ -102,7 +102,8 @@ Reject before rendering:
 - `dataGet` and `hintGet`;
 - u64 trees whose result/intermediate bounds or `.val` bridge are not proved;
 - witness `let`-steps, `mapRange`, `envRange`, and `append` outputs;
-- lookup tables with arity other than 1 (D013);
+- dynamic lookup tables and malformed static rows; S28/D034 accepts static
+  multi-column rows;
 - a configured field whose prime is not the circuit's (D010);
 - a witness cell that reads another cell of its own `.witness m` block, which
   Clean's `dynamicWitnesses` would evaluate to `0` (R2-03, D014);
@@ -131,10 +132,10 @@ ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen them):
 | `Rotation32` | compiles |
 | `Rotation64` | compiles |
 | `Not.Not64` | compiles |
-| `Xor32` | refused — 1 × `lxor` + **4 × unregistered `ByteXorTable`** |
-| `And.And8` | refused — **1 × unregistered table** (`land` now lowers) |
-| `BLAKE3.G` | refused — 4 × `lxor` + **16 × unregistered table** |
-| `Keccak256.Theta` | refused — 50 × `lxor` + **400 × unregistered table** |
+| `Xor32` | refused — 1 × `lxor`; no table refusal remains |
+| `And.And8` | **compiles** — `land` plus one certified arity-three lookup |
+| `BLAKE3.G` | refused — 4 × `lxor`; no table refusal remains |
+| `Keccak256.Theta` | refused — 50 × `lxor`; no table refusal remains |
 | `IsZeroField` | refused — `ite` (and the expression also needs `inv`) |
 | `SHA256.SHA256Round` | n/a — needs `Fact (p > 2^33)`; but see below, field width is not its real blocker |
 
@@ -142,19 +143,20 @@ ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen them):
 `Addition32Full` and `Rotation64` are compositions several gadgets deep. That is
 a real result and it was the surprise of the original sweep.
 
-**The bitwise half has three distinct boundaries.** Every byte-oriented gadget
-looks up `ByteXorTable` or a sibling — **3-column, 65536-row tables**, while this
-backend is single-column-only (D013). S26 additionally proved that the witness
-syntax itself cannot justify every bitwise result:
+**The bitwise half has two remaining boundaries after S28.** Every byte-oriented
+gadget looks up `ByteXorTable` or a sibling — **3-column, 65536-row tables**;
+S28/D034 now preserves and certifies those rows. S26 additionally proved that
+the witness syntax itself cannot justify every bitwise result:
 
 - D033 removes `And8`'s `land` refusal because `x &&& y ≤ x` preserves the
   checked Babybear bound.
 - It retains the XOR rows: their byte bounds live in `FormalCircuit.Assumptions`
   and constraints, not in `Witgen.U64Expr`, so the witness reader cannot prove a
   `.val`-rooted `lxor` result remains below the prime.
-- **Multi-column tables (D013's retirement)** is the remaining `And8` blocker
-  and one XOR-family blocker. It also requires certifying a 65536×3 table
-  through `CertifiedConfig`, whose cost at that size nobody has measured.
+- **Multi-column tables are no longer a blocker.** S28 retires D013, certifies
+  the full 65536×3 table through a heterogeneous `CertifiedConfig`, and promotes
+  `And8` into the external-tool corpus. Scale measurements are in
+  `evidence/S28/scale.md`.
 
 After S28, end-to-end Xor32/Keccak/BLAKE3 still require a source-level range
 contract or a proved constraint-to-witness analysis. Treating their assumptions
@@ -196,7 +198,7 @@ controls. The current u64-related boundaries are:
 |---|---|---|
 | XOR byte bounds are invisible to witness lowering | D033, GAPS §8, coverage and exact negative fixtures | Clean source/range-analysis enhancement; [Clean #429](https://github.com/Verified-zkEVM/clean/issues/429) and [PR #442](https://github.com/Verified-zkEVM/clean/pull/442) explain the prior u64 migration but do not provide exporter-visible evidence. A focused follow-up issue is warranted and not yet opened. |
 | shift counts at least 64 or dynamically unproved | D033 and exact shift-count fixtures | Intentional adapter refusal: Clean masks modulo 64 while LLZK consumes the felt count. Not an upstream bug; schedule a local masked-lowering increment only if needed. |
-| multi-column static lookup rows | D013 and table refusal fixtures | S28, active from S26 evidence tip `91d43ffd`. |
+| multi-column static lookup rows | D013 superseded by D034; row-shape, renderer, and G9 red controls | Resolved by S28 from S26 evidence tip `91d43ffd`; dynamic tables remain out of scope. |
 | wide-field `.val` | D033, GAPS §8, and exact `wideFieldValWitness` refusal fixture | Resolved for the current contract by refusal; general support shares the range-contract/limb-design owner above. |
 
 This register should be updated in the same commit whenever a refusal is added,
@@ -299,7 +301,8 @@ file.
   this mattered: the toolchain gates certify nothing about `@constrain` content.
   `RenderCheck.parse` is now the second line of defense, and
   `Module.render_constraintSurface` ties every successfully returned text to the
-  typed module's `readMember`, `constrainEq`, and `constrainIn` sequence. This
+  typed module's globals, `readMember`, `arrayNew`, `constrainEq`, and
+  `constrainIn` sequence. This
   closes GAPS item 2 without closing D017's assumption about LLZK semantics.
 - **Copy canonicalisation is proved stepwise (A7).**
   `CopyCanon.step_preserves`, composed with `WExpr.eval_rename` and

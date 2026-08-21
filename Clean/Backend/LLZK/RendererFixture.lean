@@ -22,7 +22,8 @@ parameter list goes to both functions.
 namespace LLZK.RendererFixture
 
 private def felt : Ty := .felt "babybear"
-private def bytes : Ty := .array 4 felt
+private def bytes : Ty := .array #[2, 2] felt
+private def bytePair : Ty := .array #[2] felt
 
 /-- Read one of the input values the component builder hands the body. The
 builder passes inputs as an array, so a fixture that asks for a position the
@@ -65,11 +66,14 @@ def demoModule : Except Diagnostic Module := do
       let w0 ← Builder.readMember self "w0" felt
       let out0 ← Builder.readMember self "out0" felt
       let table ← Builder.globalRead "Bytes" bytes
-      Builder.constrainIn table bytes w0 felt
+      let row ← Builder.arrayNew #[w0, out0] felt
+      Builder.constrainIn table bytes row bytePair
       Builder.constrainEq out0 lhs felt)
   match root with
-  | some root => return { globals := #[{ name := "Bytes", elemTy := felt, values := #[0, 1, 2, 3] }],
-                          root }
+  | some root =>
+      let bytesGlobal : ConstArray :=
+        { name := "Bytes", elemTy := felt, arity := 2, rows := #[#[0, 1], #[2, 3]] }
+      return { globals := #[bytesGlobal], root }
   | none => .error { context := "renderer fixture", message := "unallocated SSA value" }
 
 /-- A component with no members, no parameters and no constraints, so the

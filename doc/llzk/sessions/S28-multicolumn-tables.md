@@ -1,7 +1,7 @@
 # S28 — Multi-column lookup tables: retire D013
 
-Status: active; pinned syntax, row representation, and certificate design are
-settled by D034; lowering has not begun
+Status: implementation complete; clean checkpoint, G0-G12 acceptance, and
+post-completion adversarial review pending
 Depends on: S26 implementation and evidence tip
 `91d43ffd0b4dcfd0841cc97f402b2d6006c58358`
 Branch: `clean-to-llzk/s28-multicolumn-tables`
@@ -203,3 +203,25 @@ issue creation occurred during bootstrap.
 The mandatory LLZK syntax probe is preserved in
 `evidence/S28/llzk-multicolumn-ops.md`, and D034 records the resulting
 row/certificate design. No lowering code changed while making that decision.
+
+## Implementation state
+
+The interrupted implementation was recovered and completed on 2026-08-22.
+`Ty.array` carries dimensions, `ConstArray` retains nested rows,
+`RecognizedLookup` retains every column, and arity-three queries lower through
+`array.new`. Both G9 readers compare ordered polynomial rows and nested globals;
+their split-row, swapped-column, and regrouped-global controls are red.
+
+`ExportTable.Certifies` now ranges over heterogeneous `RawTable` rows and ties
+name, arity, and ordered canonical rows together. `byteXorTable_certifies`
+covers the full table, `withBytesAndXor` holds arity-one and arity-three tables
+together, and the lookup and `spec_of_compile` chains are instantiated at
+`And8`. The corpus contains 15 artifacts and 51 vectors, of which `And8`
+contributes six.
+
+All changed backend test targets pass with `--wfail`. Direct scale measurements
+are in `evidence/S28/scale.md`; the coverage delta is in
+`evidence/S28/coverage.md`. The remaining acceptance sequence is deliberately
+separate: commit this implementation/evidence tree, run the theorem probe and
+full pinned G0-G12 suite on that clean commit, record `gates.txt`, then perform
+the requested adversarial review against the frozen result.

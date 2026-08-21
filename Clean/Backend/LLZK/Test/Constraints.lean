@@ -44,6 +44,8 @@ private def mulSrc : Source Bab := Compilable.source multiply
 private def decSrc : Source Bab := Compilable.source decompose
 private def addSrc : Source Bab :=
   Compilable.source (Gadgets.Addition8FullCarry.circuit (p := pBabybear))
+private def andSrc : Source Bab :=
+  Compilable.source (Gadgets.And.And8.circuit (p := pBabybear))
 
 /-! ## The corpus agrees
 
@@ -57,11 +59,11 @@ otherwise drop out of the gate silently. -/
 -- emission (D018) and a corpus entry that dropped one would still compile.
 #guard Corpus.corpus.all fun e => e.constraintsAgree ≠ some false
 #guard Corpus.corpus.all fun e => e.witnessAgree ≠ some false
-#guard (Corpus.corpus.filter (·.witnessAgree = some true)).size == 8
+#guard (Corpus.corpus.filter (·.witnessAgree = some true)).size == 9
 
--- Eight of the fourteen corpus entries have a Clean source. The other six are the
+-- Nine of the fifteen corpus entries have a Clean source. The other six are the
 -- registry conformance squares, built from a `Recognized` — see `registryEntry`.
-#guard (Corpus.corpus.filter (·.constraintsAgree = some true)).size == 8
+#guard (Corpus.corpus.filter (·.constraintsAgree = some true)).size == 9
 #guard (Corpus.corpus.filter (·.constraintsAgree = none)).size == 6
 
 /-! ## The gate can go red -/
@@ -106,6 +108,7 @@ private def bumped (s : Source Bab) : Source Bab :=
 -- by the comparison being red for everything.
 #guard cross babybear mulSrc mulSrc
 #guard cross withBytes addSrc addSrc
+#guard cross withBytesAndXor andSrc andSrc
 
 -- A module compared against a different circuit's constraints.
 #guard !cross babybear mulSrc decSrc
@@ -124,6 +127,7 @@ private def bumped (s : Source Bab) : Source Bab :=
 
 -- A missing lookup.
 #guard !cross withBytes addSrc (noLookups addSrc)
+#guard !cross withBytesAndXor andSrc (noLookups andSrc)
 
 -- A lookup against the wrong table: the comparison is on the name as well as the
 -- queried polynomial, so a `constrain.in` pointed at a different global is red.
@@ -132,6 +136,62 @@ private def renameTable (s : Source Bab) : Source Bab :=
       | .lookup l => .lookup { l with table := { l.table with name := "Other" } }
       | o => o }
 #guard !cross withBytes addSrc (renameTable addSrc)
+
+/-! ### S28: row shape is observable
+
+These controls preserve enough scalar data that a flattened model could accept
+them. The row-preserving G9 model must reject all three. -/
+
+/-- Replace each three-column lookup by three one-column lookups with the same
+table name. This is the exact silently-weaker lowering D013 forbade. -/
+private def scalarTable (name : String) : RawTable Bab where
+  name := name
+  arity := 1
+  Contains _ _ := True
+  Soundness _ _ := True
+  Completeness _ _ := True
+  imply_soundness _ _ _ := trivial
+  implied_by_completeness _ _ _ := trivial
+
+private def splitLookupRows (s : Source Bab) : Source Bab :=
+  { s with operations := s.operations.flatMap fun
+      | .lookup l => l.entry.toArray.toList.map fun e =>
+          .lookup { table := scalarTable l.table.name, entry := #v[e] }
+      | o => [o] }
+
+#guard !cross withBytesAndXor andSrc (splitLookupRows andSrc)
+
+/-- Exchange the first two columns while keeping the same three scalar
+expressions and the same table. -/
+private def swapLookupColumns (s : Source Bab) : Source Bab :=
+  { s with operations := s.operations.map fun
+      | .lookup l =>
+          match l.entry.toArray with
+          | #[x, y, z] => .lookup {
+              table := (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw
+              entry := #v[y, x, z] }
+          | _ => .lookup l
+      | o => o }
+
+#guard !cross withBytesAndXor andSrc (swapLookupColumns andSrc)
+
+/-- Regroup the first two triples into widths two and four. Flattening produces
+the exact same scalar sequence; only the row boundaries change. -/
+private def regroupedByteXorRows : Array (Array Nat) :=
+  match byteXorRows[0]?, byteXorRows[1]? with
+  | some first, some second =>
+      #[first.take 2, first.extract 2 first.size ++ second]
+        ++ byteXorRows.extract 2 byteXorRows.size
+  | _, _ => #[]
+
+private def regroupedByteXor : Config :=
+  .unsafeWithTables .babybear #[{ byteXorTable with rows := regroupedByteXorRows }]
+
+#guard regroupedByteXorRows.flatten == byteXorRows.flatten
+#guard regroupedByteXorRows != byteXorRows
+#guard match compileSource withBytesAndXor.toConfig andSrc with
+  | .ok m => !(agree regroupedByteXor andSrc m)
+  | .error _ => false
 
 /-! ### The field, which G9 used to ignore entirely (A4)
 

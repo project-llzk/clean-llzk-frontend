@@ -147,6 +147,13 @@ def corpus : Array Entry :=
      -- first discarded bit, and Babybear's largest representative.
      Entry.ofSource babybear "Bits8" (Compilable.source bits8)
        #[#[0], #[1], #[2], #[255], #[256], #[2013265920]],
+     -- S28's row-valued lookup slice. Boundary bytes exercise the admitted
+     -- `land` witness while the out-of-assumption values continue to compare
+     -- compute semantics only (`llzk-witgen` ignores `@constrain`).
+     Entry.ofSource withBytesAndXor "And8"
+       (Compilable.source (Gadgets.And.And8.circuit (p := pBabybear)))
+       #[#[0, 0], #[1, 2], #[128, 255], #[255, 255], #[256, 1],
+         #[2013265920, 2013265920]],
      -- No carry, carry out of the low byte, and both extremes of the documented
      -- input range (two bytes plus a boolean carry-in) -- then three vectors
      -- *outside* the gadget's `Assumptions`, which R2's C5 recorded as untested.

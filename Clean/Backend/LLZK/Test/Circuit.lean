@@ -82,10 +82,9 @@ the *recognizer* and so did not hold of `lowerRecognized`, the door the six
 
 One path listed in R2-07 has no fixture because it is unreachable, not because it
 is untested: `recognizeLookup`'s "lookup queries n values" branch. `Lookup.entry`
-is a `Vector (Expression F) table.arity`, and `diagnoseRegistry` has already
-rejected every registered arity other than 1, so a lookup that gets past the
-arity comparison necessarily queries exactly one value. The branch stays as a
-total match Lean requires; it is commented as such in `Analyze.lean`.
+is a `Vector (Expression F) l.table.arity`; after the registered arity equals
+that arity, the converted array necessarily has the registered width. The check
+stays as defense in depth against representation drift.
 -/
 
 namespace LLZK.Test.Circuit
@@ -709,6 +708,12 @@ private def emitUncertified (cfg : Config) (src : Source (F pBabybear)) : String
 private def malformedTable : Config :=
   .unsafeWithTables .babybear #[{ name := "not a symbol", arity := 2, rows := #[#[0]] }]
 
+private def wrongWidthTable : Config :=
+  .unsafeWithTables .babybear #[{ name := "Bytes", arity := 3, rows := #[#[0, 1]] }]
+
+private def zeroArityTable : Config :=
+  .unsafeWithTables .babybear #[{ name := "Bytes", arity := 0, rows := #[#[]] }]
+
 /-- A table named `Main` collides with the component in the module's symbol
 table: `llzk-opt` reports "symbol @Main references a 'global.def' but expected a
 'struct.def'". R2 control S2. -/
@@ -919,11 +924,24 @@ operation 0 (lookup): lookup into table 'Bytes' has arity 2 but the registered t
 /--
 info: compilation failed:
 table 'not a symbol': name is not a legal MLIR symbol; it must start with a letter or underscore and contain only letters, digits and underscores
-table 'not a symbol': arity is 2; only single-column tables are supported, because a wider one needs an `array.new` query and a multi-dimensional `constrain.in`
 table 'not a symbol': row 0 has 1 value(s) but the arity is 2
 -/
 #guard_msgs in
 #eval IO.print (emitUncertified malformedTable oneLookup)
+
+/--
+info: compilation failed:
+table 'Bytes': row 0 has 2 value(s) but the arity is 3
+-/
+#guard_msgs in
+#eval IO.print (emitUncertified wrongWidthTable oneLookup)
+
+/--
+info: compilation failed:
+table 'Bytes': has arity zero; a lookup row must contain at least one field element
+-/
+#guard_msgs in
+#eval IO.print (emitUncertified zeroArityTable oneLookup)
 
 /--
 info: compilation failed:
@@ -1040,12 +1058,15 @@ witness cell 0: constant 2013265928 is not below the field prime 2013265921; `fe
 
 /--
 info: compilation failed:
-lookup 0 into @Bytes: constant 2013265928 is not below the field prime 2013265921; `felt.const` reduces its operand modulo the prime, so the emitted module would not denote what this expression says
+lookup 0 into @Bytes, column 0: constant 2013265928 is not below the field prime 2013265921; `felt.const` reduces its operand modulo the prime, so the emitted module would not denote what this expression says
 -/
 #guard_msgs in
 #eval IO.print (viaRecognized
   { inputSize := 1, witnesses := #[], asserts := #[],
-    lookups := #[{ tableName := "Bytes", tableRows := 1, entry := .const (pBabybear + 7) }],
+    lookups := #[{ tableName := "Bytes"
+                   tableRows := 1
+                   tableArity := 1
+                   entry := #[.const (pBabybear + 7)] }],
     tables := #[], outputs := #[] })
 
 -- The `env.size = 0` branch of the undefined-variable refusal: a distinct

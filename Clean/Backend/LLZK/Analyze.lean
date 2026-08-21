@@ -47,9 +47,9 @@ time, so they cannot disagree with the global the module defines. -/
 structure RecognizedLookup where
   tableName : String
   tableRows : Nat
-  /-- The queried value. Single-column tables only, which `ExportTable.diagnose`
-  enforces. -/
-  entry : FieldExpr
+  tableArity : Nat
+  /-- Every queried field expression, in column order. -/
+  entry : Array FieldExpr
 deriving Repr
 
 /-- A circuit recognized into the Stage-1 subset: everything the lowering needs,
@@ -96,7 +96,8 @@ def Recognized.checkLowerable (prime : Nat) (r : Recognized) : Except Diagnostic
   for (e, i) in r.asserts.zipIdx do
     FieldExpr.checkLowerable prime s!"assertion {i}" e
   for (l, i) in r.lookups.zipIdx do
-    FieldExpr.checkLowerable prime s!"lookup {i} into @{l.tableName}" l.entry
+    for (e, j) in l.entry.zipIdx do
+      FieldExpr.checkLowerable prime s!"lookup {i} into @{l.tableName}, column {j}" e
   for (e, j) in r.outputs.zipIdx do
     FieldExpr.checkLowerable prime s!"output {j}" e
 
@@ -143,20 +144,14 @@ private def recognizeLookup [CanonicalRepr F] (tables : Array ExportTable)
              message := s!"lookup into table '{l.table.name}' has arity {l.table.arity} but the \
                            registered table has arity {table.arity}" }
   else
-    match l.entry.toArray with
-    | #[entry] =>
-      .ok { tableName := table.name, tableRows := table.rows.size
-            entry := FieldExpr.ofExpression entry }
-    -- Unreachable, and kept because the match must be total. `Lookup.entry` is a
-    -- `Vector (Expression F) l.table.arity`, `diagnoseRegistry` has already
-    -- rejected every registered arity other than 1, and the comparison above has
-    -- already forced `l.table.arity = 1` — so `entry` has exactly one element.
-    -- R2-07 listed this as a rejection path with no fixture; it has none because
-    -- nothing can reach it, which is a better answer than a fixture.
-    | queried =>
+    let queried := l.entry.toArray
+    if queried.size ≠ table.arity then
       .error { context
-               message := s!"lookup queries {queried.size} value(s); only single-column tables \
-                             are supported" }
+               message := s!"lookup queries {queried.size} value(s), but table \
+                             '{table.name}' has arity {table.arity}" }
+    else
+      .ok { tableName := table.name, tableRows := table.rows.size,
+            tableArity := table.arity, entry := queried.map FieldExpr.ofExpression }
 
 /-- Recognize one flat operation. `base` is the circuit variable a witness block
 starting here would define first. -/

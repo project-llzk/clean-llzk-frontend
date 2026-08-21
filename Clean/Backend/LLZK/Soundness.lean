@@ -85,13 +85,14 @@ theorem constraintsHoldFlat_of_emitted [CanonicalRepr F] {cfg : CertifiedConfig 
     (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
     (hrec : recognize cfg.toConfig src = .ok r)
     (resolve : ∀ l ∈ FlatOperation.lookups src.operations,
-      ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.toRaw.arity,
-        l = ⟨ct.table.toRaw, entry⟩)
+      ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.arity,
+        l = ⟨ct.table, entry⟩)
     (env : Environment F) (outs : Nat → F)
     (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
     (hlookups : ∀ l ∈ FlatOperation.lookups src.operations, ∀ ct ∈ cfg.tables,
-      ∀ entry : Vector (Expression F) ct.table.toRaw.arity, l = ⟨ct.table.toRaw, entry⟩ →
-        ∃ n ∈ ct.exported.values, FiniteField.fromNat n = fromElements (entry.map env)) :
+      ∀ entry : Vector (Expression F) ct.table.arity, l = ⟨ct.table, entry⟩ →
+        ∃ values ∈ ct.exported.rows,
+          values.map FiniteField.fromNat = (entry.map env).toArray) :
     FlatOperation.ConstraintsHoldFlat env src.operations := by
   rw [FlatOperation.constraintsHoldFlat_iff_forall_mem]
   exact ⟨(eqs_iff_of_agree ha hm env outs).mp heqs |>.1,
@@ -149,15 +150,16 @@ theorem spec_of_compile [CanonicalRepr F] {cfg : CertifiedConfig F}
     (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
     (hrec : recognize cfg.toConfig (Compilable.source (F := F) c) = .ok r)
     (resolve : ∀ l ∈ FlatOperation.lookups (Compilable.source (F := F) c).operations,
-      ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.toRaw.arity,
-        l = ⟨ct.table.toRaw, entry⟩)
+      ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.arity,
+        l = ⟨ct.table, entry⟩)
     (hnoint : ((c.main (varFromOffset Input 0)).operations (size Input)).interactions = [])
     (env : Environment F) (outs : Nat → F)
     (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
     (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source (F := F) c).operations,
-      ∀ ct ∈ cfg.tables, ∀ entry : Vector (Expression F) ct.table.toRaw.arity,
-        l = ⟨ct.table.toRaw, entry⟩ →
-          ∃ n ∈ ct.exported.values, FiniteField.fromNat n = fromElements (entry.map env))
+      ∀ ct ∈ cfg.tables, ∀ entry : Vector (Expression F) ct.table.arity,
+        l = ⟨ct.table, entry⟩ →
+          ∃ values ∈ ct.exported.rows,
+            values.map FiniteField.fromNat = (entry.map env).toArray)
     (input : Input F)
     (hinput : eval env (varFromOffset Input 0 : Var Input F) = input)
     (hassm : c.Assumptions input) :

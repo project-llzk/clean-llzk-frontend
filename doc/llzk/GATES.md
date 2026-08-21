@@ -70,13 +70,15 @@ them and no input vectors. G3/G4 run over them. That is the repair for R2-04 —
 the renderer golden had never been shown to a tool and was in fact invalid LLZK,
 while its own docstring claimed `e2e.sh` fed it to `llzk-opt`.
 
-Since A5, `Module.render` is itself fail-closed. It parses `struct.readm`,
-`constrain.eq`, and `constrain.in` from the rendered `@constrain` function and
-compares them with the typed module before returning text. The round-trip
+Since A5, `Module.render` is itself fail-closed. S28 extends its independent
+readback to `global.def` and `array.new` alongside `struct.readm`,
+`constrain.eq`, and `constrain.in`, so table dimensions, row-major values, row
+construction, and membership are compared with the typed module before text is
+returned. The round-trip
 theorem is `Module.render_constraintSurface`; `Test/Print.lean` pins direct
-parses and five red mutations, including the member-alias and dropped-constraint
-changes the LLZK binaries accept. Thus G2 now covers semantic constraint-surface
-drift as well as byte drift.
+parses and red mutations, including member aliasing, dropped constraints,
+changed row grouping, malformed row construction, and wrong row field types.
+Thus G2 covers semantic constraint/table-surface drift as well as byte drift.
 
 There is deliberately no `#emit_llzk` macro. `#eval IO.print (LLZK.emit cfg
 "Name" circuit)` already does that job — the golden tests use exactly that form —
@@ -145,7 +147,9 @@ input vectors; it does not pass G9.
 Falsifiability is part of the gate rather than a note about it:
 `Test/Constraints.lean` perturbs the Clean side — dropping a constraint, bumping
 a coefficient, duplicating a constraint, dropping the lookup, substituting
-another circuit — and pins that the comparison goes red for each.
+another circuit — and pins that the comparison goes red for each. S28 adds
+row-specific controls: splitting a row into scalar memberships, swapping
+columns, and regrouping a global without changing its flattened scalar bag.
 
 **G9 is not a property of the corpus.** Since S17 the comparison is a
 *precondition of emission*: `ConstraintSet.compileSource'` runs it and refuses to

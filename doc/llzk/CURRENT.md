@@ -80,16 +80,19 @@ Current session: **S28** — bootstrapped 2026-08-21 from final S26 evidence tip
 `91d43ffd0b4dcfd0841cc97f402b2d6006c58358`. Its scope is to retire D013 with
 row-preserving multi-column tables and certificates, then demonstrate `And8`
 end to end. The mandatory pinned-LLZK syntax probe and row/certificate decision
-come before lowering. A pre-implementation adversarial review strengthened the
+preceded lowering. A pre-implementation adversarial review strengthened the
 packet's G9 and certificate-carrier obligations and added the missing exact
 wide-field `.val` refusal fixture; its targeted warning-free build passed, with
-evidence in `evidence/S28/pre-implementation-review.txt`. No
-S28 syntax decision, lowering, certificate change, corpus change, compatibility
-gate, push, or external issue creation has occurred.
+evidence in `evidence/S28/pre-implementation-review.txt`. D034 is now
+implemented: the IR, renderer, recognizer, G9 readers, and certificate chain all
+preserve ordered rows; the full `ByteXorTable` is certified; and `And8` is the
+fifteenth corpus artifact with six vectors. Targeted warning-free Lean builds
+and direct pinned-tool scale probes pass. Final G0-G12 acceptance remains; no
+push or external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 pre-implementation)
+Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 acceptance pending)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -333,8 +336,8 @@ an explicit decision, which was given.
     35 after the pre-S28 wide-field `.val` control);
     `CertifiedTable` had no
     name tie, leaving `spec_of_compile`'s lookup hypothesis incomparable with
-    module satisfaction under swapped names (R7-12, fixed with
-    `name_certifies`); the coverage sweep was unreproducible (fixed —
+    module satisfaction under swapped names (R7-12, now a name conjunct of
+    `ExportTable.Certifies`); the coverage sweep was unreproducible (fixed —
     `Test/Coverage.lean` pins every verdict and its decomposition); and eight
     document-drift items (R7-13…17). `review/R7-findings.md`,
     `evidence/R7/`.
@@ -352,10 +355,11 @@ an explicit decision, which was given.
   measured coverage update are implemented and G0-G12 are green on `8951f016`.
 - Decision complete: D033 settles the width/field policy and `U64Expr.val`
   bridge as a recursively proved bound plus explicit refusal.
-- In progress: **S28 pre-implementation**, from final S26 evidence tip
-  `91d43ffd`. The adversarial bootstrap review is resolved; D013's row encoding,
-  exact LLZK syntax, generic certificate statement, and 65536×3 scale result
-  remain undecided, and lowering has not begun.
+- In progress: **S28 acceptance**, from final S26 evidence tip `91d43ffd`. D034
+  settles the exact syntax and row/certificate model; implementation, the full
+  65536×3 certificate, `And8` corpus entry, targeted tests, and direct scale
+  probes are complete. A clean implementation commit, full G0-G12 run, and
+  post-completion adversarial review remain.
 - Blocked: none.
 
 ## Last green gates
@@ -529,8 +533,8 @@ where capability grows; S28 is where the *library* does.
 ## Roadmap after R7
 
 Stage 1 is finished, reproduced, and reviewed three times by sessions that did
-not write it. What remains sorts into five tracks. S28 is currently active at
-bootstrap; the rest are choices or dependent follow-ups.
+not write it. What remains sorts into five tracks. S28 is currently at final
+acceptance; the rest are choices or dependent follow-ups.
 
 **The two milestones, stated in the grant's terms.** Milestone 1 — one Clean
 circuit compiled through the whole LLZK pipeline, validated end to end — is
@@ -619,10 +623,9 @@ one negative fixture):
   exact; `bitsOf` lowers directly. This removes `And8`'s `land` refusal and adds
   lookup-free `LowByte`/`Bits8` corpus entries, while correctly retaining XOR
   rows whose range evidence is outside witness IR.
-- **Multi-column tables** (D013) — **S28**, immediately after, because it is
-  the remaining `And8` unlock and one XOR-family blocker: every byte-oriented
-  bitwise gadget looks up a 3-column `ByteXorTable`-family table. `array.new`, a
-  multi-dimensional `constrain.in`, and table certification at 65536×3.
+- **Multi-column tables** (D013 superseded by D034) — **S28, implemented; final
+  acceptance pending**. Ordered `array.new` rows, multi-dimensional
+  `constrain.in`, row-preserving G9, and certification at 65536×3 unlock `And8`.
 - **A range contract visible to witness lowering** before claiming end-to-end
   Xor32/Keccak/BLAKE3: either source annotations or a proved constraint
   analysis, never an unstated use of `FormalCircuit.Assumptions`.

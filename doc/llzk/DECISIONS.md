@@ -310,34 +310,38 @@ easy to mistake for the recorded gap.
 **The trust assumption is discharged, by S16.** It was exactly one sentence —
 *the rows supplied in `Config.tables` are the rows of the Clean table of that
 name* — and one sentence is something you can write down as a `Prop` and prove.
-`ExportTable.Certifies` in `Clean/Backend/LLZK/TableCert.lean` is that `Prop`,
-and two theorems discharge it for every table this backend can be given:
+`ExportTable.Certifies` in `Clean/Backend/LLZK/Certificate.lean` is that `Prop`.
+S28 generalized it from scalar values to ordered `RawTable` rows, including
+name and arity. The discharge theorems cover every table currently exported:
 
-- `ofStatic_certifies` — for *any* single-column `StaticTable`. `ofStatic`
-  computes the rows from the table's own `row` function, so the only content is
-  that `FiniteField.val` loses nothing, which is `val_injective`.
+- `ofStatic_certifies` — for *any* `StaticTable`, at any `ProvableType` row
+  arity. `ofStatic` computes the rows from the table's own `row` function, so
+  the only content is that the ordered canonical representation loses nothing.
 - `byteTable_certifies` — for `Gadgets.ByteTable`, the case this entry's
   follow-up said was open because it inlines its `StaticTable` and naming that
   breaks unrelated proofs. It does not need naming: `StaticTable.toTable` defines
   `Contains` from the `row` function alone, and `contains_iff` already relates
-  that to `x.val < 256`. `Examples.byteTable_certified` closes the loop by `rfl`.
+  that to `x.val < 256`. `Examples.byteTable_certified` closes the loop.
+- `byteXorTable_certifies` — for the full 65,536-row, arity-three
+  `Gadgets.Xor.ByteXorTable`, relating each ordered field triple to its emitted
+  canonical natural row.
 
 `certified_membership` is the payoff, and it is where the range check S08 added
 does its work: for a certified table with canonical values, Clean's `Contains`
-holds of `x` exactly when `x` is one of the field elements the emitted array
-holds — which is what the emitted `constrain.in` asserts.
+holds of an ordered row exactly when that field row is one of the rows the
+emitted array holds — which is what the emitted `constrain.in` asserts.
 
 **The certificate is carried, not enforced — and an earlier version of this
 entry said otherwise.** `CertifiedConfig` holds `CertifiedTable`s and is what
 the public entry points take (S24; it was `Config.ofCertified`, which erased
-them, when this was written), and `Examples.withBytes` is one, so the corpus's
-only lookup table has its proof next to its rows and changing the rows breaks
-the build. But R4a-2 broke the
+them, when this was written). `Examples.withBytesAndXor` carries both current
+lookup tables, so each has its proof next to its rows and changing the rows
+breaks the build. But R4a-2 broke the
 "cannot be called without a proof" reading: the caller chooses *both* the export
 table and the Clean table, and nothing ties the latter to the table the circuit's
 `.lookup` names — that is a `RawTable`, resolved by name, and `Table.toRaw` has
 erased which `Table` it came from. `selfTable e` with
-`Contains _ x := val x ∈ e.values` certifies any rows at all, and the reviewer
+`Contains _ row := canonicalRow row ∈ e.rows` certifies any rows at all, and the reviewer
 compiled `Addition8FullCarry` with a one-row `@Bytes`.
 
 So the residual is precise: the obligation is stated, and proved for every table
@@ -348,12 +352,15 @@ into `Lookup`, which is a change to Clean's core rather than to this backend.
 was proved and instantiated nowhere, with its canonicity hypothesis left to the
 caller (R4a-6). `ExportTable.values_lt_prime_of_diagnose` discharges that
 hypothesis from the check the compiler already runs — the one S08 added for
-R2-02 — and `byteTable_lookup_iff` composes the two:
+R2-02 — and the byte/ByteXor lookup theorems compose the two. For the original
+one-column case:
 
 > `Gadgets.ByteTable.Contains t x  ↔  ∃ n ∈ @Bytes's values, fromNat n = x`
 
 The left-hand side is Clean's lookup constraint; the right-hand side is what the
-emitted `constrain.in %Bytes, %x` asserts. Everything between them is a theorem.
+emitted `constrain.in %Bytes, %x` asserts. S28 states the same relation over an
+ordered array of field values and instantiates it at `And8`. Everything between
+them is a theorem.
 
 So what is left is not "the rows are trusted". It is D017's reading of
 `constrain.in` as membership, which is a statement about LLZK, and the same
@@ -375,7 +382,7 @@ Clean-side session with its own review, not to a backend increment.
 
 ## D013 — Single-column tables only, for now
 
-**Status:** accepted
+**Status:** superseded by D034; retired by S28
 **Date:** 2026-08-01
 **Enacted by:** S06
 
@@ -383,6 +390,11 @@ A wider table needs an `array.new` query and a multi-dimensional `constrain.in`,
 neither of which the emitter IR has. Rather than guess at that encoding, arity
 other than 1 is refused with a diagnostic that says what it would take. Clean's
 `ByteTable` — the Stage-1 target — is single-column.
+
+S28 performed the required exact-pin probe and implemented D034. Wider static
+tables are now accepted as ordered rows; arity zero, row-width mismatches, and
+malformed row types remain refused. This entry remains as the historical reason
+the earlier frontend failed closed rather than guessing.
 
 ## D014 — Differential testing compares against Clean's proved witness semantics
 
@@ -857,9 +869,10 @@ and `lowerRecognized` are Lean-public and take a plain `Config`; G12 is what
 gates any new caller of them — R7-13.)
 
 Two consequences worth naming. The type is indexed by `F`, which `Config` was
-not, because a `CertifiedTable F` mentions a Clean `Table F field`; that is why
+not, because a `CertifiedTable F` mentions a Clean `RawTable F`; that is why
 `Examples.babybear` is now a `CertifiedConfig (F pBabybear)` rather than a
-field-agnostic value. And the generic half of `TableCert.lean` moved to
+field-agnostic value. S28's `RawTable` carrier lets arity-one and arity-three
+certificates coexist. And the generic half of `TableCert.lean` moved to
 `Certificate.lean`, so that `WitnessCheck.lean` can name `CertifiedConfig`
 without the compiler's public surface transitively importing
 `Clean.Gadgets.ByteLookup`.
@@ -1123,8 +1136,9 @@ drop every `constrain.eq`, or emit an empty `@constrain`, and every pinned LLZK
 binary gate would remain green. The toolchain checks well-formedness, not that
 the concrete constraint program is the typed one G9 approved.
 
-The supported renderer now reads back exactly the three statement forms unique
-to that surface: `struct.readm`, `constrain.eq`, and `constrain.in`. The reader
+The supported renderer reads back every protected form at that seam:
+`global.def`, `struct.readm`, `array.new`, `constrain.eq`, and `constrain.in`.
+The reader
 extracts SSA indices, the member name, operand order, and complete rendered type
 syntax from inside the concrete `@constrain` function. The type reader rebuilds
 `Ty` rather than sharing `Ty.render`, so a field-name or nested-array rendering
@@ -1133,11 +1147,12 @@ bug does not affect both sides of the comparison. `Module.render` returns an
 projection; `EmitMain` and `renderResult` both go through it.
 
 The theorem `Module.render_constraintSurface` states the enforced round trip.
-Direct parser controls and five mutations make its success premise non-vacuous
-and its failure direction visible. This closes GAPS section 2 at the backend's
+Direct parser controls and mutations make its success premise non-vacuous and
+its failure direction visible. This closes GAPS section 2 at the backend's
 concrete-text seam without claiming a formal LLZK semantics: D017 remains, and a
-future constraint-only statement constructor must extend this reader or reopen
-the claim.
+future table/constraint-surface constructor must extend this reader or reopen
+the claim. S28 extended the original A5 surface with the global and row
+constructor when multi-column membership made them semantically load-bearing.
 
 ## D029 — Make copy canonicalisation a proved semantic step
 
@@ -1356,7 +1371,7 @@ operations. It therefore does not weaken the wide-field `val` refusal.
 
 **Date:** 2026-08-21
 
-**Enacted by:** S28 design checkpoint; implementation and scale acceptance pending
+**Enacted by:** S28
 
 The exact accepted LLZK source and Nix tools settle the target surface. A static
 multi-column table is one `array.type` with dimensions `[row-count, arity]` and
@@ -1369,17 +1384,18 @@ witness-execution probes are recorded in
 `evidence/S28/llzk-multicolumn-ops.md`; witgen ignores `@constrain`, so D017 is
 unchanged.
 
-The backend IR will represent an array type by a nonempty ordered dimension
-vector plus one scalar element type. `ConstArray` will retain `arity` and
-`Array (Array Nat)` rows, derive its declared dimensions and flat row-major
+The backend IR represents an array type by an ordered dimension vector plus one
+scalar element type; supported builders and render readback enforce a nonempty
+dimension list. `ConstArray` retains `arity` and
+`Array (Array Nat)` rows, derives its declared dimensions and flat row-major
 initializer from that one structure, and never use the flattened values as the
-semantic table representation. A recognized lookup will retain every entry
+semantic table representation. A recognized lookup retains every entry
 expression in order. Arity greater than one lowers those entries to one
 `array.new` row and constrains that row against the global; arity one may retain
 LLZK's scalar degenerate form, while every backend comparison still represents
 it as a one-element row.
 
-G9 will make the same distinction observable. `ConstraintSet.lookups` carries
+G9 makes the same distinction observable. `ConstraintSet.lookups` carries
 one ordered polynomial row per lookup, and `globals` carries the nested rows of
 each global. The independent module reader acquires an explicit row slot for
 `array.new`, validates the table and query types from their dimensions, and
@@ -1387,19 +1403,23 @@ compares nested rows. Splitting a row into scalar memberships, exchanging
 columns, or regrouping a flat scalar bag must therefore make `agree` false even
 if both sides still contain the same individual field values.
 
-The certificate boundary will be generalized at the `RawTable` level, which is
+The certificate boundary is generalized at the `RawTable` level, which is
 the heterogeneous row-erased form a `Lookup` actually carries. A certificate
 ties the exported name and arity to that raw table and equates `RawTable.Contains`
 with membership of the ordered canonical-representative row in `ExportTable.rows`.
-`CertifiedTable` can then store one `RawTable F`; a single `CertifiedConfig` can
+`CertifiedTable` stores one `RawTable F`; a single `CertifiedConfig` can
 hold `ByteTable.toRaw` (arity one) and `ByteXorTable.toRaw` (arity three) without
 fixing its public carrier to `Table F field`. The canonical-value bridge and the
-lookup/soundness chain will likewise conclude membership of an emitted field
+lookup/soundness chain likewise concludes membership of an emitted field
 row, not a flattened scalar bag.
 
 This does not close D012's residual identity gap. The caller can still choose
 the raw table paired with an export, and must prove that each circuit lookup is
 that table. It merely permits the existing named assumption to range over every
 arity without weakening its certificate. S28 must instantiate the generic
-chain concretely for `And8`, and must measure the full 65536-by-3 `ByteXor`
-table before changing this decision's implementation/scale status to complete.
+chain concretely for `And8`. S28 does so in `Test/Lookups.lean` and
+`Test/Soundness.lean`. The full 65536-by-3 `ByteXor` table materializes as
+196,608 canonical values; its certificate, renderer, pinned verifier,
+round-trip, product pipeline, and both witness backends complete within the
+recorded bounds in `evidence/S28/scale.md`. Implementation and scale acceptance
+are complete.

@@ -990,7 +990,7 @@ private def step (fieldTy : Ty) (inputSize : Nat) (r : Reader) : Stmt → Option
   -- `struct.readm`, `global.read` and the two constraint forms belong to
   -- `@constrain`. Reaching one here means the module is not the shape this
   -- reader models.
-  | .readMember .. | .globalRead .. | .constrainEq .. | .constrainIn .. => none
+  | .readMember .. | .globalRead .. | .arrayNew .. | .constrainEq .. | .constrainIn .. => none
 
 /-- Read the emitted module's `@compute`.
 

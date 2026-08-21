@@ -12,11 +12,11 @@ R5a-7's finding was not that `byteTable_lookup_iff` was wrong. It was that it wa
 passed" — was discharged at no call site, and a hypothesis nothing discharges is
 not a guarantee. The same was true of `certified_membership` before it.
 
-Both are discharged here, for `Gadgets.Addition8FullCarry` under `withBytes`,
-which is the corpus's only circuit with a lookup and the gadget the whole Stage-1
-target was chosen around. Nothing is assumed about the table that the compiler
-does not itself check, and nothing is assumed about the circuit that is not
-proved from its own operations.
+Both are discharged here for `Gadgets.Addition8FullCarry` under `withBytes`, and
+the same generalized row theorem is instantiated at `And8` under the
+heterogeneous `withBytesAndXor` registry. Nothing is assumed about a table that
+the compiler does not itself check, and nothing is assumed about either circuit
+that is not proved from its own operations.
 
 ## The one hypothesis that stays
 
@@ -41,13 +41,15 @@ abbrev Bab := F pBabybear
 
 private def addSrc : Source Bab :=
   Compilable.source (Gadgets.Addition8FullCarry.circuit (p := pBabybear))
+private def andSrc : Source Bab :=
+  Compilable.source (Gadgets.And.And8.circuit (p := pBabybear))
 
 -- The compiler accepts this circuit, which is the one hypothesis below that is
 -- checked rather than proved. Same check as G1 and the corpus.
 #guard (recognize withBytes.toConfig addSrc).isOk
 
 private def bytesCert : CertifiedTable Bab :=
-  ⟨byteTable, Gadgets.ByteTable, byteTable_certified, rfl⟩
+  ⟨byteTable, Gadgets.ByteTable.toRaw, byteTable_certified⟩
 
 private theorem bytesCert_mem : bytesCert ∈ withBytes.tables := by
   simp [withBytes, bytesCert]
@@ -66,8 +68,8 @@ theorem add8_lookups_are_byteTable : ∀ l ∈ FlatOperation.lookups addSrc.oper
 
 /-- The same fact in the shape `ofSource_lookups_iff` consumes. -/
 theorem add8_resolve : ∀ l ∈ FlatOperation.lookups addSrc.operations,
-    ∃ ct ∈ withBytes.tables, ∃ entry : Vector (Expression Bab) ct.table.toRaw.arity,
-      l = ⟨ct.table.toRaw, entry⟩ := by
+    ∃ ct ∈ withBytes.tables, ∃ entry : Vector (Expression Bab) ct.table.arity,
+      l = ⟨ct.table, entry⟩ := by
   intro l hl
   obtain ⟨tbl, entry⟩ := l
   have htbl : tbl = (Gadgets.ByteTable (p := pBabybear)).toRaw := add8_lookups_are_byteTable _ hl
@@ -90,8 +92,9 @@ theorem add8_lookup_iff {r : Recognized}
     (hrec : recognize withBytes.toConfig addSrc = .ok r) (env : Environment Bab) :
     (∀ l ∈ FlatOperation.lookups addSrc.operations, l.Contains env)
       ↔ (∀ l ∈ FlatOperation.lookups addSrc.operations, ∀ ct ∈ withBytes.tables,
-          ∀ entry : Vector (Expression Bab) ct.table.toRaw.arity, l = ⟨ct.table.toRaw, entry⟩ →
-            ∃ n ∈ ct.exported.values, FiniteField.fromNat n = fromElements (entry.map env)) :=
+          ∀ entry : Vector (Expression Bab) ct.table.arity, l = ⟨ct.table, entry⟩ →
+            ∃ values ∈ ct.exported.rows,
+              values.map FiniteField.fromNat = (entry.map env).toArray) :=
   ofSource_lookups_iff hrec env add8_resolve
 
 /-! ## `byteTable_lookup_iff`, with `hdiag` discharged
@@ -112,9 +115,50 @@ theorem byteTable_diagnose_ok {r : Recognized}
 with nothing left hypothetical but the compile. -/
 theorem byteTable_lookup_iff_of_recognize {r : Recognized}
     (hrec : recognize withBytes.toConfig addSrc = .ok r)
-    (t : Array Bab) (x : Bab) :
-    (Gadgets.ByteTable (p := pBabybear)).Contains t x
-      ↔ ∃ n ∈ (⟨"Bytes", 1, byteRows⟩ : ExportTable).values, FiniteField.fromNat n = x :=
-  byteTable_lookup_iff (byteTable_diagnose_ok hrec) t x
+    (t : Array (Vector Bab 1)) (row : Vector Bab 1) :
+    (Gadgets.ByteTable (p := pBabybear)).toRaw.Contains t row
+      ↔ ∃ values ∈ (⟨"Bytes", 1, byteRows⟩ : ExportTable).rows,
+          values.map FiniteField.fromNat = row.toArray :=
+  byteTable_lookup_iff (byteTable_diagnose_ok hrec) t row
+
+/-! ## The arity-three `And8` instantiation -/
+
+private def byteXorCert : CertifiedTable Bab :=
+  ⟨byteXorTable, Gadgets.Xor.ByteXorTable.toRaw, byteXorTable_certified⟩
+
+private theorem byteXorCert_mem : byteXorCert ∈ withBytesAndXor.tables := by
+  simp [withBytesAndXor, byteXorCert]
+
+/-- Every lookup `And8` performs is into the concrete three-column ByteXor
+table. This is D012's residual identity premise, discharged for this gadget. -/
+theorem and8_lookups_are_byteXor : ∀ l ∈ FlatOperation.lookups andSrc.operations,
+    l.table = (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw := by
+  simp [circuit_norm, andSrc, Compilable.source, Source.ofFormalCircuit,
+    Gadgets.And.And8.circuit, Gadgets.And.And8.main, FlatOperation.lookups,
+    Operations.toFlat]
+
+/-- The concrete arity-three resolution consumed by the generic certificate
+and soundness chain. -/
+theorem and8_resolve : ∀ l ∈ FlatOperation.lookups andSrc.operations,
+    ∃ ct ∈ withBytesAndXor.tables, ∃ entry : Vector (Expression Bab) ct.table.arity,
+      l = ⟨ct.table, entry⟩ := by
+  intro l hl
+  obtain ⟨tbl, entry⟩ := l
+  have htbl : tbl = (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw :=
+    and8_lookups_are_byteXor _ hl
+  subst htbl
+  exact ⟨byteXorCert, byteXorCert_mem, entry, rfl⟩
+
+/-- Clean's `And8` lookup constraint is exactly membership of one ordered
+three-field row in emitted `@ByteXor`. -/
+theorem and8_lookup_iff {r : Recognized}
+    (hrec : recognize withBytesAndXor.toConfig andSrc = .ok r) (env : Environment Bab) :
+    (∀ l ∈ FlatOperation.lookups andSrc.operations, l.Contains env)
+      ↔ (∀ l ∈ FlatOperation.lookups andSrc.operations,
+          ∀ ct ∈ withBytesAndXor.tables,
+          ∀ entry : Vector (Expression Bab) ct.table.arity, l = ⟨ct.table, entry⟩ →
+            ∃ values ∈ ct.exported.rows,
+              values.map FiniteField.fromNat = (entry.map env).toArray) :=
+  ofSource_lookups_iff hrec env and8_resolve
 
 end LLZK.Test.Lookups

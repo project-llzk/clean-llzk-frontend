@@ -19,7 +19,7 @@ namespace LLZK.Test.Print
 
 /--
 info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
-  global.def const @Bytes : !array.type<4 x !felt.type<"babybear">> = [0, 1, 2, 3]
+  global.def const @Bytes : !array.type<2,2 x !felt.type<"babybear">> = [0, 1, 2, 3]
 
   struct.def @Main {
     struct.member @w0 : !felt.type<"babybear"> {signal}
@@ -52,8 +52,9 @@ info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
     ) {
       %v3 = struct.readm %v0[@w0] : !struct.type<@Main>, !felt.type<"babybear">
       %v4 = struct.readm %v0[@out0] : !struct.type<@Main>, !felt.type<"babybear">
-      %v5 = global.read @Bytes : !array.type<4 x !felt.type<"babybear">>
-      constrain.in %v5, %v3 : !array.type<4 x !felt.type<"babybear">>, !felt.type<"babybear">
+      %v5 = global.read @Bytes : !array.type<2,2 x !felt.type<"babybear">>
+      %v6 = array.new %v3, %v4 : !array.type<2 x !felt.type<"babybear">>
+      constrain.in %v5, %v6 : !array.type<2,2 x !felt.type<"babybear">>, !array.type<2 x !felt.type<"babybear">>
       constrain.eq %v4, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
       function.return
     }
@@ -88,7 +89,7 @@ info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
 
 /-! ## A5 — the rendered constraint surface reads back
 
-The three direct parser controls make the concrete grammar visible here rather
+The five direct parser controls make the concrete grammar visible here rather
 than trusting only the renderer's own output. The module controls then pin both
 directions a gate needs: the real fixture succeeds, while each mutation R6/R7
 showed the LLZK binaries accept is refused by the Lean-side round trip.
@@ -99,17 +100,26 @@ showed the LLZK binaries accept is refused by the Lean-side round trip.
   some (.readMember 3 0 "w0" (.struct "Main") (.felt "babybear"))
 
 #guard RenderCheck.parseStmt
+    "global.def const @Bytes : !array.type<2,2 x !felt.type<\"babybear\">> = [0, 1, 2, 3]" =
+  some (.global "Bytes" (.array #[2, 2] (.felt "babybear")) #[0, 1, 2, 3])
+
+#guard RenderCheck.parseStmt
     "constrain.eq %v4, %v1 : !felt.type<\"babybear\">, !felt.type<\"babybear\">" =
   some (.constrainEq 4 1 (.felt "babybear") (.felt "babybear"))
 
 #guard RenderCheck.parseStmt
-    "constrain.in %v5, %v3 : !array.type<4 x !felt.type<\"babybear\">>, \
-      !felt.type<\"babybear\">" =
-  some (.constrainIn 5 3 (.array 4 (.felt "babybear")) (.felt "babybear"))
+    "%v6 = array.new %v3, %v4 : !array.type<2 x !felt.type<\"babybear\">>" =
+  some (.arrayNew 6 #[3, 4] (.array #[2] (.felt "babybear")))
+
+#guard RenderCheck.parseStmt
+    "constrain.in %v5, %v6 : !array.type<2,2 x !felt.type<\"babybear\">>, \
+      !array.type<2 x !felt.type<\"babybear\">>" =
+  some (.constrainIn 5 6 (.array #[2, 2] (.felt "babybear"))
+    (.array #[2] (.felt "babybear")))
 
 #guard RenderCheck.parseTy
-  "!array.type<2 x !array.type<4 x !felt.type<\"babybear\">>>" =
-    some (.array 2 (.array 4 (.felt "babybear")))
+  "!array.type<2,4 x !felt.type<\"babybear\">>" =
+    some (.array #[2, 4] (.felt "babybear"))
 
 private def renderedDemo : Option (Module × String) := do
   let m ← RendererFixture.demoModule.toOption
@@ -138,9 +148,33 @@ private def rejectsMutation (old replacement : String) : Bool :=
 
 -- A dropped lookup constraint, the third constraint-only statement form.
 #guard rejectsMutation
-  "      constrain.in %v5, %v3 : !array.type<4 x !felt.type<\"babybear\">>, \
-    !felt.type<\"babybear\">\n"
+  "      constrain.in %v5, %v6 : !array.type<2,2 x !felt.type<\"babybear\">>, \
+    !array.type<2 x !felt.type<\"babybear\">>\n"
   ""
+
+-- A dropped row constructor, now the fourth constraint-only statement form.
+#guard rejectsMutation
+  "      %v6 = array.new %v3, %v4 : !array.type<2 x !felt.type<\"babybear\">>\n"
+  ""
+
+-- The global's dimensions and row-major initializer are protected too.
+#guard rejectsMutation
+  "global.def const @Bytes : !array.type<2,2 x !felt.type<\"babybear\">>"
+  "global.def const @Bytes : !array.type<4 x !felt.type<\"babybear\">>"
+
+#guard rejectsMutation
+  "= [0, 1, 2, 3]"
+  "= [0, 2, 1, 3]"
+
+-- A shallower parser could accept these malformed/wrong-field row constructors;
+-- the protected readback refuses both before artifact release.
+#guard rejectsMutation
+  "%v6 = array.new %v3, %v4 : !array.type<2 x !felt.type<\"babybear\">>"
+  "%v6 = array.new %v3 : !array.type<2 x !felt.type<\"babybear\">>"
+
+#guard rejectsMutation
+  "%v6 = array.new %v3, %v4 : !array.type<2 x !felt.type<\"babybear\">>"
+  "%v6 = array.new %v3, %v4 : !array.type<2 x !felt.type<\"bn254\">>"
 
 -- The reader also ties the surface to the `@constrain` function, not merely to
 -- the sequence of protected lines somewhere in the module.
