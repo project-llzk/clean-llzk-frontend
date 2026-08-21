@@ -139,4 +139,6 @@ probe commands — the R6-2 lesson: check the tool, do not trust the note).
 - Deviations:
 - Blockers:
 - Resulting commit:
-- Exact next action: `doc/llzk/sessions/S27-fork-gadgets.md`
+- Exact next action: expand and execute
+  `doc/llzk/sessions/S28-multicolumn-tables.md`; S27 remains returned for
+  re-scoping under R7-09.

@@ -11,6 +11,16 @@ updates require an explicit session and decision-log entry.
 | upstream VeIR | `a4e6194d5810a02d74f0094ff6014cda6db6d617` | Long-term Lean MLIR framework |
 | llzk-lean VeIR | `d899d95004d4bd988c8456d686c33b11a7a5eb4a` | Previously accepted differential harness pin |
 
+Public-readiness note (checked 2026-08-21): `project-llzk/llzk-lib` `main` is
+`25fb3740ea3465c9129a06289297bb4f0554b7a5`, 25 commits ahead of the accepted
+LLZK pin. The changed surface includes core transforms, analysis,
+`llzk-witgen`, and downstream backends. There is no newer tagged GitHub release
+than v2.1.2 even though the pinned build identifies itself as LLZK 3.0.0, so a
+tag comparison is not a sufficient update policy. L0 in
+`PUBLIC-READINESS.md` will either retain this known reproducible pin or advance
+it through a separate full-gate compatibility session. Until that decision,
+the table above remains authoritative.
+
 ## Clean repository
 
 - Fork: `git@github.com:alexanderlhicks/clean.git`
@@ -60,4 +70,3 @@ verification, discards the substitute, and falls back to building from source
 without saying why. `nix-daemon` reads this file only at startup, so a change
 needs `sudo systemctl restart nix-daemon`. See
 `doc/llzk/evidence/S01/substituter-diagnosis.md`.
-

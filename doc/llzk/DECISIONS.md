@@ -14,7 +14,9 @@ This avoids coupling Clean's Lean 4.30 toolchain to the project VeIR fork on
 
 ## D002 — Use `alexanderlhicks/clean` as the project home
 
-**Status:** accepted  
+**Status:** accepted for development; superseded for the public destination by
+D027
+
 **Date:** 2026-07-31
 
 The fork `alexanderlhicks/clean` owns the frontend implementation, fixtures,
@@ -956,7 +958,7 @@ built for, not against the case that was easiest to write a test for.
 
 **Status:** accepted
 **Date:** 2026-08-04
-**Enacted by:** S25, S26, S27 (proposed)
+**Enacted by:** S25, S26, S28 (proposed)
 
 Two capability increments were about to be built at Clean `1e563b9c`: a recognizer
 for the bit-decomposition shape `ofNat (mod (div (val x) (const 2^i)) (const 2))`,
@@ -974,13 +976,17 @@ Measured against `upstream/main` = `0e53b9f2` (Lean 4.32.2, merged 2026-08-04,
 - **`VExpr.bitsOf {n} (x : FExpr F)` exists**, with `BExpr.bit x i` beside it. Bit
   decomposition is a *constructor* upstream, so the recognizer would have been a
   workaround for something already fixed.
-- `FExpr` also lost `envGet`, renamed `ofNat` to `ofU64`, and gained `lor`;
-  conditions became a sort of their own (`BExpr`); `Step.letN` became `letU`.
+- `FExpr` also lost `envGet` and renamed `ofNat` to `ofU64`; `BExpr` gained
+  `flt` and `bit`; `VExpr` gained `envRange` and `bitsOf`; and `Step.letN`
+  became `letU`. R7 corrected an earlier inventory that wrongly put `lor` on
+  `FExpr` and described pre-existing constructors as new.
 
-So the order is: bump (S25), then rewrite the witness recognizer structurally
-against `U64Expr` (S26), then port gadgets onto a current base (S27). Doing the
-increments first means doing the toolchain move twice and throwing away the work
-in between.
+So the order is: bump (S25), rewrite the witness recognizer structurally against
+`U64Expr` (S26), add multi-column tables (S28), then promote the newly supported
+gadgets. S27 was returned for re-scoping by R7: its GF(2) submission has no
+bitwise witness operations and is blocked by `letF`, not S26. Doing capability
+increments before the bump still means targeting a deleted IR and throwing the
+work away.
 
 **What this does to D011, precisely.** D011's argument is *"`NExpr` denotes
 unbounded `ℕ`, so lowering piecewise is wrong; therefore match two whole shapes."*
@@ -1005,3 +1011,41 @@ reopening D003.
 of planning against a local pin — the same lesson the CI paragraph in `CURRENT.md`
 records at the cost of two days. A version pin is a claim about the world, and it
 goes stale silently.
+
+## D027 — Prepare an organization-owned public home
+
+**Status:** accepted as a milestone; publication not yet authorized
+
+**Date:** 2026-08-21
+
+**Enacted by:** `PUBLIC-READINESS.md`
+
+The personal fork remains the development and staging remote while the project
+builds a release candidate. The intended public destination is an
+organization-owned repository under `project-llzk`, where it can be listed with
+the Circom, Halo2/PLONKish, Airbender, and Noir frontends.
+
+Moving early would make repository ownership look settled while the code still
+rests on a stale Clean base, has only one proved headline example in the full
+external-tool corpus, and leaves the renderer's constraint-only statements with
+one line of defense. Repository transfer is therefore an exit action, not a way
+to create the milestone.
+
+The release candidate must satisfy `PUBLIC-READINESS.md`: current upstream
+Clean alignment, an explicit review of the moving LLZK pin, an end-to-end
+bitwise example family, renderer round-trip assurance, green falsifiable gates,
+public documentation, and a final frozen-tree review. The personal fork
+decision in D002 remains valid for staging until then.
+
+Two publication topologies remain available:
+
+1. transfer or recreate the GitHub fork as `project-llzk/clean`, preserving the
+   fork relationship but giving a broad upstream project an ambiguous LLZK name;
+2. create `project-llzk/clean-llzk-frontend` with the full Git history and keep
+   `Verified-zkEVM/clean` as `upstream`, which is clearer in the organization's
+   frontend list but may not display GitHub's fork badge.
+
+Prefer the descriptive repository unless preserving the GitHub fork relation is
+explicitly required. Creating the repository, changing remotes, pushing,
+transferring, and organization settings remain reserved for a separate explicit
+publication decision under `ORCHESTRATION.md` section 11.

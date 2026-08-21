@@ -1,11 +1,16 @@
 # Clean → LLZK current state
 
-Updated: 2026-08-09  
-Active milestone: **Stage 1 finished, reviewed three times, and reproduced by
-R7** — all gates green against the pinned tools and in CI; the pipeline
-milestone (a Clean circuit compiled, validated, and its emitted constraints
-proved to imply the gadget's `Spec`) stands. **The plan to scale it was wrong
-and is corrected**: see `review/R7-findings.md`  
+Updated: 2026-08-21
+
+Active milestone: **public-ready Clean to LLZK release candidate** — make the
+repository suitable for an organization-owned home under `project-llzk`, with a
+clear public reading path, current upstream base, impactful library examples,
+and a frozen adversarially reviewed assurance story. Acceptance criteria and the
+critical path are in `PUBLIC-READINESS.md`. Stage 1 remains finished, reviewed
+three times, and reproduced by R7; all gates were green against the pinned tools
+and in CI, and the pipeline milestone (a Clean circuit compiled, validated, and
+its emitted constraints proved to imply the gadget's `Spec`) stands.
+
 Last accepted session: R7 — a five-surface adversarial review of the finished
 Stage 1 *and of the plan*. The formal chain held; the coverage headline
 (R7-05), two of the three bootstrapped session packets (R7-08, R7-09), and G0's
@@ -14,10 +19,32 @@ same session; the coverage sweep is now a checked test
 (`Test/Coverage.lean`), `CertifiedTable` carries a name tie, and S28
 (multi-column tables) joined the critical path  
 Next session: **S25** — `sessions/S25-align-upstream.md`, **as corrected by R7**
-(read its Deliverable 2a first). Bootstrapped, not started  
-Integration branch: `clean-to-llzk/integration`  
-Integration commit: `doc/llzk/evidence/R7/gates.txt`  
+(read its Deliverable 2a first). Bootstrapped, not started; changing the Clean
+pin remains an explicit decision boundary
+
+Integration branch: `clean-to-llzk/integration`
+
+Active working branch: `clean-to-llzk/public-readiness` (documentation and
+repository hygiene only; no pin or capability change yet)
+
+Integration commit: `doc/llzk/evidence/R7/gates.txt`
+
 Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
+
+Publication state, verified 2026-08-21: local `clean-to-llzk/integration` is at
+`97390fac`, seven commits ahead of the fork remote. The open fork PR #1 is still
+at `7ff51310`; all four CI jobs are green there, but A4 and R7 have therefore
+been reproduced only by their committed local evidence, not by CI at their own
+commits. A public release candidate must put the branch, evidence, and CI on the
+same frozen commit. No push is authorized by this status update.
+
+Dependency state, also verified 2026-08-21: Clean upstream remains exactly
+`0e53b9f2`, S25's reviewed target. LLZK `main` is now `25fb3740`, 25 commits
+ahead of the accepted `5db6f8f9` tool pin. The delta touches LLZK core
+transforms, analysis, and `llzk-witgen`, not only unrelated backends. The
+3.0.0 pin remains accepted and reproducible; public readiness adds an isolated
+L0 review after S25 to decide whether to retain it or advance it and rerun the
+full compatibility matrix.
 
 ## Accepted pins
 
@@ -238,7 +265,13 @@ an explicit decision, which was given.
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
     constraint system.
-- In progress: none.
+- In progress: public-readiness P0 — root introduction, frontend document map,
+  contribution guidance, and a release-candidate acceptance contract on
+  `clean-to-llzk/public-readiness`.
+- Decision pending: authorize S25's move of the accepted Clean base from
+  `1e563b9c` / Lean 4.30.0 to `0e53b9f2` / Lean 4.32.2. This is not a technical
+  blocker; the project control plane reserves pin changes for an explicit
+  decision.
 - Blocked: none.
 
 ## Last green gates

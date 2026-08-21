@@ -14,6 +14,35 @@ Clean FormalCircuit
   → llzk-witgen interpreter and execution engine
 ```
 
+## Public release-candidate milestone
+
+Stage 1 proved the vertical slice. The next milestone is not simply "more
+constructors": it is a repository that can move into the LLZK organization and
+support its public claims under review. [`PUBLIC-READINESS.md`](PUBLIC-READINESS.md)
+is the acceptance contract.
+
+Its dependency order is:
+
+```text
+public documentation and hygiene
+  → S25: current upstream Clean and Lean
+  → L0: review or advance the LLZK toolchain pin
+  → S26: structural U64, bitwise operations, and conditionals
+  → S28: multi-column lookup tables and certificates
+  → end-to-end Xor32 plus one composed bitwise gadget
+  → renderer round-trip assurance
+  → frozen-candidate adversarial review
+```
+
+This order joins the three goals that matter for publication. S25 removes the
+stale Clean foundation; L0 decides against a measured 25-commit LLZK delta
+rather than silently treating either the old pin or moving `main` as canonical;
+S26 plus S28 turns measured refusals into impactful examples; and the renderer
+round trip strengthens the one artifact boundary every pinned LLZK binary
+currently accepts without checking semantic content. The release candidate is
+reached only when those examples are in the external-tool corpus, not when
+`LLZK.compile` merely returns `some`.
+
 The initial implementation lives under:
 
 ```text
@@ -238,4 +267,3 @@ file.
   only line of defense, and a parser back to `Module` would be its second.
 - **The corpus is chosen, not exhaustive.** `Addition8FullCarry` is now tested
   outside its `Assumptions` (three of its nine vectors, S19).
-

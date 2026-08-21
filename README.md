@@ -7,6 +7,52 @@
 
 </div>
 
+# Clean to LLZK frontend
+
+This fork develops a **fail-closed, assurance-oriented LLZK frontend for
+Clean**. Clean circuits are written and proved in Lean; the frontend analyzes a
+documented subset, lowers it through a small typed IR, emits textual LLZK, and
+checks the result with the pinned LLZK toolchain.
+
+Stage 1 is complete. Its reference example, Clean's formally proved
+`Addition8FullCarry` gadget, is compiled to LLZK, parsed, verified,
+round-tripped, and run through both LLZK witness generators. The emitted
+constraints and witness program are also compared in Lean with the circuit they
+came from. The checked corpus currently contains 12 LLZK modules and 33 input
+vectors.
+
+The project is deliberately explicit about its boundary: this is a verified
+source-to-typed-module pipeline with differential checks over the rendered
+artifact; it is not yet a formal semantics of LLZK text. Open assurance gaps are
+kept in one [gap register](doc/llzk/GAPS.md), rather than hidden behind a general
+"verified" label.
+
+Start here:
+
+- [Frontend guide and document map](doc/llzk/README.md)
+- [Current status and exact next action](doc/llzk/CURRENT.md)
+- [Public-readiness milestone](doc/llzk/PUBLIC-READINESS.md)
+- [Capability roadmap](doc/llzk/ROADMAP.md)
+- [Contribution guide](CONTRIBUTING.md)
+
+To build the Lean project:
+
+```bash
+lake build
+lake build CleanTests
+```
+
+The full LLZK conformance run needs the pinned tools described in
+[`doc/llzk/PINS.md`](doc/llzk/PINS.md):
+
+```bash
+export LLZK_SESSION=my-session
+bash scripts/llzk/worktree-lock.sh claim "full LLZK conformance run"
+bash scripts/llzk/e2e.sh
+```
+
+## About Clean
+
 `clean` is an embedded Lean DSL for writing zk circuits, targeting popular arithmetizations like AIR, PLONK and R1CS.
 
 **Check out our blog post for an introduction: https://blog.zksecurity.xyz/posts/clean**

@@ -1,8 +1,8 @@
 # S25 — Align with upstream Clean and Lean 4.32.2
 
 Status: proposed
-Depends on: A4 (landed, `fc22da88`); nothing else
-Base integration commit: `89a6f4e8`
+Depends on: R7 (landed, `97390fac`); nothing else
+Base integration commit: `97390fac`
 Worktree: `/home/alh/LLZK/clean-llzk-frontend`
 Branch: a **new** branch off `clean-to-llzk/integration` — see "Branch" below
 
@@ -58,7 +58,8 @@ more than expected, abandoning a branch is free.
 
 ## The facts, measured, so they are not rediscovered
 
-Verified 2026-08-04 against `upstream/main`:
+Verified 2026-08-04 against `upstream/main`; the remote head was checked again
+on 2026-08-21 and was unchanged:
 
 | | value |
 |---|---|
@@ -128,12 +129,15 @@ Then `lake exe cache get` before anything else, or mathlib builds from source.
 Expect the breakage to be concentrated, and expect it to be *loud*:
 
 - **`Witness.lean`** — `describeFExpr` is exhaustive over `FExpr` and
-  `describeNExpr` over `NExpr`. The first loses `envGet`, gains `lor`, and renames
-  `ofNat`; the second is about a type that no longer exists. This is the design
-  working (D009: "exhaustiveness is what makes adding a constructor a compile
-  error in this module rather than a silent unsupported"), so do not paper over
-  it — every new constructor gets a diagnostic that names it and says what
-  supporting it would take.
+  `describeNExpr` over `NExpr`. The former must lose `envGet`, rename `ofNat` to
+  `ofU64`, and stay exhaustive over the upstream `FExpr`; the latter must become
+  an exhaustive `U64Expr` description, including `land`/`lor`/`lxor` and shifts.
+  `BExpr`, `VExpr.envRange`, and `VExpr.bitsOf` must likewise reach explicit
+  acceptance or rejection paths. This is the design working (D009:
+  "exhaustiveness is what makes adding a constructor a compile error in this
+  module rather than a silent unsupported"), so do not paper over it — every
+  constructor gets a diagnostic that names it and says what supporting it would
+  take.
 - **`FieldExpr.ofFExpr`** matches `.ofNat (.mod (.val x) (.const c))` and
   `.ofNat (.div …)`. Those patterns are gone. **Deliverable 2 keeps the accepted
   set the same size** — translate the two shapes to their `U64Expr` equivalents
