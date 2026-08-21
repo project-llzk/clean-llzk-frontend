@@ -72,7 +72,8 @@ shifts, and `VExpr.bitsOf`; `eval_lt_upperBound` and `eval_ofWitgen` discharge
 the source semantics. The conformance corpus has grown to 14 artifacts and 45
 vectors with lookup-free `LowByte` and `Bits8` entries. The re-measured gadget
 sweep removes `And8`'s `land` diagnostic but retains XOR diagnostics whose byte
-bounds exist only outside witness IR. Full gates are not yet recorded.
+bounds exist only outside witness IR. G0-G12 passed on clean implementation
+commit `8951f016`; evidence is in `evidence/S26/`.
 
 Integration branch: `clean-to-llzk/integration`
 
@@ -333,10 +334,9 @@ an explicit decision, which was given.
     reconstructed types and the function boundary, before releasing an
     artifact. `Module.render_constraintSurface` states the generic round trip;
     five mutations make it red. G0-G12 passed on clean commit `28132f64`.
-- In progress: **S26**, bootstrapped from L0 evidence tip `884d5b1c`; D033, the
-  structural lowering, theorem-backed independent reader, corpus, and measured
-  coverage update are implemented locally. The committed full pinned gate is
-  the remaining handoff step.
+- Completed locally: **S26**, bootstrapped from L0 evidence tip `884d5b1c`;
+  D033, the structural lowering, theorem-backed independent reader, corpus, and
+  measured coverage update are implemented and G0-G12 are green on `8951f016`.
 - Decision complete: D033 settles the width/field policy and `U64Expr.val`
   bridge as a recursively proved bound plus explicit refusal.
 - Blocked: none.
@@ -345,31 +345,30 @@ an explicit decision, which was given.
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete run: L0, clean pin commit
-`5fe8f465b9ad74db9c5d74f483c8041754ba0d67`; see
-`evidence/L0/post-pin.txt`. All G0-G12 passed. The expanded L0 axiom probe
-covers the generic soundness, lookup, registry, D026 witness, A5 renderer, and
-A7 copy-canonicalisation theorems with no `sorryAx`; the concrete babybear
-examples add only the two documented `native_decide` prime facts.
+Latest complete run: S26, clean implementation commit
+`8951f016673921c724b53b3ea3e2013345e1255c`; see `evidence/S26/gates.txt`.
+All G0-G12 passed. The S26 axiom probe covers the bound, structural witness,
+direct `bitsOf`, IR-lowering, and verified-compile agreement theorems with no
+`sorryAx`.
 
 | Gate | Result |
 |---|---|
 | G0 state and pins | PASS — and since R6 it also fails on any change to Clean's core outside `Clean/Backend/LLZK/`, `Clean.lean` and `Clean/Test.lean` |
 | G1 lint + `lake build --wfail Clean` + `lake build CleanTests` | PASS |
-| G2 renderer: goldens plus checked constraint-surface round trip | PASS — 2 renderer fixtures, 12 corpus modules, 5 red mutations |
-| G3 `llzk-opt` parse and verify | PASS — 12 modules + 2 fixtures |
-| G4 `llzk-opt --verify-roundtrip` | PASS — 12 modules + 2 fixtures |
-| G5 `llzk-witgen` interpreter | PASS — 33 vectors |
-| G6 `llzk-witgen` execution engine | PASS — 33 vectors |
+| G2 renderer: goldens plus checked constraint-surface round trip | PASS — 2 renderer fixtures, 14 corpus modules, 5 red mutations |
+| G3 `llzk-opt` parse and verify | PASS — 14 modules + 2 fixtures |
+| G4 `llzk-opt --verify-roundtrip` | PASS — 14 modules + 2 fixtures |
+| G5 `llzk-witgen` interpreter | PASS — 45 vectors |
+| G6 `llzk-witgen` execution engine | PASS — 45 vectors |
 | G7 both backends vs Clean's own interpreter | PASS — carried by `--check-output` |
-| G8 fail closed | PASS — 34 negative fixtures, plus tool-version rejection. Five S25 fixtures pin the newly reachable `letU`, `envRange`, `bitsOf`, `flt`, and `bit` rejection paths; the general "one per path" claim is not reinstated |
+| G8 fail closed | PASS — exact negative fixtures include the new bound, shift-count, dynamic-operand, index, and oversized-`bitsOf` refusals, plus tool-version rejection |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
-| G10a LLZK analysis pipeline admits the module | PASS — all 14 |
+| G10a LLZK analysis pipeline admits the module | PASS — all 16 |
 | G11 the harness's own error paths | PASS — 53 exercised, including the worktree lock's opaque-owner branches, R7's uncommitted-core-edit branch of G0 (R7-01), and ten CI dependency/permission/benchmark/cache policy controls |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |
-| G10b SMT lowering | PASS — 10 lowered, 4 out of scope for a declared reason |
+| G10b SMT lowering | PASS — 10 lowered, 6 out of scope for a declared reason |
 
 Every gate is checked to be falsifiable, and the checks are part of the gate
 rather than notes about it:

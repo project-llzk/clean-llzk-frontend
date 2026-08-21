@@ -212,10 +212,10 @@ emitted module could enter any LLZK analysis and no gate noticed (R2-12, D015).
 `lib.sh`**, matched against the tool's own diagnostic rather than against what the
 artifact contains. The tolerance list holds only reasons a corpus artifact
 actually produces, because a tolerance nothing exercises can only ever excuse
-something. At the LLZK 3.0.0 pin those are `felt.uintdiv`/`felt.umod`, which the
-lowering marks illegal, and a module with no felt type, whose prime field cannot
-be deduced. Nine of the eleven corpus modules lower; `Decompose` and
-`Addition8FullCarry` do not.
+something. At the LLZK 3.0.0 pin those are natural and bitwise/shift felt
+operations, which the lowering marks illegal, and a module with no felt type,
+whose prime field cannot be deduced. Ten of the sixteen corpus-plus-fixture
+modules lower; six are out of scope for exactly those declared reasons.
 
 **The solver step is not reachable from the pinned tools.** `llzk-smt-check`
 ships in the same `bin/` and takes SMT-LIB, and `llzk-translate --smt-to-smtlib`

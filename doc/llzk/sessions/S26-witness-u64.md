@@ -1,23 +1,22 @@
 # S26 — Lower `U64Expr` structurally, and stop matching whole shapes
 
-Status: proposed
-Depends on: **S25 must have landed with all gates green.** This packet is
-unexecutable before it — it is written against constructors that do not exist at
-`1e563b9c`.
-Base integration commit: S25's resulting commit
+Status: completed locally; G0-G12 green on implementation commit `8951f016`
+Depends on: S25 alignment and L0 pin review, both complete before execution.
+Base integration commit: final L0 evidence tip `884d5b1c`
 Worktree: `/home/alh/LLZK/clean-llzk-frontend`
-Branch: off S25's branch, or off `integration` once S25 has merged
+Branch: `clean-to-llzk/s26-witness-u64`
 
 ## Objective
 
 Replace D011's two hand-matched natural shapes with a structural lowering of
 `Witgen.U64Expr`, and take `VExpr.bitsOf` and the bitwise operations with it.
 
-Measured payoff, from `ROADMAP.md`'s coverage table: the whole bitwise half of
-Clean's gadget library is refused today for exactly one reason. `Xor.Xor32`,
-`And.And8`, `BLAKE3.G` and `Keccak256.Theta` all fail on `lxor`/`land`, and
-`Keccak256.Theta` alone produces 450 diagnostics. This session is what turns
-those into modules.
+The packet's original payoff claim treated the bitwise half as one witness-IR
+blocker. Adversarial execution confirmed that claim was too strong: `And8` loses
+its `land` refusal, but the XOR family remains refused because its range facts do
+not occur in witness IR, and the multi-column lookup blocker remains. D033 and
+the handoff below record the theorem-backed result instead of weakening the
+policy to fit the prediction.
 
 ## Must read
 
@@ -134,11 +133,23 @@ probe commands — the R6-2 lesson: check the tool, do not trust the note).
 
 ## Handoff
 
-- Changes made:
-- Decisions made:
-- Deviations:
-- Blockers:
-- Resulting commit:
+- Changes made: added D033's total u64 bound analysis, structural lowering and
+  exact LLZK operation rendering, independent semantic reader/theorems, direct
+  `bitsOf`, positive and negative goldens, `LowByte`/`Bits8`, 12 vectors, and
+  remeasured coverage.
+- Decisions made: every recursively admitted u64 value is below the field
+  prime; `.val` is accepted only at field size at most `2^64`; dynamic or
+  otherwise unproved divisors, shifts, indices, locals, and conditionals are
+  refused. Existing XOR assumptions are not silently imported into witness IR.
+- Deviations: the packet's “all bitwise counts drop to lookup refusals” premise
+  was refuted by the theorem obligation. Exhaustive IR rendering/reading,
+  generated showcase consistency, active assurance docs, and the newly observed
+  G10b diagnostic required touching `Print`, `Constraints`, renderer/showcase
+  files, `EXAMPLES.md`, `GATES.md`, `PUBLIC-READINESS.md`, and `scripts/llzk/lib.sh`
+  outside the literal allowed-scope list.
+- Blockers: none for S26. XOR-family promotion still needs a source-visible or
+  proved range contract in addition to S28's multi-column tables.
+- Resulting implementation commit: `8951f016673921c724b53b3ea3e2013345e1255c`.
 - Exact next action: expand and execute
   `doc/llzk/sessions/S28-multicolumn-tables.md`; S27 remains returned for
   re-scoping under R7-09.
