@@ -1,0 +1,20 @@
+module attributes {llzk.lang = "clean-s28-probe", llzk.main = !struct.type<@Main>} {
+  global.def const @Rows : !array.type<2,3 x !felt.type<"babybear">> = [1, 2, 3, 4, 5, 6]
+
+  struct.def @Main {
+    function.def @compute() -> !struct.type<@Main> {
+      %self = struct.new : !struct.type<@Main>
+      function.return %self : !struct.type<@Main>
+    }
+
+    function.def @constrain(%self: !struct.type<@Main>) {
+      %one = felt.const 1 : !felt.type<"babybear">
+      %two = felt.const 2 : !felt.type<"babybear">
+      %three = felt.const 3 : !felt.type<"babybear">
+      %row = array.new %one, %two, %three : !array.type<3 x !felt.type<"babybear">>
+      %rows = global.read @Rows : !array.type<2,3 x !felt.type<"babybear">>
+      constrain.in %rows, %row : !array.type<2,3 x !felt.type<"babybear">>, !array.type<3 x !felt.type<"babybear">>
+      function.return
+    }
+  }
+}

@@ -1,7 +1,7 @@
 # S28 — Multi-column lookup tables: retire D013
 
-Status: active, bootstrap only; syntax, representation, and certificate decisions
-are still pending
+Status: active; pinned syntax, row representation, and certificate design are
+settled by D034; lowering has not begun
 Depends on: S26 implementation and evidence tip
 `91d43ffd0b4dcfd0841cc97f402b2d6006c58358`
 Branch: `clean-to-llzk/s28-multicolumn-tables`
@@ -200,5 +200,6 @@ and the pinned LLZK tools pass the doctor check. No syntax decision, lowering,
 certificate change, corpus change, build, compatibility gate, push, or external
 issue creation occurred during bootstrap.
 
-The first implementation action is the mandatory LLZK syntax probe and
-row/certificate decision above.
+The mandatory LLZK syntax probe is preserved in
+`evidence/S28/llzk-multicolumn-ops.md`, and D034 records the resulting
+row/certificate design. No lowering code changed while making that decision.

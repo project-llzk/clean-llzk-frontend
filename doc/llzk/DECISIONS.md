@@ -1349,3 +1349,57 @@ loops, let-steps, and control flow are separate increments.
 `VExpr.bitsOf` is not routed through `U64Expr.val`: it means the low bits of the
 full `FiniteField.val` and is lowered directly with LLZK felt shift/bit
 operations. It therefore does not weaken the wide-field `val` refusal.
+
+## D034 — Preserve lookup rows as true multidimensional LLZK arrays
+
+**Status:** accepted
+
+**Date:** 2026-08-21
+
+**Enacted by:** S28 design checkpoint; implementation and scale acceptance pending
+
+The exact accepted LLZK source and Nix tools settle the target surface. A static
+multi-column table is one `array.type` with dimensions `[row-count, arity]` and
+a flat row-major initializer. Its query is a one-dimensional row built by
+`array.new`, and `constrain.in` accepts that row because its dimensions are the
+suffix of the table dimensions. Recursive nesting is not an equivalent
+spelling: LLZK rejects an `array.type` whose element is another `array.type`.
+The direct parse, verifier round trip, full-inlining/product pipeline, and
+witness-execution probes are recorded in
+`evidence/S28/llzk-multicolumn-ops.md`; witgen ignores `@constrain`, so D017 is
+unchanged.
+
+The backend IR will represent an array type by a nonempty ordered dimension
+vector plus one scalar element type. `ConstArray` will retain `arity` and
+`Array (Array Nat)` rows, derive its declared dimensions and flat row-major
+initializer from that one structure, and never use the flattened values as the
+semantic table representation. A recognized lookup will retain every entry
+expression in order. Arity greater than one lowers those entries to one
+`array.new` row and constrains that row against the global; arity one may retain
+LLZK's scalar degenerate form, while every backend comparison still represents
+it as a one-element row.
+
+G9 will make the same distinction observable. `ConstraintSet.lookups` carries
+one ordered polynomial row per lookup, and `globals` carries the nested rows of
+each global. The independent module reader acquires an explicit row slot for
+`array.new`, validates the table and query types from their dimensions, and
+compares nested rows. Splitting a row into scalar memberships, exchanging
+columns, or regrouping a flat scalar bag must therefore make `agree` false even
+if both sides still contain the same individual field values.
+
+The certificate boundary will be generalized at the `RawTable` level, which is
+the heterogeneous row-erased form a `Lookup` actually carries. A certificate
+ties the exported name and arity to that raw table and equates `RawTable.Contains`
+with membership of the ordered canonical-representative row in `ExportTable.rows`.
+`CertifiedTable` can then store one `RawTable F`; a single `CertifiedConfig` can
+hold `ByteTable.toRaw` (arity one) and `ByteXorTable.toRaw` (arity three) without
+fixing its public carrier to `Table F field`. The canonical-value bridge and the
+lookup/soundness chain will likewise conclude membership of an emitted field
+row, not a flattened scalar bag.
+
+This does not close D012's residual identity gap. The caller can still choose
+the raw table paired with an export, and must prove that each circuit lookup is
+that table. It merely permits the existing named assumption to range over every
+arity without weakening its certificate. S28 must instantiate the generic
+chain concretely for `And8`, and must measure the full 65536-by-3 `ByteXor`
+table before changing this decision's implementation/scale status to complete.
