@@ -45,6 +45,16 @@ Active docs no longer depend on a developer-local path. Read-only GitHub checks
 confirmed the relevant security features are not inherited from `llzk-lib`.
 Evidence is in `evidence/P0/publication-hygiene.txt`; no external state changed.
 
+Latest completed CI-hardening increment: every external action is a reviewed
+commit SHA; hosted jobs name Ubuntu 24.04; Plonky3 names Rust 1.98.0; and the
+main token defaults to contents read-only. The LLZK job uses the accepted public
+substituter/key with source builds disabled. All hosted and self-hosted benchmark
+entry points are inert unless `CLEAN_BENCH_ENABLED == 'true'`, which publication
+keeps unset pending a runner threat review. G11 now exercises 53 error paths,
+including ten controls for these policies. Full G0-G12 passed on clean commit
+`9b809e32`; evidence is in `evidence/P0/ci-hardening.txt`. The workflows have
+not run remotely at this commit, and no external state changed.
+
 Next session: **S25** — `sessions/S25-align-upstream.md`, **as corrected by R7**
 (read its Deliverable 2a first). Bootstrapped, not started; changing the Clean
 pin remains an explicit decision boundary

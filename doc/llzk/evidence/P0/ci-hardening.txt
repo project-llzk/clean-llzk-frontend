@@ -1,0 +1,67 @@
+P0 — public CI supply-chain hardening
+Date: 2026-08-21
+
+Frozen implementation-and-document commit:
+  9b809e320a69d1590e938d98231965fea6c9071d
+
+Immutable action provenance (GitHub commit API):
+  verified  actions/checkout
+            11d5960a326750d5838078e36cf38b85af677262
+            2026-07-16T19:43:47Z
+  verified  leanprover/lean-action
+            38fbc41a8c28c4cbaec22d7f7de508ec2e7c0dd9
+            2026-04-22T01:02:58Z
+  verified  cachix/install-nix-action
+            ba0dd844c9180cbf77aa72a116d6fbc515d0e87b
+            2024-05-15T11:36:04Z
+  verified  actions/upload-artifact
+            ea165f8d65b6e75b540449e92b4886f43607fa02
+            2025-03-19T17:34:59Z
+  verified  actions/github-script
+            f28e40c7f34bde8b3046d885e986cb6290c5673b
+            2025-06-06T08:19:36Z
+  verified  actions/cache
+            0057852bfaa89a56745cba8c7296529d2fc39830
+            2025-09-24T13:47:33Z
+  verified  dtolnay/rust-toolchain
+            4360b52568e2003a75bf9bc1d59f33a8e3fc893c
+            2026-08-05T04:31:12Z
+
+For every entry the API returned verification reason "valid". The dated
+official Rust stable manifest reports:
+  manifest date: 2026-08-20
+  rust: 1.98.0 (88d9e12ae 2026-08-18)
+
+Configured boundaries:
+  hosted runner: ubuntu-24.04
+  default CI token: contents read-only
+  LLZK source: 5db6f8f9baaa40787a1a40625796497445f2da36
+  LLZK substituter: https://veridise-public.cachix.org
+  LLZK source builds: disabled with --max-jobs 0
+  benchmark workflows: disabled unless CLEAN_BENCH_ENABLED == 'true'
+
+Focused checks:
+  PASS — bash scripts/llzk/check-actions-pinned.sh
+         15 immutable action references
+  PASS — bash scripts/llzk/test-scripts.sh
+         53 error paths, including ten CI dependency, permission,
+         benchmark-opt-in, and binary-cache controls
+  PASS — all four workflow files parsed with Ruby's YAML parser
+  PASS — bash -n on every affected shell script
+  PASS — scripts/check-consecutive-empty-lines.py
+  PASS — git diff --check
+
+Full pinned-tool result on the clean frozen commit:
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  12 circuit(s), 33 input vector(s), both witgen backends
+  2 renderer fixture(s), syntax only
+  G10a: all 12 + 2 modules admitted by --llzk-product-program
+  G10b: 10 modules lowered to SMT, 4 out of scope for a declared reason
+  G11: 53 harness error paths exercised
+
+The self-hosted benchmark runner was not enabled or exercised; PUBLICATION.md
+keeps that boundary disabled pending a separate runner-owner threat review.
+The workflow changes have not run remotely at this commit. Organization CI on
+the eventual frozen candidate must establish action execution, anonymous cache
+access, actual runtime, and all four required status checks at that exact SHA.
+No repository, variable, remote, workflow run, or organization setting changed.

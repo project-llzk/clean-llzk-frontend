@@ -44,7 +44,8 @@ GitHub's commit API reported a verified signature for each commit when reviewed
 on 2026-08-21. Release names in comments are review labels; the full commit SHA
 is the executable authority. Hosted jobs use `ubuntu-24.04`. The Plonky3 job
 requests Rust `1.98.0`, the stable release in the official 2026-08-20 manifest,
-rather than following the action's moving `stable` default.
+rather than following the action's moving `stable` default. The captured API
+results and full-gate run are in `evidence/P0/ci-hardening.txt`.
 
 The LLZK job installs the exact `veridise-public.cachix.org` substituter and key
 recorded below, then builds with `--max-jobs 0`. The accepted output was present
