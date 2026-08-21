@@ -17,6 +17,8 @@ that one — imports the gadgets the tables belong to:
   `ofStatic` because it inlines its `StaticTable` into `Table.fromStatic`, and
   naming that `StaticTable` breaks every proof that unfolds `ByteTable` with
   `simp`. This is the exact case D012's follow-up left open.
+* `byteXorTable_certifies`, here, covers the full 65,536 ordered triples used by
+  S28's `And8` path.
 -/
 
 namespace LLZK
@@ -97,14 +99,11 @@ holds `x`.**
 The left-hand side is Clean's lookup constraint. The right-hand side is what
 `constrain.in %Bytes, %x` asserts, under D017.
 
-**`hdiag` is a hypothesis, and nothing discharges it.** An earlier version of
-this docstring said it was "discharged by the compiler before any module is
-emitted", on the grounds that `ExportTable.diagnose` is the check S08 added for
-R2-02. The compiler does run that check — but this theorem is instantiated at no
-call site, so its hypothesis is discharged at none either, and a hypothesis of an
-uninstantiated theorem is discharged by nothing. R5a-7. `GAPS.md` item 4 records
-that the lookup half of `ConstraintsHoldFlat` has no *composed* semantic
-theorem; this is the piece that would go in it. -/
+`hdiag` remains explicit because this low-level theorem is usable independently
+of compilation. `Test/Lookups.byteTable_lookup_iff_of_recognize` instantiates it
+and derives the hypothesis from `registryOk_of_recognize`; the generic public
+chain uses `canonical_of_recognize'` for the same reason. This was not true when
+R5a-7 found the theorem uninstantiated. -/
 theorem byteTable_lookup_iff
     (hdiag : ExportTable.diagnose (FiniteField.size (_root_.F p)) ⟨"Bytes", 1, byteRows⟩ = #[])
     (t : Array (Vector (_root_.F p) 1)) (row : Vector (_root_.F p) 1) :

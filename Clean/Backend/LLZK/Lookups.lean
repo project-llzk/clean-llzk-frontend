@@ -28,7 +28,7 @@ that, twice over, and until A1 nothing could say so:
   D010 as a theorem rather than as a sentence, and is what makes the two bounds
   the same bound.
 
-`canonical_of_compile` below is the composition. Nothing is assumed at a call
+`canonical_of_recognize` below is the composition. Nothing is assumed at a call
 site: a module that came out of `compile` carries all three.
 
 ## What this still does not do

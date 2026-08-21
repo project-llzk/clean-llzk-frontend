@@ -178,8 +178,40 @@ private def lower (cfg : Config) (r : Recognized) : Except Diagnostic Module := 
                          a defect in the backend, not in the circuit: please report it with the \
                          circuit that triggered it" }
 
+/-- Whether two registry entries are identical as emitted tables. -/
+private def sameExportTable (a b : ExportTable) : Bool :=
+  a.name == b.name && a.arity == b.arity && a.rows == b.rows
+
+/-- Validate the table information carried by a hand-built `Recognized`.
+
+`recognize` derives this information from `cfg.tables`; `lowerRecognized` accepts
+it from a caller. Checking only `cfg.tables` therefore leaves a second,
+unvalidated registry inside `r`. Every retained table must itself diagnose clean,
+must occur unchanged in the validated configuration, and every retained lookup
+must agree with the retained table's shape. -/
+private def diagnoseRecognizedTables (cfg : Config) (r : Recognized) : Array Diagnostic :=
+  diagnoseRegistry cfg.field.prime r.tables
+    ++ r.tables.filterMap (fun table =>
+      if cfg.tables.any (sameExportTable table) then none
+      else some {
+        context := s!"recognized table '{table.name}'"
+        message := "is not present unchanged in the validated configuration; a hand-built \
+                    Recognized may not supply a second table registry" })
+    ++ r.lookups.filterMap (fun lookup =>
+      match r.tables.find? (·.name = lookup.tableName) with
+      | none => some {
+          context := s!"lookup into '{lookup.tableName}'"
+          message := "has no matching table in the recognized table registry" }
+      | some table =>
+          if table.arity = lookup.tableArity && table.rows.size = lookup.tableRows then none
+          else some {
+            context := s!"lookup into '{lookup.tableName}'"
+            message := s!"retains shape [{lookup.tableRows}, {lookup.tableArity}], but the \
+                          recognized table has shape [{table.rows.size}, {table.arity}]" })
+
 /-- Lower a `Recognized` that was not produced by `recognize`, validating the
-parts of `Config` that `recognize` would have.
+parts of `Config` that `recognize` would have and the retained table registry
+that a caller supplied directly.
 
 `lower` itself is private, because it runs no validation at all: `Recognized` is
 a public structure, so a caller could hand it a table name that is not a symbol,
@@ -197,6 +229,12 @@ def lowerRecognized (cfg : Config) (r : Recognized) : Except (Array Diagnostic) 
               message := s!"configured field '{cfg.field.name}' with prime {cfg.field.prime} is \
                             not an entry of `FieldSpec.registry`" }]
   match diagnoseRegistry cfg.field.prime cfg.tables with
+  | #[] => pure ()
+  | problems => throw problems
+  -- Preserve the expression-specific diagnostics `lower` has always produced
+  -- before reporting a secondary hand-built table-shape defect.
+  r.checkLowerable cfg.field.prime |>.mapError (#[·])
+  match diagnoseRecognizedTables cfg r with
   | #[] => pure ()
   | problems => throw problems
   lower cfg r |>.mapError (#[·])

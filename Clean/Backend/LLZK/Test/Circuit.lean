@@ -74,6 +74,7 @@ is now pinned below, in this order:
 | a divisor at or above the prime, likewise | `recognizedWith #[.umod _ (p+5)]` |
 | a constant at or above the prime, in an output | `recognizedWith #[] #[.const (p+7)]` |
 | the same, in an assertion | the `asserts` guard below |
+| a hand-built `Recognized` carrying tables absent from its validated config | `malformedRecognizedRegistry` |
 
 The last five are R5's. The registry-membership branch was R4b-1's own repair and
 had no fixture; the other four are D011's side conditions, which were enforced by
@@ -999,6 +1000,27 @@ private def recognizedWith (witnesses outputs : Array FieldExpr) : Recognized :=
 
 private def viaRecognized (r : Recognized) : String :=
   renderResult (lowerRecognized (.forField .babybear) r)
+
+/-! A hand-built `Recognized` carries its own table array. Before the S28
+post-completion review, `lowerRecognized` diagnosed only `cfg.tables`, then
+emitted `r.tables` unchecked; the malformed two-column global below both lowered
+and passed `Module.render` despite not occurring in the configuration at all. -/
+private def malformedRecognizedRegistry : Recognized :=
+  { inputSize := 1
+    witnesses := #[]
+    asserts := #[]
+    lookups := #[]
+    tables := #[{ name := "not a symbol", arity := 2, rows := #[#[0]] }]
+    outputs := #[.var 0] }
+
+/--
+info: compilation failed:
+table 'not a symbol': name is not a legal MLIR symbol; it must start with a letter or underscore and contain only letters, digits and underscores
+table 'not a symbol': row 0 has 1 value(s) but the arity is 2
+recognized table 'not a symbol': is not present unchanged in the validated configuration; a hand-built Recognized may not supply a second table registry
+-/
+#guard_msgs in
+#eval IO.print (viaRecognized malformedRecognizedRegistry)
 
 -- Baseline: a well-formed divisor still lowers, so the guards below are not red
 -- for some unrelated reason.

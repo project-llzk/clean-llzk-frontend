@@ -57,9 +57,9 @@ def isSymbolName (name : String) : Bool :=
 
 namespace ExportTable
 
-/-- The values this table puts into the emitted `global.def const`, in order.
-Single-column tables are the only ones that reach the emitter, so this is the
-row list. -/
+/-- The row-major values this table puts into the emitted `global.def const`, in
+order. Row boundaries remain authoritative in `rows`; this flattening exists
+only for LLZK's initializer syntax and canonical-value diagnostics. -/
 def values (table : ExportTable) : Array Nat := table.rows.flatten
 
 /-- Every row value that is not a canonical representative.

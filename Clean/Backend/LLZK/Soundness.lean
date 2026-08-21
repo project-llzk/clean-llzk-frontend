@@ -13,9 +13,11 @@ constraints by its `Assumptions → Spec`.
 
 The chain has four links, and three of them are Clean's own:
 
-1. `ConstraintSet.eqs_iff_of_agree` and `Lookups.ofSource_lookups_iff` — the two
-   conjuncts of `constraintsHoldFlat_iff_forall_mem`, from the emitted module.
-   The second is A1; before it this chain could not be built at all.
+1. `ConstraintSet.eqs_iff_of_agree`, `lookupRows_of_agree`, and
+   `Lookups.ofSource_lookups_iff` — the two conjuncts of
+   `constraintsHoldFlat_iff_forall_mem`, from the emitted module. The middle
+   bridge makes the lookup premise range over `C.lookups`, not a restatement of
+   the source list.
 2. `Circuit.constraintsHold_toFlat_iff` — Clean's own bridge between the flat and
    nested representations.
 3. `Circuit.can_replace_soundness` — Clean's own step to `ConstraintsHold.Soundness`,
@@ -58,6 +60,21 @@ variable {F : Type} [FiniteField F] [DecidableEq F]
 
 /-! ## The emitted side -/
 
+/-- Semantic satisfaction of the lookup rows the independent module reader
+extracts.
+
+For every ordered polynomial row in `C.lookups`, evaluating that row must yield
+one ordered row of every same-named entry in `C.globals`. Both sides therefore
+come from the independent module reader. `agree` and the certificate bridge
+those global rows to Clean's raw table; D017 remains the assumption that LLZK
+gives `constrain.in` this membership meaning. -/
+def ConstraintSet.LookupRowsHold (C : ConstraintSet F)
+    (env : Environment F) (outs : Nat → F) : Prop :=
+  ∀ name row, (name, row) ∈ C.lookups →
+    ∀ rows, (name, rows) ∈ C.globals →
+      ∃ values ∈ rows,
+        values.map FiniteField.fromNat = row.map (Poly.eval (assign env outs))
+
 /-- `eqs_iff_of_compileSource'` needs only the comparison, not the compile.
 
 Factored out because `compile` goes through `compileSourceVerified`, whose
@@ -75,11 +92,81 @@ theorem ConstraintSet.eqs_iff_of_agree {cfg : Config} {src : Source F} {m : Modu
   exact ⟨fun hh p hp => hh p (hperm.mem_iff.mpr hp),
          fun hh p hp => hh p (hperm.mem_iff.mp hp)⟩
 
-/-- **Both conjuncts of `ConstraintsHoldFlat`, from the emitted module.**
+/-- The module reader's ordered lookup rows are a permutation of the source
+reader's ordered lookup rows whenever G9 agrees. -/
+theorem ConstraintSet.lookups_perm_of_agree {cfg : Config} {src : Source F} {m : Module}
+    {C : ConstraintSet F} (ha : agree cfg src m = true)
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C) :
+    C.lookups.Perm (ofSource cfg src).lookups := by
+  simp only [agree, hm, Bool.and_eq_true] at ha
+  exact List.isPerm_iff.mp ha.2
 
-The assertion half comes from the polynomial comparison, the lookup half from A1.
-Together they are exactly `constraintsHoldFlat_iff_forall_mem`'s right-hand side. -/
-theorem constraintsHoldFlat_of_emitted [CanonicalRepr F] {cfg : CertifiedConfig F}
+/-- Convert semantic satisfaction of the module reader's lookup rows into the
+source-indexed certified-row premise consumed by `ofSource_lookups_iff`.
+
+This is the name/arity bridge R7-12 left open. The lookup permutation comes from
+G9, the table name equality comes from `ExportTable.Certifies`, and evaluation
+of each retained polynomial is `Expression.eval`. -/
+theorem ConstraintSet.lookupRows_of_agree {cfg : CertifiedConfig F} {src : Source F}
+    {m : Module} {C : ConstraintSet F}
+    (ha : agree cfg.toConfig src m = true)
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
+    (env : Environment F) (outs : Nat → F)
+    (hlookups : C.LookupRowsHold env outs) :
+    ∀ l ∈ FlatOperation.lookups src.operations, ∀ ct ∈ cfg.tables,
+      ∀ entry : Vector (Expression F) ct.table.arity, l = ⟨ct.table, entry⟩ →
+        ∃ values ∈ ct.exported.rows,
+          values.map FiniteField.fromNat = (entry.map env).toArray := by
+  intro l hl ct hct entry heq
+  have hsource : (l.table.name, l.entry.toArray.map Expression.toPoly) ∈
+      (ofSource cfg.toConfig src).lookups := by
+    simp only [ofSource]
+    exact List.mem_map.mpr ⟨l, hl, rfl⟩
+  have hmodule : (l.table.name, l.entry.toArray.map Expression.toPoly) ∈ C.lookups :=
+    (lookups_perm_of_agree ha hm).mem_iff.mpr hsource
+  have hused : (FlatOperation.lookups src.operations).any
+      (fun l => l.table.name = ct.exported.name) := by
+    apply List.any_eq_true.mpr
+    refine ⟨l, hl, ?_⟩
+    simp only [heq]
+    exact decide_eq_true ct.certificate.1.symm
+  have hsourceGlobal : (ct.exported.name, ct.exported.rows) ∈
+      (ofSource cfg.toConfig src).globals := by
+    simp only [ofSource]
+    apply List.mem_map.mpr
+    refine ⟨ct.exported, ?_, rfl⟩
+    have hmem : ct.exported ∈
+        cfg.toConfig.tables.filter (fun table =>
+          (FlatOperation.lookups src.operations).any (·.table.name = table.name)) :=
+      Array.mem_filter.mpr ⟨CertifiedConfig.mem_toConfig_tables hct, hused⟩
+    simpa using hmem
+  have hm' : ofModule (F := F) (Ty.felt cfg.toConfig.field.name) m = some C := by
+    change ofModule (F := F) (Ty.felt cfg.field.name) m = some C
+    exact hm
+  have hagree := ha
+  simp only [agree, hm', Bool.and_eq_true] at hagree
+  have hglobal : (ct.exported.name, ct.exported.rows) ∈ C.globals := by
+    rw [beq_iff_eq.mp hagree.1.1.2]
+    exact hsourceGlobal
+  rw [heq] at hmodule
+  obtain ⟨values, hvalues, hrow⟩ :=
+    hlookups ct.exported.name (entry.toArray.map Expression.toPoly)
+      (by simpa only [ct.certificate.1] using hmodule)
+      ct.exported.rows hglobal
+  refine ⟨values, hvalues, ?_⟩
+  rw [hrow]
+  apply Array.ext
+  · simp
+  · intro i hi₁ hi₂
+    simp [Expression.eval_toPoly]
+
+/-- Both conjuncts of `ConstraintsHoldFlat`, with the lookup rows already
+indexed by the source.
+
+Kept as the explicit compatibility form for callers that already have Clean's
+lookup premise. The public `constraintsHoldFlat_of_emitted` below accepts
+semantic satisfaction of `C.lookups` and proves this source-indexed premise. -/
+theorem constraintsHoldFlat_of_sourceRows [CanonicalRepr F] {cfg : CertifiedConfig F}
     {src : Source F} {m : Module} {C : ConstraintSet F} {r : Recognized}
     (ha : agree cfg.toConfig src m = true)
     (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
@@ -97,6 +184,27 @@ theorem constraintsHoldFlat_of_emitted [CanonicalRepr F] {cfg : CertifiedConfig 
   rw [FlatOperation.constraintsHoldFlat_iff_forall_mem]
   exact ⟨(eqs_iff_of_agree ha hm env outs).mp heqs |>.1,
          (ofSource_lookups_iff hrec env resolve).mpr hlookups⟩
+
+/-- **Both conjuncts of `ConstraintsHoldFlat`, from the emitted module.**
+
+The assertion half comes from the polynomial comparison, the lookup half from A1.
+The lookup premise ranges over `C.lookups`, not a separately restated source
+list; `lookupRows_of_agree` proves the bridge between them. Together they are
+exactly `constraintsHoldFlat_iff_forall_mem`'s right-hand side. -/
+theorem constraintsHoldFlat_of_emitted [CanonicalRepr F] {cfg : CertifiedConfig F}
+    {src : Source F} {m : Module} {C : ConstraintSet F} {r : Recognized}
+    (ha : agree cfg.toConfig src m = true)
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
+    (hrec : recognize cfg.toConfig src = .ok r)
+    (resolve : ∀ l ∈ FlatOperation.lookups src.operations,
+      ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.arity,
+        l = ⟨ct.table, entry⟩)
+    (env : Environment F) (outs : Nat → F)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+    (hlookups : C.LookupRowsHold env outs) :
+    FlatOperation.ConstraintsHoldFlat env src.operations :=
+  constraintsHoldFlat_of_sourceRows ha hm hrec resolve env outs heqs
+    (lookupRows_of_agree ha hm env outs hlookups)
 
 /-! ## The Clean side -/
 
@@ -155,6 +263,30 @@ theorem spec_of_compile [CanonicalRepr F] {cfg : CertifiedConfig F}
     (hnoint : ((c.main (varFromOffset Input 0)).operations (size Input)).interactions = [])
     (env : Environment F) (outs : Nat → F)
     (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+    (hlookups : C.LookupRowsHold env outs)
+    (input : Input F)
+    (hinput : eval env (varFromOffset Input 0 : Var Input F) = input)
+    (hassm : c.Assumptions input) :
+    c.Spec input (eval env (c.output (varFromOffset Input 0) (size Input))) :=
+  spec_of_constraintsHoldFlat c env
+    (constraintsHoldFlat_of_emitted (constraintsAgree_of_compileSourceVerified hcompile)
+      hm hrec resolve env outs heqs hlookups)
+    hnoint input hinput hassm
+
+/-- Compatibility form of `spec_of_compile` for a caller that already states
+lookup satisfaction over the source operations. Unlike `spec_of_compile`, this
+theorem does not claim that premise was obtained from `C.lookups`. -/
+theorem spec_of_compile_sourceRows [CanonicalRepr F] {cfg : CertifiedConfig F}
+    {c : FormalCircuit F Input Output} {m : Module} {C : ConstraintSet F} {r : Recognized}
+    (hcompile : compile cfg c = .ok m)
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
+    (hrec : recognize cfg.toConfig (Compilable.source (F := F) c) = .ok r)
+    (resolve : ∀ l ∈ FlatOperation.lookups (Compilable.source (F := F) c).operations,
+      ∃ ct ∈ cfg.tables, ∃ entry : Vector (Expression F) ct.table.arity,
+        l = ⟨ct.table, entry⟩)
+    (hnoint : ((c.main (varFromOffset Input 0)).operations (size Input)).interactions = [])
+    (env : Environment F) (outs : Nat → F)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
     (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source (F := F) c).operations,
       ∀ ct ∈ cfg.tables, ∀ entry : Vector (Expression F) ct.table.arity,
         l = ⟨ct.table, entry⟩ →
@@ -165,7 +297,7 @@ theorem spec_of_compile [CanonicalRepr F] {cfg : CertifiedConfig F}
     (hassm : c.Assumptions input) :
     c.Spec input (eval env (c.output (varFromOffset Input 0) (size Input))) :=
   spec_of_constraintsHoldFlat c env
-    (constraintsHoldFlat_of_emitted (constraintsAgree_of_compileSourceVerified hcompile)
+    (constraintsHoldFlat_of_sourceRows (constraintsAgree_of_compileSourceVerified hcompile)
       hm hrec resolve env outs heqs hlookups)
     hnoint input hinput hassm
 

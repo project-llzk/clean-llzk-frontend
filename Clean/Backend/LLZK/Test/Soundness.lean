@@ -73,11 +73,7 @@ theorem add8_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognize
     (hrec : recognize withBytes.toConfig (Compilable.source add8) = .ok r)
     (env : Environment Bab) (outs : Nat → Bab)
     (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
-    (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source add8).operations,
-      ∀ ct ∈ withBytes.tables, ∀ entry : Vector (Expression Bab) ct.table.arity,
-        l = ⟨ct.table, entry⟩ →
-          ∃ values ∈ ct.exported.rows,
-            values.map FiniteField.fromNat = (entry.map env).toArray)
+    (hlookups : C.LookupRowsHold env outs)
     (input : Gadgets.Addition8FullCarry.Inputs Bab)
     (hinput : eval env
       (varFromOffset Gadgets.Addition8FullCarry.Inputs 0 :
@@ -109,7 +105,7 @@ theorem add8_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recogniz
     add8.Spec input
       (eval env (add8.output (varFromOffset Gadgets.Addition8FullCarry.Inputs 0)
         (size Gadgets.Addition8FullCarry.Inputs))) :=
-  add8_spec_of_compile hcompile hm hrec env outs heqs
+  spec_of_compile_sourceRows hcompile hm hrec add8_resolve add8_no_interactions env outs heqs
     ((add8_lookup_iff hrec env).mp hlookups) input hinput hassm
 
 /-! ## S28: the same chain instantiated at three-column `And8` -/
@@ -135,11 +131,7 @@ theorem and8_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognize
     (hrec : recognize withBytesAndXor.toConfig (Compilable.source and8) = .ok r)
     (env : Environment Bab) (outs : Nat → Bab)
     (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
-    (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source and8).operations,
-      ∀ ct ∈ withBytesAndXor.tables, ∀ entry : Vector (Expression Bab) ct.table.arity,
-        l = ⟨ct.table, entry⟩ →
-          ∃ values ∈ ct.exported.rows,
-            values.map FiniteField.fromNat = (entry.map env).toArray)
+    (hlookups : C.LookupRowsHold env outs)
     (input : Gadgets.And.And8.Inputs Bab)
     (hinput : eval env
       (varFromOffset Gadgets.And.And8.Inputs 0 : Var Gadgets.And.And8.Inputs Bab) = input)
@@ -166,7 +158,7 @@ theorem and8_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recogniz
     and8.Spec input
       (eval env (and8.output (varFromOffset Gadgets.And.And8.Inputs 0)
         (size Gadgets.And.And8.Inputs))) :=
-  and8_spec_of_compile hcompile hm hrec env outs heqs
+  spec_of_compile_sourceRows hcompile hm hrec and8_resolve and8_no_interactions env outs heqs
     ((and8_lookup_iff hrec env).mp hlookups) input hinput hassm
 
 end LLZK.Test.Soundness

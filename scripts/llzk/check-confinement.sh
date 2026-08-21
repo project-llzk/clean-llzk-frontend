@@ -21,8 +21,9 @@
 #    multiplication constraint deleted -- through `lowerRecognized` and passed
 #    G3, G4, G5, G6, G10a and G10b with it.
 #
-#    `lowerRecognized` is not "unchecked": it validates the field registry, the
-#    table registry, and (since R5) D011's side conditions. What it cannot do is
+#    `lowerRecognized` is not "unchecked": it validates the field registry, both
+#    the configured and hand-built retained table registries, their exact
+#    relationship, and (since R5) D011's side conditions. What it cannot do is
 #    compare against a Clean circuit, because a hand-built `Recognized` has none.
 #    That is why the six `Square_*` corpus entries report `constraintsAgree =
 #    none` rather than `some true` -- G9 does not apply to them, and `EmitMain`

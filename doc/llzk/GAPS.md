@@ -163,26 +163,24 @@ R5e called it the statement a user most likely assumes the project has.
 
 > take any assignment of the emitted component's cells — `env` for the circuit
 > variables, `outs` for the `@out{j}` members D008 adds — that satisfies every
-> polynomial the reader extracts from `@constrain`, **and every lookup of the
-> source, in certified-row form** (for each source lookup into a certified
-> table, the ordered queried row is `fromNat` of one exported row); assume
+> polynomial the reader extracts from `@constrain`, **and every ordered
+> polynomial row in `C.lookups`** (each evaluated row is `fromNat` of one row in
+> every same-named nested table in `C.globals`); assume
 > the gadget's own `Assumptions` of the input; then the gadget's own `Spec`
 > holds of that input and the corresponding output.
 
-The bolded half is R7-12's finding: the lookup hypothesis is stated over the
-*source's* lookups via the certificate, not over the `C.lookups`/`C.globals` the
-reader extracts from the module — an earlier version of this blockquote said
-"every lookup it extracts", which is the statement a user would want and not the
-one the theorem has. Under D017 the module's assertion is membership in the
-global *named* `l.table.name`; equating that with the certified-row form needs
-equal names and arities, which `ExportTable.Certifies` demands — so the bridging
-lemma is now *provable*, but it is not
-*proved*, and until it is, a caller holding a satisfying assignment of the
-module discharges `hlookups` by that (unproved, routine) step. The theorem also
-carries the caller-supplied `resolve` hypothesis — that every source lookup is
-into one of the configuration's certified tables — which is item 1's second
-half surfacing in the statement, proved at the instantiation by
-`add8_lookups_are_byteTable`.
+R7-12 found that the lookup hypothesis was instead stated over the *source's*
+lookups via the certificate. S28's post-completion review closed that interface
+gap: `ConstraintSet.lookupRows_of_agree` uses G9's ordered-row/global agreement
+and the certificate's name equality to turn `C.LookupRowsHold` into the
+source-indexed premise of `ofSource_lookups_iff`. The compatibility theorem
+`spec_of_compile_sourceRows` retains the old, honestly named interface for
+callers that already have that premise. `spec_of_compile` now takes the module
+reader's rows directly. It still carries the caller-supplied `resolve`
+hypothesis — that every source lookup is into one of the configuration's
+certified tables — which is item 1's second half surfacing in the statement,
+proved at the instantiations by `add8_lookups_are_byteTable` and
+`and8_lookups_are_byteXor`.
 
 Four links, three of them Clean's own: the two conjuncts of
 `constraintsHoldFlat_iff_forall_mem` (item 4, closed by A1 — this chain could not
@@ -196,7 +194,7 @@ is the one place Stage 1's narrowness pays rather than costs.
 
 **What it is not.** It is the *soundness* direction only: nothing here says the
 module has a satisfying assignment. It is stated over the `ConstraintSet` the
-reader extracts (equality half) and the certificate (lookup half — see above),
+reader extracts (both equality and ordered-lookup halves) and the certificate,
 so D017 (item 7) and the renderer (item 2) still stand between it and the
 emitted text. And the hypotheses of the form "this compile run succeeded" are
 checked rather than proved, because `recognize` on a real gadget does not reduce
@@ -227,9 +225,10 @@ is the shape the rest of this file's items need.
   against `cfg.field.prime` a bound against `FiniteField.size F`).
   `canonical_of_recognize` composes them into exactly the hypothesis
   `certified_membership` needs.
-- **Both are instantiated**, at `Gadgets.Addition8FullCarry` under `withBytes`,
-  in `Test/Lookups.lean`. `add8_lookups_are_byteTable` proves from the gadget's
-  own operations that every lookup it performs is into `Gadgets.ByteTable`.
+- **Both are instantiated**, at `Gadgets.Addition8FullCarry` under `withBytes`
+  and at three-column `And8` under `withBytesAndXor`, in `Test/Lookups.lean`.
+  The concrete resolution theorems prove from each gadget's own operations that
+  every lookup uses the certified table claimed for it.
 
 What is *left* of this entry is one hypothesis and it is named: `recognize
 withBytes.toConfig addSrc = .ok r`, "the compiler accepted this circuit".

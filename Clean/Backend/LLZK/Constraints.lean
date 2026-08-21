@@ -39,14 +39,14 @@ emitted `constrain.eq`s are satisfied by exactly the assignments that satisfy
 Clean's assertions — *given* that `ofModule` reads the emitted IR the way LLZK
 does.
 
-The **lookup half of `ConstraintsHoldFlat` has no such theorem here.**
-`lookups_perm_of_compileSource'` is a statement about `Poly` data: the emitted
-`constrain.in`s name the tables Clean's `.lookup`s named and query the same
-polynomials. Turning that into `Lookup.Contains` needs
-`TableCert.certified_membership`, which needs a certificate for the table the
-circuit actually uses — and `RawTable` has erased which `Table` that is. So the
-composed end-to-end statement does not exist, and R4a-6 was right to say the
-docstring implied it did.
+The lookup half is data here and semantics in `Lookups.lean` and
+`Soundness.lean`. `lookups_perm_of_compileSource'` says each emitted
+`constrain.in` names the table Clean's `.lookup` named and queries the same
+ordered polynomial row. `Lookups.ofSource_lookups_iff` turns certified exported
+rows into `Lookup.Contains`; `Soundness.lookupRows_of_agree` bridges semantic
+satisfaction of the module reader's `C.lookups` to that source-indexed theorem.
+The one premise the compiler still cannot derive is which certified raw table a
+source lookup came from, because `RawTable` erased the originating `Table`.
 
 That last clause is an assumption, and it is deliberately a small and inspectable
 one: `felt.add` is `+`, `felt.mul` is `*`, `felt.const n` is `fromNat n`,
@@ -64,12 +64,12 @@ emitted in the wrong field is a mismatch here rather than only in
 Clean's `.lookup` named and queries the same polynomial. That the *rows* are the
 table's rows is a separate obligation, `ExportTable.Certifies`, and
 `Clean/Backend/LLZK/TableCert.lean` discharges it for every table this backend
-can be given — generically for anything derived from a `StaticTable`, and
-specifically for `Gadgets.ByteTable`, which cannot be. What the compiler does not
-do is *demand* the certificate: `Config.tables` takes bare `ExportTable`s, and
-tying a certificate to a lookup would need the `Table` that `RawTable` erased.
-For the corpus the obligation is discharged and the build enforces it, because
-`Examples.byteTable_certified` holds by `rfl` and breaks if the rows change.
+uses — generically for anything derived from a `StaticTable`, and specifically
+for `Gadgets.ByteTable` and the full three-column `ByteXorTable`. Supported
+compile entry points take `CertifiedConfig`, so they demand one certificate per
+export. What the compiler cannot demand is that the certified raw table is the
+one a source lookup originated from; concrete resolution theorems discharge
+that residual D012 premise for `Addition8FullCarry` and `And8`.
 -/
 
 namespace LLZK

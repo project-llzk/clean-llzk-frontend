@@ -4,6 +4,7 @@ import Clean.Backend.LLZK.Test.Soundness
 #print axioms LLZK.canonicalRow_injective
 #print axioms LLZK.ofStatic_certifies
 #print axioms LLZK.certified_membership
+#print axioms LLZK.ConstraintSet.lookupRows_of_agree
 
 -- Concrete full-size certificate and protected rendered surface.
 #print axioms LLZK.byteXorTable_certifies

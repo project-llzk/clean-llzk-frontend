@@ -1,7 +1,7 @@
 # S28 — Multi-column lookup tables: retire D013
 
-Status: implementation complete; clean checkpoint, G0-G12 acceptance, and
-post-completion adversarial review pending
+Status: implementation and clean G0-G12 acceptance complete; post-completion
+review repairs implemented, clean rerun pending
 Depends on: S26 implementation and evidence tip
 `91d43ffd0b4dcfd0841cc97f402b2d6006c58358`
 Branch: `clean-to-llzk/s28-multicolumn-tables`
@@ -178,8 +178,10 @@ In addition to the ordinary gate log, preserve:
   pinned-tool probes;
 - `evidence/S28/scale.md` — 65536×3 measurements;
 - `evidence/S28/coverage.md` — exact before/after diagnostic decomposition;
-- `evidence/S28/probe.lean` — theorem/axiom closure; and
-- `evidence/S28/gates.txt` — final clean-commit G0–G12 run.
+- `evidence/S28/probe.lean` — theorem/axiom closure;
+- `evidence/S28/gates.txt` — clean implementation-commit G0–G12 run; and
+- `evidence/S28/adversarial-review.md` — post-completion attacks, findings,
+  repairs, and post-repair validation.
 
 ## Pre-implementation adversarial review
 
@@ -224,4 +226,8 @@ are in `evidence/S28/scale.md`; the coverage delta is in
 `evidence/S28/coverage.md`. The implementation was frozen as `03bf2f9b`; the
 committed theorem probe and full pinned G0-G12 suite both passed on that clean
 tree, as recorded in `evidence/S28/gates.txt`. The requested post-completion
-adversarial review now runs against that frozen result.
+adversarial review found two confirmed issues: `lowerRecognized` validated
+`cfg.tables` while emitting an unchecked `r.tables`, and `spec_of_compile` still
+stated its lookup premise over source rows rather than `C.lookups`. Both repairs
+and their focused controls pass; `evidence/S28/adversarial-review.md` records the
+details. A clean repair commit and full pinned G0-G12 rerun remain.

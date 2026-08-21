@@ -1416,8 +1416,8 @@ row, not a flattened scalar bag.
 This does not close D012's residual identity gap. The caller can still choose
 the raw table paired with an export, and must prove that each circuit lookup is
 that table. It merely permits the existing named assumption to range over every
-arity without weakening its certificate. S28 must instantiate the generic
-chain concretely for `And8`. S28 does so in `Test/Lookups.lean` and
+arity without weakening its certificate. S28 requires the generic chain to be
+instantiated concretely for `And8`, and does so in `Test/Lookups.lean` and
 `Test/Soundness.lean`. The full 65536-by-3 `ByteXor` table materializes as
 196,608 canonical values; its certificate, renderer, pinned verifier,
 round-trip, product pipeline, and both witness backends complete within the

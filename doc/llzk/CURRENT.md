@@ -88,12 +88,14 @@ implemented: the IR, renderer, recognizer, G9 readers, and certificate chain all
 preserve ordered rows; the full `ByteXorTable` is certified; and `And8` is the
 fifteenth corpus artifact with six vectors. G0-G12 passed on clean
 implementation commit `03bf2f9b`; scale and theorem evidence are in
-`evidence/S28/`. The requested post-completion adversarial review is in
-progress; no push or external issue creation has occurred.
+`evidence/S28/`. The requested post-completion adversarial review found and
+repaired an unchecked `lowerRecognized` retained-table registry and the missing
+module-lookup-to-source-row soundness bridge. Focused checks pass; a clean
+post-repair G0-G12 rerun remains. No push or external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 accepted; adversarial review in progress)
+Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 review repairs; final rerun pending)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -359,8 +361,9 @@ an explicit decision, which was given.
 - Completed locally: **S28**, from final S26 evidence tip `91d43ffd`. D034,
   row-preserving multi-column lowering/readback, the full 65536×3 certificate,
   and the six-vector `And8` corpus entry are green on `03bf2f9b`.
-- In progress: the requested post-completion adversarial review of that frozen
-  S28 result.
+- In progress: the requested post-completion adversarial review found two
+  substantive issues; both are repaired and focused checks pass. A clean repair
+  commit and full G0-G12 rerun remain.
 - Blocked: none.
 
 ## Last green gates
@@ -433,7 +436,8 @@ tautology; S24 closed the *erasure* half, so the certificate reaches the
 compiler, and R7 tied it to the table's *name*, but not to the circuit's own
 table); and `FieldExpr.lower_spec` is satisfied by five grossly wrong lowerings
 and does not compose. (§4 was on this list until A1 closed it; §3 until A2 —
-`spec_of_compile`, with R7-12's correction of what its lookup hypothesis says;
+`spec_of_compile`, whose lookup hypothesis now ranges over the module reader's
+ordered `C.lookups` after the S28 review closed R7-12's remaining bridge;
 §6 until A4; §2 until A5's checked textual constraint-surface round trip; and
 §8's copy-canonicalisation premise until A7.)
 
