@@ -18,6 +18,12 @@ blindness to the working tree (R7-01) did not. All findings repaired in the
 same session; the coverage sweep is now a checked test
 (`Test/Coverage.lean`), `CertifiedTable` carries a name tie, and S28
 (multi-column tables) joined the critical path  
+Latest completed feature session: **A5** — the supported renderer now parses
+the concrete `@constrain` surface back into typed statements, refuses a mismatch
+before returning text, and carries a generic round-trip theorem. Five mutations
+make the check go red. Full G0-G12 passed on clean commit `28132f64`; evidence is
+in `evidence/A5/`. This feature branch has not been integrated or pushed.
+
 Next session: **S25** — `sessions/S25-align-upstream.md`, **as corrected by R7**
 (read its Deliverable 2a first). Bootstrapped, not started; changing the Clean
 pin remains an explicit decision boundary
@@ -265,9 +271,12 @@ an explicit decision, which was given.
     round-trips and product-forms it, both witgen backends reproduce Clean's
     witness on every recorded input, and its emitted `@constrain` is Clean's own
     constraint system.
-- In progress: A5 — fail-closed textual round trip for the three statement forms
-  unique to `@constrain`. Targeted Lean builds and all corpus emission pass;
-  the full G0-G12 run is the remaining acceptance evidence.
+  - **A5**, closing `GAPS.md` section 2. `Module.render` reads the three
+    constraint-only statement forms back from text, including independently
+    reconstructed types and the function boundary, before releasing an
+    artifact. `Module.render_constraintSurface` states the generic round trip;
+    five mutations make it red. G0-G12 passed on clean commit `28132f64`.
+- In progress: none.
 - Decision pending: authorize S25's move of the accepted Clean base from
   `1e563b9c` / Lean 4.30.0 to `0e53b9f2` / Lean 4.32.2. This is not a technical
   blocker; the project control plane reserves pin changes for an explicit
@@ -282,7 +291,7 @@ Evidence under `doc/llzk/evidence/`.
 |---|---|
 | G0 state and pins | PASS — and since R6 it also fails on any change to Clean's core outside `Clean/Backend/LLZK/`, `Clean.lean` and `Clean/Test.lean` |
 | G1 lint + `lake build --wfail Clean` + `lake build CleanTests` | PASS |
-| G2 goldens: renderer (2) and six full emitted modules | PASS |
+| G2 renderer: goldens plus checked constraint-surface round trip | PASS — 2 renderer fixtures, 12 corpus modules, 5 red mutations |
 | G3 `llzk-opt` parse and verify | PASS — 12 modules + 2 fixtures |
 | G4 `llzk-opt --verify-roundtrip` | PASS — 12 modules + 2 fixtures |
 | G5 `llzk-witgen` interpreter | PASS — 33 vectors |
@@ -560,23 +569,22 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1, A2, A4, A5 and B are done; R7 revalidated everything through A4.** The next thing is
-still **S25**, the upstream alignment — the pin is now five weeks stale, the
+**A1, A2, A4, A5 and B are done; R7 revalidated everything through A4.** The
+next thing is still **S25**, the upstream alignment — the pin is more than six
+weeks old and 70 upstream commits behind, the
 witness IR underneath us has been rebuilt (D025), and upstream has not moved
-past `0e53b9f2` (checked 2026-08-09) — but execute it *as R7 corrected it*:
+past `0e53b9f2` (checked 2026-08-21) — but execute it *as R7 corrected it*:
 Deliverable 2a (the `val`-truncation decision, D026) is the part the gates
 cannot see. Then **S26** (bitwise + `ite`, with the val bridge in its decision
 entry), then **S28** (multi-column tables — new, and the actual library
 unlock), then the witness-IR loop increment. S27 is returned for re-scoping and
 should not be executed as written (R7-09).
 
-The assurance track resumes at **A5, the renderer** — R7-02 made it more than
-a proof-hygiene item: an empty `@constrain` body passes every binary gate
-including the SMT lowering, so the emit-time Lean comparison is the on-disk
-artifact's *only* line of defense, and a parser back to `Module` with a
-round-trip check is its second. Then A6 (the preservation theorem, D021) and A7
-(the copy-canonicalisation premise). A3 is more important than any of them but
-is a Clean-core session, so it should be *scheduled* rather than slipped into a
+The assurance track's A5 renderer item is now done: the on-disk constraint
+surface has the second line of defense R7-02 called for. Its next independent
+items are A6 (the preservation theorem, D021) and A7 (the
+copy-canonicalisation premise). A3 is more important than either but is a
+Clean-core session, so it should be *scheduled* rather than slipped into a
 backend increment — and G0 now enforces that, including against uncommitted
 edits (R7-01).
 

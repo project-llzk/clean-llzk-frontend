@@ -1,0 +1,36 @@
+A5 renderer round-trip assurance
+Date: 2026-08-21
+Commit under test: 28132f646773dc3bfaf7a623e231b4cb2296fd9f
+Worktree: clean; held by LLZK_SESSION=A5
+
+Command:
+
+  LLZK_SESSION=A5 \
+  LLZK_OPT=/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result: exit 0
+
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+    12 circuit(s), 33 input vector(s), both witgen backends.
+    2 renderer fixture(s), syntax only.
+    G10a: all 12 + 2 module(s) admitted by --llzk-product-program.
+    G10b: 10 module(s) lowered to SMT, 4 out of scope for a declared reason.
+
+G11 exercised 43 harness error paths. G2 emitted every artifact through the
+checked Module.render path. Test/Print.lean additionally made RenderCheck.check
+go red for five concrete mutations: same-typed member substitution, dropped
+constrain.eq, dropped constrain.in, renamed @constrain, and a babybear-to-bn254
+type change.
+
+Axiom probe:
+
+  lake env lean doc/llzk/evidence/A5/probe.lean
+
+Result:
+
+  'LLZK.Module.render_constraintSurface' depends on axioms:
+  [propext, Classical.choice, Quot.sound]
+
+No sorryAx.

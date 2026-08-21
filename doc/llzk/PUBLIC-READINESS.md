@@ -87,12 +87,12 @@ authorized.
 
 ```text
 P0 public documentation and repository hygiene
+  -> A5 renderer round-trip assurance (done)
   -> S25 upstream Clean / Lean alignment
   -> L0 LLZK pin review and compatibility run
   -> S26 structural U64 and bitwise lowering
   -> S28 multi-column lookup tables
   -> P1 promote headline examples into the full corpus
-  -> A5 renderer round-trip assurance
   -> R8 frozen-candidate adversarial review
   -> explicit publication decision
 ```
@@ -100,9 +100,9 @@ P0 public documentation and repository hygiene
 S25 is intentionally isolated from capability work: a green bump says the
 existing frontend survived upstream change. L0 applies the same discipline to
 the live LLZK delta and either retains or advances the accepted tool pin with
-evidence. S26 and S28 together create the impactful example increment. A5 then
-strengthens the one assurance boundary R7 showed every LLZK binary gate can
-miss.
+evidence. A5 has already strengthened the one assurance boundary R7 showed
+every LLZK binary gate can miss. S26 and S28 together create the impactful
+example increment.
 
 ## Current scorecard
 
@@ -115,7 +115,7 @@ miss.
 | Structural bitwise witness IR | pending S25 | S26 |
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |
-| Renderer round-trip assurance | implemented; full gates pending | A5 / `Module.render_constraintSurface` |
+| Renderer round-trip assurance | complete locally | A5; G0-G12 green on `28132f64` |
 | Final frozen-tree review | not started | R8 |
 | Organization access | available | active `project-llzk` admin verified 2026-08-21 |
 | Publication | not authorized | separate final action |
