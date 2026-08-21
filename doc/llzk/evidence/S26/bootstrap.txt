@@ -1,0 +1,35 @@
+S26 session bootstrap
+Date: 2026-08-21
+
+Frontend branch point:
+  884d5b1c71020252076ca7c0ff5d0ea3b8799df8
+  Record the accepted L0 pin gates
+
+Branch:
+  clean-to-llzk/s26-witness-u64
+
+Worktree ownership:
+  session S26 — S26 structural U64 lowering bootstrap
+
+Accepted inputs inherited unchanged from L0:
+  Clean: 0e53b9f2d05f06defa2aa0a859f549b611583f10
+  LLZK:  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+L0 prerequisite:
+  the previous and candidate LLZK tools passed the unchanged same-tree matrix;
+  the committed new pin passed G0-G12 on 5fe8f465b9ad74db9c5d74f483c8041754ba0d67;
+  final L0 evidence tip 884d5b1c is the S26 branch point.
+
+The opaque worktree lock was explicitly reclaimed from completed session L0
+with `--from L0` and is now held by S26.
+
+Bootstrap made no width/field or `U64Expr.val` design decision, changed no Lean
+frontend, corpus, fixture, golden, expected count, pin, or CI input, ran no
+toolchain build or compatibility gate, and performed no push or external-state
+mutation.
+
+The first S26 action is the packet's required decision work: read D011 then
+D025, re-establish the D017 boundary, inspect the S25 u64-per-field evidence,
+and settle a theorem-or-refusal policy for expression bounds and the `val`
+bridge before writing lowering code. The pinned LLZK dialect must then be
+probed directly before choosing bitwise operations.

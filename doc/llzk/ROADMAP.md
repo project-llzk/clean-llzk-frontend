@@ -27,24 +27,24 @@ Its dependency order is:
 public documentation and hygiene
   → renderer and copy-canonicalisation assurance (A5 + A7, done)
   → S25: current upstream Clean and Lean (done locally)
-  → L0: review or advance the LLZK toolchain pin
-  → S26: structural U64, bitwise operations, and conditionals
+  → L0: review or advance the LLZK toolchain pin (done locally)
+  → S26: structural U64, bitwise operations, and conditionals (bootstrapped)
   → S28: multi-column lookup tables and certificates
   → end-to-end Xor32 plus one composed bitwise gadget
   → frozen-candidate adversarial review
 ```
 
 This order joins the three goals that matter for publication. S25 removed the
-stale Clean foundation; L0 decides against a measured 25-commit LLZK delta
-rather than silently treating either the old pin or moving `main` as canonical;
-a read-only L0 preflight has frozen and classified that delta in
-`sessions/L0-review-llzk-pin.md`; its compatibility matrix runs on the S25 tree.
-A5 has already strengthened the one artifact boundary every pinned LLZK binary
-accepts without checking semantic content; A7 removed the remaining
-inspection-only premise from copy canonicalisation. S26 plus S28 turns measured
-refusals into impactful examples. The release candidate is reached only when
-those examples are in the external-tool corpus, not when `LLZK.compile` merely
-returns `some`.
+stale Clean foundation. L0 compared the measured 25-commit LLZK delta on one
+frozen tree and advanced the immutable pin to `25fb3740`; both exact toolchains
+and the committed new pin passed the complete matrix. S26 is now isolated from
+that final L0 evidence tip and begins with the width/field and `U64Expr.val`
+decision, not lowering code. A5 has already strengthened the one artifact
+boundary every pinned LLZK binary accepts without checking semantic content;
+A7 removed the remaining inspection-only premise from copy canonicalisation.
+S26 plus S28 turns measured refusals into impactful examples. The release
+candidate is reached only when those examples are in the external-tool corpus,
+not when `LLZK.compile` merely returns `some`.
 
 The initial implementation lives under:
 

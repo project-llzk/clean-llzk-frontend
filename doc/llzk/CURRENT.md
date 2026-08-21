@@ -63,10 +63,17 @@ G0-G12 with identical counts and declared diagnostics. D032 advances the
 accepted LLZK pin to `25fb3740`; the comparison and theorem audit are in
 `evidence/L0/`. The required post-pin run passed on clean commit `5fe8f465`.
 
+Current session: **S26** — bootstrapped 2026-08-21 from final L0 evidence tip
+`884d5b1c`. The worktree is isolated on the S26 branch and held by session S26;
+the accepted Clean and LLZK pins are unchanged. No lowering, corpus, fixture,
+count, or design decision has started. The first deliverable is the explicit
+width/field and `U64Expr.val` bridge decision required by
+`sessions/S26-witness-u64.md` before implementation.
+
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/l0-llzk-pin` (L0 toolchain comparison
-only; no frontend capability, corpus, golden, or example change)
+Active working branch: `clean-to-llzk/s26-witness-u64` (S26 capability work;
+currently bootstrap-only)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -321,10 +328,11 @@ an explicit decision, which was given.
     reconstructed types and the function boundary, before releasing an
     artifact. `Module.render_constraintSurface` states the generic round trip;
     five mutations make it red. G0-G12 passed on clean commit `28132f64`.
-- In progress: none. L0 advanced the LLZK pin to `25fb3740` after both exact
-  toolchains passed the unchanged same-tree matrix; S26 is next.
-- Decision pending: none for the LLZK pin. D032 records the advance and its
-  costs; WTNS/R1CS export remains outside the frontend claim.
+- In progress: **S26**, bootstrapped from L0 evidence tip `884d5b1c`; no
+  implementation or accepted-count change has started.
+- Decision pending: S26's width/field policy and the `U64Expr.val` bridge. The
+  packet requires this to be stated as a theorem or refusal before lowering
+  code; field width alone does not settle the wide-field truncation hazard.
 - Blocked: none.
 
 ## Last green gates
@@ -630,8 +638,9 @@ can close, because closing it means formalising LLZK.
 unchanged `0e53b9f2` head, preserved the narrow accepted subset, and made
 Deliverable 2a visible as D026 rather than letting green gates hide the weakened
 theorem domain. L0 advanced the LLZK input to exact SHA `25fb3740` after the old
-and new tools passed the unchanged same-tree matrix. The next thing is **S26**
-(bitwise + `ite`, with the val bridge in its decision entry), **S28**
+and new tools passed the unchanged same-tree matrix. **S26 is now bootstrapped**;
+its first action is the width and `val`-bridge decision, followed by structural
+bitwise lowering. Then come **S28**
 (multi-column tables and the actual library unlock), and the witness-IR loop
 increment. S27 remains returned for re-scoping (R7-09).
 
