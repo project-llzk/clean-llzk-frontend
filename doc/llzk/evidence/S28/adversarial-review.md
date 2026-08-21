@@ -5,7 +5,8 @@ Date: 2026-08-22
 Frozen result reviewed: `bb24f96f` (implementation `03bf2f9b` plus its clean
 G0-G12 evidence).
 
-Status: two confirmed findings repaired; clean post-repair G0-G12 rerun pending.
+Status: complete. Two confirmed findings were repaired and the clean repair
+commit passed G0-G12.
 
 ## Review method
 
@@ -120,4 +121,23 @@ python3 scripts/check-consecutive-empty-lines.py
 git diff --check
 ```
 
-The final section will record the clean repair commit and full G0-G12 rerun.
+## Final validation
+
+The repairs were frozen as
+`129fbe6ed34be3643ae65e923aabc75ea0b1c359`. On that clean commit, the exact
+pinned command in `review-gates.txt` exited zero:
+
+```text
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  15 circuit(s), 51 input vector(s), both witgen backends.
+  2 renderer fixture(s), syntax only.
+  G9: 9 source-backed modules; 6 registry modules not applicable.
+  G10a: all 15 + 2 module(s) admitted by --llzk-product-program.
+  G10b: 10 module(s) lowered to SMT, 7 out of scope for a declared reason.
+```
+
+The committed theorem probe also exited zero on the repair commit. No confirmed
+review finding remains open. The residual source-table identity gap, D017's lack
+of formal LLZK semantics/constraint execution, and the translation-validation
+rather than verified-translator boundary remain explicitly named in `GAPS.md`;
+none was widened or hidden by S28.

@@ -1,0 +1,54 @@
+S28 post-adversarial-review gate evidence
+Date: 2026-08-22
+
+Clean committed repair tree under test:
+  129fbe6ed34be3643ae65e923aabc75ea0b1c359
+  Repair S28 adversarial review findings
+
+Frozen result reviewed:
+  bb24f96f
+
+Repository-accepted LLZK source:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Nix output:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+Worktree:
+  clean; held by LLZK_SESSION=S28
+
+Command:
+  LLZK_SESSION=S28 \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result: exit 0
+
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+    15 circuit(s), 51 input vector(s), both witgen backends.
+    2 renderer fixture(s), syntax only.
+    G9: 9 source-backed modules; 6 registry modules not applicable.
+    G10a: all 15 + 2 module(s) admitted by --llzk-product-program.
+    G10b: 10 module(s) lowered to SMT, 7 out of scope for a declared reason.
+
+This run includes both adversarial-review repairs. G1 pins the exact refusal of
+the formerly accepted hand-built malformed retained registry. It also builds
+the strengthened generic and concrete soundness chain whose lookup premise is
+semantic satisfaction of the ordered `C.lookups` against the same-named nested
+rows in `C.globals`.
+
+The only Lean warnings were the ten inherited upstream
+Clean/Utils/Test/TestCircuitProofStart.lean sorries already documented by S25.
+G0 proved Clean core byte-identical to the accepted upstream base. G11 exercised
+all 53 harness error paths.
+
+Committed theorem command:
+  lake env lean doc/llzk/evidence/S28/probe.lean
+
+Result: exit 0. `ConstraintSet.lookupRows_of_agree` uses only:
+  [propext, Classical.choice, Quot.sound]
+
+The concrete And8 lookup/spec chain additionally inherits only the already
+recorded Babybear native_decide field facts and And8's upstream bv_decide
+identity. No probed theorem depends on sorryAx.

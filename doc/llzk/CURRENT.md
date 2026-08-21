@@ -90,12 +90,13 @@ fifteenth corpus artifact with six vectors. G0-G12 passed on clean
 implementation commit `03bf2f9b`; scale and theorem evidence are in
 `evidence/S28/`. The requested post-completion adversarial review found and
 repaired an unchecked `lowerRecognized` retained-table registry and the missing
-module-lookup-to-source-row soundness bridge. Focused checks pass; a clean
-post-repair G0-G12 rerun remains. No push or external issue creation has occurred.
+module-lookup-to-source-row soundness bridge. The clean repair commit
+`129fbe6e` passed G0-G12; no confirmed review finding remains open. No push or
+external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 review repairs; final rerun pending)
+Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 complete and adversarially reviewed)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -361,20 +362,21 @@ an explicit decision, which was given.
 - Completed locally: **S28**, from final S26 evidence tip `91d43ffd`. D034,
   row-preserving multi-column lowering/readback, the full 65536×3 certificate,
   and the six-vector `And8` corpus entry are green on `03bf2f9b`.
-- In progress: the requested post-completion adversarial review found two
-  substantive issues; both are repaired and focused checks pass. A clean repair
-  commit and full G0-G12 rerun remain.
+- Completed locally: **S28 post-completion adversarial review**. It found two
+  confirmed issues, repaired both, and reran G0-G12 on clean commit `129fbe6e`.
+  No confirmed review finding remains open; residual project-wide boundaries
+  remain named in `GAPS.md`.
 - Blocked: none.
 
 ## Last green gates
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete run: S28, clean implementation commit
-`03bf2f9b57cee9fae66d9ada2c8460101040ebe2`; see `evidence/S28/gates.txt`.
-All G0-G12 passed. The S28 axiom probe covers row injectivity, generic and
-concrete certificates, renderer readback, and the And8 lookup/spec chain with
-no `sorryAx`.
+Latest complete run: S28 post-review repair commit
+`129fbe6ed34be3643ae65e923aabc75ea0b1c359`; see
+`evidence/S28/review-gates.txt`. All G0-G12 passed. The S28 axiom probe covers
+row injectivity, generic and concrete certificates, the module-lookup bridge,
+renderer readback, and the And8 lookup/spec chain with no `sorryAx`.
 
 | Gate | Result |
 |---|---|
