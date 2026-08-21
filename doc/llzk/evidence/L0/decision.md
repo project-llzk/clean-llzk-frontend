@@ -56,6 +56,7 @@ the frontend's claims.
 
 ## Post-pin gate
 
-After the pin, CI flake reference, and active documents are committed, G0-G12
-must pass once more with the repository-provisioned candidate. That result is
-recorded in `post-pin.txt`; it is the acceptance evidence for the enacted pin.
+The pin, CI flake reference, and active documents were committed as `5fe8f465`,
+then G0-G12 passed once more with the repository-provisioned candidate and the
+theorem probe passed on the same clean commit. `post-pin.txt` is the acceptance
+evidence for the enacted pin.

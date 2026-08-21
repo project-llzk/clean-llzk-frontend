@@ -124,7 +124,7 @@ premise. S26 and S28 together create the impactful example increment.
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
 | CI supply-chain policy | complete locally | commit `9b809e32`; immutable action SHAs, fixed Ubuntu/Rust/Nix-cache inputs, 53 G11 controls; organization CI still required on the frozen SHA |
 | Upstream Clean alignment | complete locally | S25; G0-G12 on `6ccca6f8`, `evidence/S25/`; `0e53b9f2` / Lean 4.32.2, D026 recorded |
-| LLZK pin review | complete locally | D032; `25fb3740` accepted after both exact outputs passed the unchanged matrix; `evidence/L0/` |
+| LLZK pin review | complete locally | D032; `25fb3740` accepted after both exact outputs passed, then G0-G12 passed on committed pin `5fe8f465`; `evidence/L0/` |
 | Structural bitwise witness IR | next | S26 |
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |

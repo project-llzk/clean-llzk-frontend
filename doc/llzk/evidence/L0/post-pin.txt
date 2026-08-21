@@ -1,0 +1,46 @@
+L0 post-pin acceptance run
+Date: 2026-08-21
+
+Clean committed tree under test:
+  5fe8f465b9ad74db9c5d74f483c8041754ba0d67
+  Advance the LLZK pin after L0 review
+
+Worktree:
+  clean; held by LLZK_SESSION=L0
+
+Repository-accepted LLZK source:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Nix output:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+Command:
+  LLZK_SESSION=L0 \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result: exit 0
+
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+    12 circuit(s), 33 input vector(s), both witgen backends.
+    2 renderer fixture(s), syntax only.
+    G10a: all 12 + 2 module(s) admitted by --llzk-product-program.
+    G10b: 10 module(s) lowered to SMT, 4 out of scope for a declared reason.
+
+G0 read the new pin and CI state from committed revision `5fe8f465`. G11
+exercised 53 error paths; all six field-registry entries passed. The only Lean
+warnings were the ten inherited upstream `TestCircuitProofStart.lean` sorries
+already documented by S25.
+
+Committed theorem command:
+  lake env lean doc/llzk/evidence/L0/probe.lean
+
+Result: exit 0. Generic theorems used only the documented classical axioms,
+copy canonicalisation used its documented smaller subset, the concrete
+babybear examples added only the two named native_decide facts, and no
+`sorryAx` appeared.
+
+This is the required post-edit run: the candidate comparison on `782160dd` was
+compatibility evidence; this run proves that the committed repository pin,
+provisioning command, CI flake reference, and unchanged frontend agree.

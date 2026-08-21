@@ -61,7 +61,7 @@ Latest completed dependency session: **L0** — both the previous LLZK input
 reference and run against the same frozen post-S25 frontend tree. Both passed
 G0-G12 with identical counts and declared diagnostics. D032 advances the
 accepted LLZK pin to `25fb3740`; the comparison and theorem audit are in
-`evidence/L0/`.
+`evidence/L0/`. The required post-pin run passed on clean commit `5fe8f465`.
 
 Integration branch: `clean-to-llzk/integration`
 
@@ -331,11 +331,12 @@ an explicit decision, which was given.
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete run: S25, clean implementation commit
-`6ccca6f862f3fdb13c8d418849aacb98e9841287`; see `evidence/S25/gates.txt`.
-All G0-G12 passed. The S25 axiom probe reports only `propext`,
-`Classical.choice`, and `Quot.sound` for `spec_of_compile`,
-`ofSource_lookups_iff`, and `WExpr.eval_ofWitgen`, with no `sorryAx`.
+Latest complete run: L0, clean pin commit
+`5fe8f465b9ad74db9c5d74f483c8041754ba0d67`; see
+`evidence/L0/post-pin.txt`. All G0-G12 passed. The expanded L0 axiom probe
+covers the generic soundness, lookup, registry, D026 witness, A5 renderer, and
+A7 copy-canonicalisation theorems with no `sorryAx`; the concrete babybear
+examples add only the two documented `native_decide` prime facts.
 
 | Gate | Result |
 |---|---|
