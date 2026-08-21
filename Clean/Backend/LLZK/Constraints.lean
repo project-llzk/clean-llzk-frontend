@@ -74,6 +74,8 @@ For the corpus the obligation is discharged and the build enforces it, because
 
 namespace LLZK
 
+section CleanSource
+
 variable {F : Type} [Field F] [DecidableEq F]
 
 /-! ## Clean's constraints as polynomials -/
@@ -205,6 +207,8 @@ theorem ofSource_eqs_iff (cfg : Config) (src : Source F) (env : Environment F) (
 
 end ConstraintSet
 
+end CleanSource
+
 /-! ## The emitted module's constraints as polynomials
 
 The reader below knows nothing about `Recognized` or about the circuit that
@@ -219,7 +223,7 @@ private inductive Slot (F : Type) where
   /-- `%self`. Only legal as the first operand of a member read. -/
   | self
 
-variable [FiniteField F]
+variable {F : Type} [FiniteField F] [DecidableEq F]
 
 namespace ConstraintSet
 

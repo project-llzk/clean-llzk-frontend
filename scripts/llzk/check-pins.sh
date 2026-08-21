@@ -6,9 +6,9 @@ repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 
 # shellcheck source=scripts/llzk/lib.sh
 source "${script_dir}/lib.sh"
-clean_base="1e563b9c27991b3795eb440c1ee0757edb4ce8b1"
+clean_base="0e53b9f2d05f06defa2aa0a859f549b611583f10"
 expected_upstream="git@github.com:Verified-zkEVM/clean.git"
-expected_toolchain="leanprover/lean4:v4.30.0"
+expected_toolchain="leanprover/lean4:v4.32.2"
 
 cd "${repo_root}"
 
@@ -85,4 +85,3 @@ echo "HEAD:       $(git rev-parse HEAD)"
 echo "upstream:   ${actual_upstream}"
 echo "toolchain:  ${actual_toolchain}"
 echo "pin check:  PASS"
-

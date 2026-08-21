@@ -1,10 +1,11 @@
 # S25 — Align with upstream Clean and Lean 4.32.2
 
-Status: proposed
+Status: in progress; authorized and merged 2026-08-21, full gates pending
 Depends on: R7 (landed, `97390fac`); nothing else
-Base integration commit: `97390fac`
+Base public-readiness commit: `805f2a07`
 Worktree: `/home/alh/LLZK/clean-llzk-frontend`
-Branch: a **new** branch off `clean-to-llzk/integration` — see "Branch" below
+Branch: `clean-to-llzk/bump-4.32.2`, from the complete local public-readiness
+stack rather than the older integration tip
 
 ## Objective
 

@@ -9,8 +9,13 @@ Implement the first frontend as pure Lean under `Clean/Backend/LLZK/`. Emit a
 small, deterministic textual LLZK subset and validate it with the pinned C++
 LLZK 3.0 tools.
 
-This avoids coupling Clean's Lean 4.30 toolchain to the project VeIR fork on
-4.31-rc2 or upstream VeIR on 4.32.2.
+This initially avoided coupling Clean's Lean 4.30 toolchain to the project VeIR
+fork on 4.31-rc2 or upstream VeIR on 4.32.2. S25 moved Clean to Lean 4.32.2 and
+remeasured that rationale: the toolchain mismatch is no longer decisive, but
+the accepted project VeIR pin still has no Struct or Array LLZK dialect and its
+opcode definitions explicitly defer `constrain.in` and `function.call`.
+Consequently the small textual seam remains the only complete host for the
+frontend's accepted output surface.
 
 ## D002 — Use `alexanderlhicks/clean` as the project home
 
@@ -27,12 +32,19 @@ verifier, or witness-tool change.
 
 ## D003 — Keep VeIR non-blocking
 
-**Status:** accepted  
+**Status:** accepted; reaffirmed by S25
 **Date:** 2026-07-31
 
 VeIR initially consumes the frozen `.llzk` fixture corpus as an independent
 round-trip/checking track. A direct dependency is reconsidered only after
 toolchains and required LLZK dialect coverage align.
+
+S25 rechecked the accepted project VeIR revision
+`eae1c27e7842c0503233ec99155c39791bd5f502`: it is still on Lean 4.31.0-rc2,
+has LLZK Felt/Bool/Global/Function coverage, but no Struct or Array dialect, and
+marks `constrain.in` and `function.call` as deferred in `Veir/OpCode.lean`.
+Clean's move to 4.32.2 therefore removes one integration obstacle without
+removing the binding dialect gap.
 
 ## D004 — Fail closed on source semantics
 
@@ -206,7 +218,8 @@ prime — not passing a new string.
 
 ## D011 — Match the natural division/modulo shapes whole, with a literal divisor
 
-**Status:** accepted
+**Status:** accepted for the pre-S25 `NExpr` design; superseded by D026 for the
+current `U64Expr` bridge
 **Date:** 2026-08-01
 **Enacted by:** S05
 
@@ -958,7 +971,7 @@ built for, not against the case that was easiest to write a test for.
 
 **Status:** accepted
 **Date:** 2026-08-04
-**Enacted by:** S25, S26, S28 (proposed)
+**Enacted by:** S25; S26 and S28 remain proposed
 
 Two capability increments were about to be built at Clean `1e563b9c`: a recognizer
 for the bit-decomposition shape `ofNat (mod (div (val x) (const 2^i)) (const 2))`,
@@ -1007,10 +1020,52 @@ dialects — Struct, Array, `constrain.in`, `function.call` — are the binding
 constraint, not the toolchain, and D003 rests on those. Re-measure both before
 reopening D003.
 
+**S25 remeasurement.** The accepted project VeIR pin remains
+`eae1c27e7842c0503233ec99155c39791bd5f502` on Lean 4.31.0-rc2. Its LLZK
+dialect tree has Felt, Bool, Global, Function, Include, and String modules but
+no Struct or Array modules; `Veir/OpCode.lean` explicitly defers
+`Constrain.in` until Array types land and `Function.call` until its call phase.
+The toolchain half of D001's rationale lapsed, while D003's dialect-coverage
+boundary was reaffirmed.
+
 **Why this entry exists at all.** The finding came from checking upstream instead
 of planning against a local pin — the same lesson the CI paragraph in `CURRENT.md`
 records at the cost of two days. A version pin is a claim about the world, and it
 goes stale silently.
+
+## D026 — Preserve the narrow u64 shapes with an explicit field-size boundary
+
+**Status:** accepted
+
+**Date:** 2026-08-21
+
+**Enacted by:** S25
+
+Upstream replaced unbounded `NExpr.val` with `U64Expr.val`, whose evaluation is
+`UInt64.ofNat (FiniteField.val x)`. It therefore truncates modulo `2^64`.
+Translating the old whole shapes to `ofU64 (div/mod (val x) (const c))` preserves
+their syntax but not their generic meaning: the emitted `felt.uintdiv` and
+`felt.umod` operate on the full felt representative.
+
+S25 keeps the accepted syntactic subset unchanged and makes the theorem boundary
+visible. `WExpr.eval_ofWitgen` now requires
+`FiniteField.size F ≤ 2^64`; its proof uses that every representative is then
+below the truncation modulus. This covers babybear, koalabear, mersenne31, and
+goldilocks. It does not cover bn254 or grumpkin for `val`-rooted division/modulo
+witnesses. Their field-registry entries and circuits without those witness
+shapes are unaffected.
+
+This is a real semantic limitation, not an LLZK-tool failure. G9's two readers
+still agree structurally because both map the source shape to the same `WExpr`,
+and the wide-field corpus entries exercise multiplication rather than this
+bridge. Green gates therefore cannot recover the missing theorem premise.
+
+Only bn254 and grumpkin have prime greater than `2^64` and can represent every
+u64 directly as a felt. Goldilocks and the three roughly 31-bit fields make the
+source bridge non-truncating in the other direction but cannot host arbitrary
+u64 values without a range/limb policy. S26 must choose and prove such a policy,
+change the emitted semantics to truncate, or refuse the wide-field bridge; S25
+does not silently choose among those capability designs.
 
 ## D027 — Prepare an organization-owned public home
 

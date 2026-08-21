@@ -1,6 +1,6 @@
 # L0 — Review or advance the LLZK toolchain pin
 
-Status: preflight complete; execution waits for S25
+Status: preflight complete; execution is next after S25's evidence commit
 
 Depends on: S25 landed with G0-G12 green
 

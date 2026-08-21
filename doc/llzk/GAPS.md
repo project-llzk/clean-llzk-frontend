@@ -315,6 +315,16 @@ ignores `constrain()`, so there is no executor for it in the pinned toolchain.
 
 ## 8. Small, named, and real
 
+- **The wide-field `U64Expr.val` bridge.** S25 preserved the two whole
+  division/modulo shapes after upstream replaced unbounded `NExpr` with wrapping
+  `U64Expr`. `U64Expr.val` truncates a field representative modulo `2^64`, while
+  the emitted felt operation sees the full representative. Consequently
+  `WExpr.eval_ofWitgen` now requires `FiniteField.size F ≤ 2^64`: it covers
+  babybear, koalabear, mersenne31, and goldilocks, but not bn254 or grumpkin for
+  `val`-rooted division/modulo witnesses. G9 cannot see the difference because
+  its source reader is structural and the wide-field corpus entries do not use
+  this shape. D026 records the boundary; S26 owns the range/limb, truncation, or
+  refusal decision.
 - **The copy-canonicalisation premise — closed by A7.** `WitnessSet.ofSource` collapses a
   witness cell that is a bare variable into the variable it copies, which is
   forced — the emitted module does not distinguish them. `WExpr.eval_rename` and
@@ -347,7 +357,8 @@ Worth stating, because a gaps file with no floor reads as though nothing holds.
 These were attacked directly across R2–R5 and held:
 
 - the `Poly` normal form and every one of its evaluation homomorphisms;
-- `WExpr.eval_ofWitgen`, `ofStatic_certifies`, `byteTable_certifies`,
+- `WExpr.eval_ofWitgen` under its explicit field-size hypothesis,
+  `ofStatic_certifies`, `byteTable_certifies`,
   `certified_membership`, `values_lt_prime_of_diagnose`;
 - `CanonicalRepr`'s enforcement at every entry point, and that its two laws
   really do pin `val` for a prime field;

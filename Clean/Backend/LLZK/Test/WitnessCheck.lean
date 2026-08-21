@@ -78,9 +78,9 @@ private def x : Witgen.FExpr Bab := .expr (.var ⟨0⟩)
 
 private def sq : Source Bab := source 1 [wit (.mul x x)] #[.var ⟨1⟩]
 private def dbl : Source Bab := source 1 [wit (.add x x)] #[.var ⟨1⟩]
-private def mod256 : Source Bab := source 1 [wit (.ofNat (.mod (.val x) (.const 256)))] #[.var ⟨1⟩]
-private def mod128 : Source Bab := source 1 [wit (.ofNat (.mod (.val x) (.const 128)))] #[.var ⟨1⟩]
-private def div256 : Source Bab := source 1 [wit (.ofNat (.div (.val x) (.const 256)))] #[.var ⟨1⟩]
+private def mod256 : Source Bab := source 1 [wit (.ofU64 (.mod (.val x) (.const 256)))] #[.var ⟨1⟩]
+private def mod128 : Source Bab := source 1 [wit (.ofU64 (.mod (.val x) (.const 128)))] #[.var ⟨1⟩]
+private def div256 : Source Bab := source 1 [wit (.ofU64 (.div (.val x) (.const 256)))] #[.var ⟨1⟩]
 private def twoCells : Source Bab :=
   source 1 [.witness 2 (.ir [] (.lit #v[.mul x x, .add x x]))] #[.var ⟨1⟩, .var ⟨2⟩]
 private def twoCellsSwapped : Source Bab :=

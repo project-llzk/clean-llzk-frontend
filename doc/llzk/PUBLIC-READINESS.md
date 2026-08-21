@@ -49,7 +49,8 @@ authorized.
 - Preserve the Stage-1 vertical slice: `Addition8FullCarry` compiles, the LLZK
   tools accept it, both witness engines agree with Clean, and the typed module's
   constraints imply the gadget's semantic `Spec` under named hypotheses.
-- Align to current upstream Clean before adding capability (S25).
+- **Done locally:** align to current upstream Clean before adding capability
+  (S25, exact fetched head `0e53b9f2`, Lean 4.32.2).
 - Review the LLZK toolchain pin after S25 and before capability work. As of
   2026-08-21, `project-llzk/llzk-lib` `main` is 25 commits past the accepted
   `5db6f8f9` pin and includes changes in LLZK transforms and `llzk-witgen`.
@@ -96,7 +97,7 @@ authorized.
 ```text
 P0 public documentation and repository hygiene
   -> A5 renderer + A7 copy-canonicalisation assurance (done)
-  -> S25 upstream Clean / Lean alignment
+  -> S25 upstream Clean / Lean alignment (done locally)
   -> L0 LLZK pin review and compatibility run
   -> S26 structural U64 and bitwise lowering
   -> S28 multi-column lookup tables
@@ -105,8 +106,9 @@ P0 public documentation and repository hygiene
   -> explicit publication decision
 ```
 
-S25 is intentionally isolated from capability work: a green bump says the
-existing frontend survived upstream change. L0 applies the same discipline to
+S25 was intentionally isolated from capability work: its green bump says the
+existing frontend survived upstream change, subject to D026's explicit theorem
+boundary. L0 applies the same discipline to
 the live LLZK delta and either retains or advances the accepted tool pin with
 evidence. A5 has already strengthened the one assurance boundary R7 showed
 every LLZK binary gate can miss, and A7 removed the witness reader's remaining
@@ -122,9 +124,9 @@ example increment.
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
 | CI supply-chain policy | complete locally | commit `9b809e32`; immutable action SHAs, fixed Ubuntu/Rust/Nix-cache inputs, 53 G11 controls; organization CI still required on the frozen SHA |
-| Upstream Clean alignment | pending explicit pin decision | S25 |
-| LLZK pin review | preflight complete; execution waits for S25 | `sessions/L0-review-llzk-pin.md`; exact 25-commit risk inventory and same-tree matrix |
-| Structural bitwise witness IR | pending S25 | S26 |
+| Upstream Clean alignment | implementation complete; full evidence pending | S25; `0e53b9f2` / Lean 4.32.2, D026 recorded |
+| LLZK pin review | preflight complete; next after S25 evidence | `sessions/L0-review-llzk-pin.md`; exact 25-commit risk inventory and same-tree matrix |
+| Structural bitwise witness IR | pending L0 | S26 |
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |
 | Renderer round-trip assurance | complete locally | A5; G0-G12 green on `28132f64` |

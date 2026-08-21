@@ -21,11 +21,19 @@ Use VeIR in a second, non-blocking track:
    coverage and fork/upstream strategy are resolved;
 3. ultimately, as the semantic target for lowering-correctness proofs.
 
-This gives the requested Lean implementation now without coupling Clean's
-Lean 4.30 toolchain to either the project LLZK VeIR fork (4.31-rc2) or current
-upstream VeIR (4.32.2).
+This originally gave the requested Lean implementation without coupling Clean's
+Lean 4.30 toolchain to either the project LLZK VeIR fork (4.31-rc2) or upstream
+VeIR (4.32.2). S25 moved Clean itself to Lean 4.32.2, so the toolchain mismatch
+half of that rationale has lapsed. D003 still rests on the substantive boundary:
+the accepted VeIR inputs do not provide the complete Struct, Array,
+`constrain.in`, and `function.call` surface this frontend emits.
 
 ## 2. Exact source state reviewed
+
+The table below is the 2026-07-31 investigation baseline, not the current pin
+register. S25 advanced Clean to
+`0e53b9f2d05f06defa2aa0a859f549b611583f10` / Lean 4.32.2 on 2026-08-21;
+`PINS.md` is authoritative for accepted inputs.
 
 | Project | Ref reviewed | Toolchain / relevant state |
 |---|---|---|

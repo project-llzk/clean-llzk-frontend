@@ -26,7 +26,7 @@ Its dependency order is:
 ```text
 public documentation and hygiene
   → renderer and copy-canonicalisation assurance (A5 + A7, done)
-  → S25: current upstream Clean and Lean
+  → S25: current upstream Clean and Lean (done locally)
   → L0: review or advance the LLZK toolchain pin
   → S26: structural U64, bitwise operations, and conditionals
   → S28: multi-column lookup tables and certificates
@@ -34,11 +34,11 @@ public documentation and hygiene
   → frozen-candidate adversarial review
 ```
 
-This order joins the three goals that matter for publication. S25 removes the
+This order joins the three goals that matter for publication. S25 removed the
 stale Clean foundation; L0 decides against a measured 25-commit LLZK delta
 rather than silently treating either the old pin or moving `main` as canonical;
 a read-only L0 preflight has frozen and classified that delta in
-`sessions/L0-review-llzk-pin.md`; the compatibility matrix still runs after S25.
+`sessions/L0-review-llzk-pin.md`; its compatibility matrix runs on the S25 tree.
 A5 has already strengthened the one artifact boundary every pinned LLZK binary
 accepts without checking semantic content; A7 removed the remaining
 inspection-only premise from copy canonicalisation. S26 plus S28 turns measured
@@ -88,7 +88,7 @@ Accept:
 - field variables, constants, addition, and multiplication;
 - assertions;
 - lookup tables resolved by an explicit export registry;
-- the two justified Addition8 natural division/modulo forms, matched whole, with
+- the two justified Addition8 u64 division/modulo forms, matched whole, with
   a literal divisor that is non-zero and below the prime (D011).
 
 Reject before rendering:
@@ -96,8 +96,8 @@ Reject before rendering:
 - native or interaction witness programs;
 - unresolved tables;
 - `dataGet` and `hintGet`;
-- unrecognized natural arithmetic;
-- witness `let`-steps, `mapRange` and `append` outputs;
+- unrecognized u64 arithmetic;
+- witness `let`-steps, `mapRange`, `envRange`, `bitsOf`, and `append` outputs;
 - lookup tables with arity other than 1 (D013);
 - a configured field whose prime is not the circuit's (D010);
 - a witness cell that reads another cell of its own `.witness m` block, which
@@ -230,7 +230,7 @@ Status against that definition:
 | Requirement | State |
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
-| unsupported cases fail with structured diagnostics | done — 29 negative fixtures pin exact messages. Not "one per rejection path": R5 found three reachable paths with none, and R7 found three more (R7-04); each round's were added |
+| unsupported cases fail with structured diagnostics | done — 34 negative fixtures pin exact messages, including S25's five new constructor paths. This is still not claimed to be one per rejection path |
 | `llzk-opt` accepts and round-trips | done — 12 modules and 2 renderer fixtures, G3 and G4 |
 | every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 14 |
 | both witgen backends agree | done — 33 input vectors, G5 and G6 |

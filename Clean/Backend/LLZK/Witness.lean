@@ -18,27 +18,27 @@ Accepted today:
 
 * programs of the form `.ir [] (.lit es)` — no `let`-steps, a literal output
   vector;
-* within an element: `.expr`, `.const`, `.add`, `.mul`, and the two natural
+* within an element: `.expr`, `.const`, `.add`, `.mul`, and the two u64
   division/modulo shapes described below.
 
-Everything else — `.native` closures, `let`-steps, `mapRange`/`append` outputs,
-`inv`, `ite`, `envGet`, `listGet`, `dataGet`, `hintGet`, and any other `ofNat`
-shape — is rejected.
+Everything else — `.native` closures, `let`-steps,
+`mapRange`/`envRange`/`bitsOf`/`append` outputs, `inv`, `ite`, `listGet`,
+`dataGet`, `hintGet`, and any other `ofU64` shape — is rejected.
 
-## The two accepted natural shapes
+## The two accepted u64 shapes
 
-`Witgen.NExpr` denotes *unbounded* `ℕ`, so lowering natural arithmetic to `felt.*`
-is wrong in general: field reduction changes intermediate values. Only these two
-whole shapes are recognized, and only as a unit:
+The upstream witness IR now uses wrapping `Witgen.U64Expr`. S25 preserves the
+accepted language by recognizing only the two shapes the old backend accepted,
+and only as a unit:
 
 ```
-ofNat (mod (val x) (const c))  ↦  felt.umod    ⟦x⟧, felt.const c
-ofNat (div (val x) (const c))  ↦  felt.uintdiv ⟦x⟧, felt.const c
+ofU64 (mod (val x) (const c))  ↦  felt.umod    ⟦x⟧, felt.const c
+ofU64 (div (val x) (const c))  ↦  felt.uintdiv ⟦x⟧, felt.const c
 ```
 
-Matching the whole shape — rather than `val`, `mod` and `ofNat` separately — is
-what makes this sound. No natural value ever escapes the pattern, so there is no
-intermediate that could have exceeded the field.
+Matching the whole shape — rather than `val`, `mod` and `ofU64` separately — is
+what keeps the accepted bridge narrow. No intermediate `U64Expr` escapes the
+pattern; the field-size boundary needed for semantic fidelity is stated below.
 
 Two side conditions are checked at recognition time, which is why the divisor
 must be a literal:
@@ -48,12 +48,12 @@ must be a literal:
 * `c < p`. `felt.const c` denotes `c mod p`, so a divisor at or above the prime
   would silently become a different number.
 
-Given those, the lowering is faithful for the prime fields in
-`FieldSpec.registry`. `FiniteField.val x` is the canonical representative in
-`[0, p)`, which is exactly the operand interpretation LLZK's `umod`/`uintdiv`
-use. The result re-enters the field through `FiniteField.fromNat`, and
-`val_fromNat` gives back the same natural because both `val x % c` and
-`val x / c` are at most `val x`, hence below the field size.
+Given those, the lowering is faithful when `FiniteField.size F ≤ 2^64`:
+`U64Expr.val` does not truncate any representative, and the result re-enters the
+field through `FiniteField.fromNat`. This covers babybear, koalabear,
+mersenne31, and goldilocks. On bn254 and grumpkin the source bridge truncates
+while LLZK's felt operation sees the full representative; S25 records that
+semantic boundary as D026 and `WExpr.eval_ofWitgen` requires the size bound.
 
 **That last paragraph has a side condition `FiniteField` does not carry**, and
 until S18 it was not stated anywhere. `FiniteField` abstracts over prime *and*
@@ -89,37 +89,36 @@ namespace LLZK
 would require. Kept exhaustive rather than falling back to a generic message, so
 a rejection tells the reader which roadmap item they are hitting.
 
-Total over all twelve constructors even though `ofFExpr` handles five of them
+Total over all eleven constructors even though `ofFExpr` handles five of them
 before reaching here: exhaustiveness is what makes adding a constructor to
 `Witgen.FExpr` a compile error in this module rather than a silent "unsupported". -/
 private def describeFExpr {F : Type} : Witgen.FExpr F → String
   | .expr _ => "a circuit expression"
-  | .envGet _ => "`envGet` (an environment read at a computed index)"
   | .const _ => "a field constant"
   | .localVar _ => "`localVar` (a reference to a `let`-step)"
   | .add _ _ => "an addition"
   | .mul _ _ => "a multiplication"
   | .inv _ => "`inv` (field inverse); it needs `felt.inv`, which is a later increment"
-  | .ofNat _ =>
-    "`ofNat` on a natural expression that is not one of the two recognized \
+  | .ofU64 _ =>
+    "`ofU64` on a u64 expression that is not one of the two recognized \
      division/modulo shapes"
   | .ite _ _ _ => "`ite` (a conditional); it needs `scf.if`, which is a later increment"
   | .listGet _ _ => "`listGet` (a constant-list read); it needs the array dialect"
   | .dataGet _ _ _ _ => "`dataGet` (a read of committed prover data)"
   | .hintGet _ _ _ _ => "`hintGet` (a read of an uncommitted prover hint)"
 
-/-- Name a natural-sorted witness-IR constructor. Exhaustive for the same reason
-`describeFExpr` is: a rejection should say which construct was hit, and `NExpr`
+/-- Name a u64-sorted witness-IR constructor. Exhaustive for the same reason
+`describeFExpr` is: a rejection should say which construct was hit, and `U64Expr`
 was one of the two places that fell back to a generic message. -/
-private def describeNExpr {F : Type} : Witgen.NExpr F → String
-  | .const _ => "a natural constant"
-  | .val _ => "`val` (the field-to-natural bridge) applied on its own"
+private def describeU64Expr {F : Type} : Witgen.U64Expr F → String
+  | .const _ => "a u64 constant"
+  | .val _ => "`val` (the truncating field-to-u64 bridge) applied on its own"
   | .idx => "`idx` (a `mapRange` loop index)"
   | .localVar _ => "`localVar` (a reference to a `let`-step)"
-  | .add _ _ => "a natural addition"
-  | .mul _ _ => "a natural multiplication"
-  | .div _ _ => "a natural division whose shape is not `div (val x) (const c)`"
-  | .mod _ _ => "a natural modulo whose shape is not `mod (val x) (const c)`"
+  | .add _ _ => "a u64 addition"
+  | .mul _ _ => "a u64 multiplication"
+  | .div _ _ => "a u64 division whose shape is not `div (val x) (const c)`"
+  | .mod _ _ => "a u64 modulo whose shape is not `mod (val x) (const c)`"
   | .land _ _ => "`land` (bitwise and)"
   | .lor _ _ => "`lor` (bitwise or)"
   | .lxor _ _ => "`lxor` (bitwise exclusive or)"
@@ -127,10 +126,24 @@ private def describeNExpr {F : Type} : Witgen.NExpr F → String
   | .shiftR _ _ => "`shiftR` (a right shift)"
   | .ite _ _ _ => "`ite` (a conditional); it needs `scf.if`, which is a later increment"
 
+/-- Name the condition at the root of a rejected field `ite`. Keeping this
+exhaustive makes upstream condition constructors fail compilation here until
+the backend gives them an explicit boundary. -/
+private def describeBExpr {F : Type} : Witgen.BExpr F → String
+  | .true => "`true`"
+  | .false => "`false`"
+  | .feq _ _ => "`feq` (field equality)"
+  | .neq _ _ => "`neq` (u64 equality)"
+  | .lt _ _ => "`lt` (u64 less-than)"
+  | .flt _ _ => "`flt` (field-representative less-than)"
+  | .bit _ _ => "`bit` (a field-representative bit test)"
+  | .not _ => "`not`"
+  | .and _ _ => "`and`"
+
 /-- Name a `let`-step's constructor, for the same reason. -/
 private def describeStep {F : Type} : Witgen.Step F → String
   | .letF _ => "`letF` (a field-sorted `let`-step)"
-  | .letN _ => "`letN` (a natural-sorted `let`-step)"
+  | .letU _ => "`letU` (a u64-sorted `let`-step)"
 
 namespace FieldExpr
 
@@ -195,7 +208,7 @@ def checkLowerable (prime : Nat) (context : String) :
 
 `.expr` delegates to `ofExpression`, which is total, so an embedded circuit
 expression is always accepted; the arithmetic constructors recurse; the two
-natural division/modulo shapes are matched whole; everything else is refused by
+u64 division/modulo shapes are matched whole; everything else is refused by
 name. -/
 def ofFExpr [CanonicalRepr F] (prime : Nat) (context : String) :
     Witgen.FExpr F → Except Diagnostic FieldExpr
@@ -203,15 +216,19 @@ def ofFExpr [CanonicalRepr F] (prime : Nat) (context : String) :
   | .const c => .ok (.const (FiniteField.val c))
   | .add a b => return .add (← ofFExpr prime context a) (← ofFExpr prime context b)
   | .mul a b => return .mul (← ofFExpr prime context a) (← ofFExpr prime context b)
-  | .ofNat (.mod (.val x) (.const c)) => do
-    checkDivisor context "modulo" prime c
-    return .umod (← ofFExpr prime context x) c
-  | .ofNat (.div (.val x) (.const c)) => do
-    checkDivisor context "division" prime c
-    return .uintdiv (← ofFExpr prime context x) c
-  | .ofNat n =>
+  | .ite c _ _ =>
     .error { context
-             message := "unsupported witness expression: `ofNat` applied to " ++ describeNExpr n
+             message := "unsupported witness expression: `ite` with " ++ describeBExpr c
+                        ++ "; conditionals need `scf.if`, which is a later increment" }
+  | .ofU64 (.mod (.val x) (.const c)) => do
+    checkDivisor context "modulo" prime c.toNat
+    return .umod (← ofFExpr prime context x) c.toNat
+  | .ofU64 (.div (.val x) (.const c)) => do
+    checkDivisor context "division" prime c.toNat
+    return .uintdiv (← ofFExpr prime context x) c.toNat
+  | .ofU64 n =>
+    .error { context
+             message := "unsupported witness expression: `ofU64` applied to " ++ describeU64Expr n
                         ++ "; only the two recognized division/modulo shapes are lowered" }
   | e => .error { context, message := "unsupported witness expression: " ++ describeFExpr e }
 
@@ -241,6 +258,14 @@ private def ofVExpr [CanonicalRepr F] (prime : Nat) (context : String) :
     .error { context
              message := "witness output is an `append`; only literal output vectors are \
                          supported" }
+  | _, .envRange _ =>
+    .error { context
+             message := "witness output is an `envRange`; only literal output vectors are \
+                         supported" }
+  | _, .bitsOf _ =>
+    .error { context
+             message := "witness output is a `bitsOf`; structural bit decomposition is S26, \
+                         not part of this compatibility bump" }
 
 /-- Reject a cell that reads a circuit variable its own block allocates.
 

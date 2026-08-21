@@ -44,10 +44,15 @@ is now pinned below, in this order:
 | natural divisor is `0` | `moduloByZero` |
 | natural divisor is at or above the prime | `divideByPrime` |
 | an unrecognized `FExpr` (`ite`) | `Gadgets.IsZeroField` |
-| an unrecognized `NExpr` under `ofNat` | `shiftWitness` |
+| new `BExpr.flt` under a rejected `ite` | `fieldLessThanWitness` |
+| new `BExpr.bit` under a rejected `ite` | `bitConditionWitness` |
+| an unrecognized `U64Expr` under `ofU64` | `shiftWitness` |
 | a `.native` witness closure | `nativeWitness` |
 | witness `let`-steps | `letStepWitness` |
+| a u64 witness `let`-step | `letUStepWitness` |
 | a `mapRange` witness output | `mapRangeWitness` |
+| an `envRange` witness output | `envRangeWitness` |
+| a `bitsOf` witness output | `bitsOfWitness` |
 | an `append` witness output | `appendWitness` |
 | a witness cell reading its own block | `selfReadingBlock` |
 | an expression naming an undefined circuit variable | `undefinedVariable` |
@@ -422,12 +427,23 @@ private def rawChannel : RawChannel (F pBabybear) where
   Guarantees _ _ _ := True
   Requirements _ _ _ := True
 
-/-- A natural shift is not one of the two recognized `ofNat` shapes. The
-diagnostic names the `NExpr` constructor rather than falling back to a generic
+/-- A u64 shift is not one of the two recognized `ofU64` shapes. The
+diagnostic names the `U64Expr` constructor rather than falling back to a generic
 message, which was one of the two places `describeFExpr`'s stated principle was
 not followed (R2 §D1). -/
 private def shiftWitness : Source (F pBabybear) :=
-  source 1 [.witness 1 (.ir [] (.lit #v[.ofNat (.shiftR (.val (.expr (.var ⟨0⟩))) (.const 8))]))]
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 (.shiftR (.val (.expr (.var ⟨0⟩))) (.const 8))]))]
+
+/-- The new field comparison has an explicit condition diagnostic even though
+all conditionals remain outside S25's accepted language. -/
+private def fieldLessThanWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[
+    .ite (.flt (.expr (.var ⟨0⟩)) (.const 7)) (.const 1) (.const 0)]))]
+
+/-- The new direct bit test likewise reaches a named rejection path. -/
+private def bitConditionWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[
+    .ite (.bit (.expr (.var ⟨0⟩)) 0) (.const 1) (.const 0)]))]
 
 /-- A native witness closure: the one thing Clean's own `#assert_exportable`
 also rejects. -/
@@ -438,9 +454,21 @@ private def nativeWitness : Source (F pBabybear) :=
 private def letStepWitness : Source (F pBabybear) :=
   source 1 [.witness 1 (.ir [.letF (.const 0)] (.lit #v[.localVar 0]))]
 
+/-- The renamed/new u64 `let` step is rejected separately from `letF`. -/
+private def letUStepWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [.letU (.const 0)] (.lit #v[.const 0]))]
+
 /-- A witness output built by a `mapRange` loop rather than a literal vector. -/
 private def mapRangeWitness : Source (F pBabybear) :=
   source 1 [.witness 2 (.ir [] (.mapRange 2 (.const 0)))]
+
+/-- Upstream's direct environment slice is not silently accepted. -/
+private def envRangeWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.envRange 0))]
+
+/-- Upstream's structural bit decomposition is S26 capability, not S25. -/
+private def bitsOfWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.bitsOf (.expr (.var ⟨0⟩))))]
 
 /-- A witness output built by appending two vectors. -/
 private def appendWitness : Source (F pBabybear) :=
@@ -546,14 +574,28 @@ operation 1 (witness): witness division has divisor 2013265921, which is not bel
 
 /--
 info: compilation failed:
-operation 0 (witness): unsupported witness expression: `ite` (a conditional); it needs `scf.if`, which is a later increment
+operation 0 (witness): unsupported witness expression: `ite` with `feq` (field equality); conditionals need `scf.if`, which is a later increment
 -/
 #guard_msgs in
 #eval IO.print (emit babybear (Gadgets.IsZeroField.circuit (F := F pBabybear)))
 
 /--
 info: compilation failed:
-operation 0 (witness): unsupported witness expression: `ofNat` applied to `shiftR` (a right shift); only the two recognized division/modulo shapes are lowered
+operation 0 (witness): unsupported witness expression: `ite` with `flt` (field-representative less-than); conditionals need `scf.if`, which is a later increment
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear fieldLessThanWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ite` with `bit` (a field-representative bit test); conditionals need `scf.if`, which is a later increment
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear bitConditionWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `shiftR` (a right shift); only the two recognized division/modulo shapes are lowered
 -/
 #guard_msgs in
 #eval IO.print (emitSource babybear shiftWitness)
@@ -574,10 +616,31 @@ operation 0 (witness): witness program starts with `letF` (a field-sorted `let`-
 
 /--
 info: compilation failed:
+operation 0 (witness): witness program starts with `letU` (a u64-sorted `let`-step) and has 1 `let`-step(s) in total; only step-free programs are supported
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear letUStepWitness)
+
+/--
+info: compilation failed:
 operation 0 (witness): witness output is a `mapRange` loop; only literal output vectors are supported (unrolling or `scf.for` is a later increment)
 -/
 #guard_msgs in
 #eval IO.print (emitSource babybear mapRangeWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): witness output is an `envRange`; only literal output vectors are supported
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear envRangeWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): witness output is a `bitsOf`; structural bit decomposition is S26, not part of this compatibility bump
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear bitsOfWitness)
 
 /--
 info: compilation failed:

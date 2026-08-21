@@ -55,19 +55,20 @@ including ten controls for these policies. Full G0-G12 passed on clean commit
 `9b809e32`; evidence is in `evidence/P0/ci-hardening.txt`. The workflows have
 not run remotely at this commit, and no external state changed.
 
-Next session: **S25** — `sessions/S25-align-upstream.md`, **as corrected by R7**
-(read its Deliverable 2a first). Bootstrapped, not started; changing the Clean
-pin remains an explicit decision boundary
+Current session: **S25** — authorized 2026-08-21. The exact fetched upstream
+head remains `0e53b9f2` / Lean 4.32.2. The merge is isolated on the bump branch;
+the backend and `CleanTests` compile, the new constructors have explicit red
+paths, and D026 records the `U64Expr.val` theorem boundary. Full G0-G12 evidence
+is still required before the session is complete.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/ci-hardening` (immutable CI dependencies,
-fixed hosted-runner/toolchain inputs, and default-disabled self-hosted benchmark
-jobs; no application pin, capability, Nix build, or external-state change)
+Active working branch: `clean-to-llzk/bump-4.32.2` (S25 compatibility only; no
+new accepted constructor, LLZK pin change, push, or external-state change)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
-Pinned Clean base: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
+Pinned Clean base: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
 
 Publication state, verified 2026-08-21: local `clean-to-llzk/integration` is at
 `97390fac`, seven commits ahead of the fork remote. The open fork PR #1 is still
@@ -77,22 +78,22 @@ commits. A public release candidate must put the branch, evidence, and CI on the
 same frozen commit. No push is authorized by this status update.
 
 Dependency state, also verified 2026-08-21: Clean upstream remains exactly
-`0e53b9f2`, S25's reviewed target. LLZK `main` is now `25fb3740`, 25 commits
+`0e53b9f2`, now S25's accepted base. LLZK `main` is `25fb3740`, 25 commits
 ahead of the accepted `5db6f8f9` tool pin. The delta touches LLZK core
 transforms, analysis, and `llzk-witgen`, not only unrelated backends. The
 3.0.0 pin remains accepted and reproducible; public readiness adds an isolated
 L0 review after S25 to decide whether to retain it or advance it and rerun the
 full compatibility matrix.
 
-L0 preflight is now complete without building or accepting a candidate. The
+L0 preflight is complete without building or accepting a candidate. The
 25-commit delta is frozen at `25fb3740`, classified across syntax, product,
 SMT, memory, and witness-generation surfaces, and converted into a same-tree
 old-versus-candidate procedure in `sessions/L0-review-llzk-pin.md`. Its execution
-still follows S25 so both toolchains see the actual post-alignment frontend.
+is the next critical-path session after S25 closes.
 
 ## Accepted pins
 
-- Clean: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
+- Clean: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
 - LLZK source: `5db6f8f9baaa40787a1a40625796497445f2da36`
 - LLZK tools: the Nix output of the pinned LLZK source; reports version 3.0.0
 - project-llzk VeIR: `eae1c27e7842c0503233ec99155c39791bd5f502`
@@ -100,13 +101,13 @@ still follows S25 so both toolchains see the actual post-alignment frontend.
 
 See `PINS.md` for how to obtain the tools, including the cache-key requirement.
 
-**The Clean pin is stale, deliberately and with a plan.** Upstream `main` is
-`0e53b9f2` on Lean **4.32.2**, 70 commits ahead, merged 2026-08-04. It **deletes
-`Witgen.NExpr`** — the sort D011's whole argument is about — in favour of a
-bounded `U64Expr`, and makes bit decomposition a constructor (`VExpr.bitsOf`).
-D025 records why that means aligning comes *before* any new capability, and
-`sessions/S25-align-upstream.md` is the packet. Do not add witness-IR capability
-at this pin; it targets types that no longer exist upstream.
+**The Clean pin is current as fetched on 2026-08-21.** S25 merged the 70-commit
+delta at `0e53b9f2` and moved Lean from 4.30.0 to **4.32.2**. The backend now
+matches `U64Expr`, `ofU64`, `letU`, `BExpr.flt`/`bit`, and
+`VExpr.envRange`/`bitsOf` exhaustively while preserving the old accepted subset.
+The non-obvious cost is D026: `U64Expr.val` truncates, so
+`WExpr.eval_ofWitgen` requires field size at most `2^64` and no longer covers
+bn254/grumpkin `val`-rooted div/mod witnesses.
 
 ## Reproduce everything
 
@@ -316,11 +317,10 @@ an explicit decision, which was given.
     reconstructed types and the function boundary, before releasing an
     artifact. `Module.render_constraintSurface` states the generic round trip;
     five mutations make it red. G0-G12 passed on clean commit `28132f64`.
-- In progress: none.
-- Decision pending: authorize S25's move of the accepted Clean base from
-  `1e563b9c` / Lean 4.30.0 to `0e53b9f2` / Lean 4.32.2. This is not a technical
-  blocker; the project control plane reserves pin changes for an explicit
-  decision.
+- In progress: **S25**, authorized and merged; compatibility implementation and
+  focused builds are green, with the committed full G0-G12 run still pending.
+- Decision pending: none for the Clean pin. L0 will make the separate LLZK pin
+  decision on the frozen post-S25 tree.
 - Blocked: none.
 
 ## Last green gates
@@ -343,7 +343,7 @@ invariants.
 | G5 `llzk-witgen` interpreter | PASS — 33 vectors |
 | G6 `llzk-witgen` execution engine | PASS — 33 vectors |
 | G7 both backends vs Clean's own interpreter | PASS — carried by `--check-output` |
-| G8 fail closed | PASS — 29 negative fixtures, plus tool-version rejection. Not "one per rejection path": R5 found three reachable paths with none, and R7 found three more (R7-04); each round's were added and the general claim is not reinstated |
+| G8 fail closed | PASS — 34 negative fixtures, plus tool-version rejection. Five S25 fixtures pin the newly reachable `letU`, `envRange`, `bitsOf`, `flt`, and `bit` rejection paths; the general "one per path" claim is not reinstated |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 14 |
 | G11 the harness's own error paths | PASS — 53 exercised, including the worktree lock's opaque-owner branches, R7's uncommitted-core-edit branch of G0 (R7-01), and ten CI dependency/permission/benchmark/cache policy controls |
@@ -485,7 +485,7 @@ into the packets themselves. Read them in order.
 | `sessions/S28-multicolumn-tables.md` | **new** — retire D013: `array.new`, multi-dim `constrain.in`, certification at 65536×3 | this, with S26, is what actually unlocks Xor32/And8/Keccak/BLAKE3; outline now, expand after S26 |
 | `sessions/S27-fork-gadgets.md` | port `~/zkgolf/submission_gf2` onto fork `main` | **returned for re-scoping** (R7-09): the submission is GF(2) — not an LLZK field — has zero bitwise ops, and its real blocker is `letF`. The port survives as Clean-side library work; its backend payoff needs a decision first |
 
-S25 keeps the accepted subset exactly the size it is now, so its gates say one
+S25 keeps the accepted subset exactly the size it was, so its gates say one
 thing only: the bump did or did not break the backend — except D026, which only
 the theorem statement and the decision register can express (R7-08's point: the
 realistic bump failure is green gates over a silently weakened theorem). S26 is
@@ -621,16 +621,14 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1, A2, A4, A5, A7 and B are done; R7 revalidated everything through A4.** The
-next thing is still **S25**, the upstream alignment — the pin is more than six
-weeks old and 70 upstream commits behind, the
-witness IR underneath us has been rebuilt (D025), and upstream has not moved
-past `0e53b9f2` (checked 2026-08-21) — but execute it *as R7 corrected it*:
-Deliverable 2a (the `val`-truncation decision, D026) is the part the gates
-cannot see. Then **S26** (bitwise + `ite`, with the val bridge in its decision
-entry), then **S28** (multi-column tables — new, and the actual library
-unlock), then the witness-IR loop increment. S27 is returned for re-scoping and
-should not be executed as written (R7-09).
+**A1, A2, A4, A5, A7, B, and the S25 implementation are done.** S25 fetched and
+merged the unchanged `0e53b9f2` head, preserved the narrow accepted subset, and
+made Deliverable 2a visible as D026 rather than letting green gates hide the
+weakened theorem domain. After its full gate evidence is committed, the next
+thing is **L0**, the prepared same-tree LLZK pin review. Then come **S26**
+(bitwise + `ite`, with the val bridge in its decision entry), **S28**
+(multi-column tables and the actual library unlock), and the witness-IR loop
+increment. S27 remains returned for re-scoping (R7-09).
 
 The assurance track's A5 renderer and A7 copy-canonicalisation items are now
 done: the on-disk constraint surface has the second line of defense R7-02 called

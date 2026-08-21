@@ -34,9 +34,10 @@ readers are structural over the same source.
 
 `WExpr.eval`'s `umod` case *is* the assumption that `felt.umod a b` denotes
 `fromNat (val a % val b)`, and `uintdiv` likewise. That is the D011/D017 reading,
-and `eval_ofWitgen` proves Clean's `ofNat (mod (val x) (const c))` denotes the
-same thing — so the two sides of D011's argument are now connected by a theorem
-rather than by prose. `CanonicalRepr` (D019) is what makes `val` the
+and `eval_ofWitgen` proves Clean's `ofU64 (mod (val x) (const c))` denotes the
+same thing when field values fit in a u64. Upstream's `U64Expr.val` truncates;
+the explicit size hypothesis is therefore part of the theorem rather than a
+property the corpus can infer. `CanonicalRepr` (D019) is what makes `val` the
 representative that reading refers to.
 
 ## What this does not do
@@ -140,8 +141,8 @@ def ofWitgen : Witgen.FExpr F → Option WExpr
   | .const c => some (.const (FiniteField.val c))
   | .add a b => (ofWitgen a).bind fun wa => (ofWitgen b).map (WExpr.add wa)
   | .mul a b => (ofWitgen a).bind fun wa => (ofWitgen b).map (WExpr.mul wa)
-  | .ofNat (.mod (.val x) (.const c)) => (ofWitgen x).map (WExpr.umod · c)
-  | .ofNat (.div (.val x) (.const c)) => (ofWitgen x).map (WExpr.uintdiv · c)
+  | .ofU64 (.mod (.val x) (.const c)) => (ofWitgen x).map (WExpr.umod · c.toNat)
+  | .ofU64 (.div (.val x) (.const c)) => (ofWitgen x).map (WExpr.uintdiv · c.toNat)
   | _ => none
 
 /-! ## The readings mean what Clean means -/
@@ -159,10 +160,12 @@ theorem eval_ofExpression (σ : Nat → F) (env : Environment F) (hσ : ∀ i, �
 
 This is the theorem D011 wanted and could not state: the two recognized natural
 division/modulo shapes denote, in Clean, exactly what `WExpr.eval` says
-`felt.umod`/`felt.uintdiv` denote. Everything else in the accepted subset is
-structural. -/
+`felt.umod`/`felt.uintdiv` denote when every field representative fits in a
+u64. The hypothesis is necessary: `U64Expr.val` truncates modulo `2^64`, so the
+statement is false in general for bn254 and grumpkin. Everything else in the
+accepted subset is structural. -/
 theorem eval_ofWitgen (ctx : Witgen.Ctx F) (σ : Nat → F)
-    (hσ : ∀ i, σ i = ctx.env.get i) :
+    (hσ : ∀ i, σ i = ctx.env.get i) (hsize : FiniteField.size F ≤ 2 ^ 64) :
     ∀ (e : Witgen.FExpr F) (w : WExpr), ofWitgen e = some w → eval σ w = e.eval ctx := by
   intro e
   induction e using ofWitgen.induct with
@@ -182,12 +185,18 @@ theorem eval_ofWitgen (ctx : Witgen.Ctx F) (σ : Nat → F)
     intro w h
     simp only [ofWitgen, Option.map_eq_some_iff] at h
     obtain ⟨wx, hx, rfl⟩ := h
-    simp [eval, Witgen.FExpr.eval, Witgen.NExpr.eval, ih wx hx]
+    have hval : FiniteField.val (Witgen.FExpr.eval ctx x) < 2 ^ 64 :=
+      lt_of_lt_of_le (FiniteField.val_lt _) hsize
+    simp [eval, Witgen.FExpr.eval, Witgen.U64Expr.eval, ih wx hx,
+      UInt64.toNat_mod]
   | case6 x c ih =>
     intro w h
     simp only [ofWitgen, Option.map_eq_some_iff] at h
     obtain ⟨wx, hx, rfl⟩ := h
-    simp [eval, Witgen.FExpr.eval, Witgen.NExpr.eval, ih wx hx]
+    have hval : FiniteField.val (Witgen.FExpr.eval ctx x) < 2 ^ 64 :=
+      lt_of_lt_of_le (FiniteField.val_lt _) hsize
+    simp [eval, Witgen.FExpr.eval, Witgen.U64Expr.eval, ih wx hx,
+      UInt64.toNat_div]
   | case7 e _ => intro w h; simp [ofWitgen] at h
 
 end WExpr

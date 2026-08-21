@@ -5,7 +5,7 @@ updates require an explicit session and decision-log entry.
 
 | Component | Revision | Role |
 |---|---|---|
-| Clean | `1e563b9c27991b3795eb440c1ee0757edb4ce8b1` | Frontend host and source semantics |
+| Clean | `0e53b9f2d05f06defa2aa0a859f549b611583f10` | Frontend host and source semantics; S25 |
 | LLZK | `5db6f8f9baaa40787a1a40625796497445f2da36` | LLZK 3.0 syntax, verifier, and witgen reference |
 | project-llzk VeIR | `eae1c27e7842c0503233ec99155c39791bd5f502` | Existing LLZK-aware VeIR fork |
 | upstream VeIR | `a4e6194d5810a02d74f0094ff6014cda6db6d617` | Long-term Lean MLIR framework |
@@ -65,10 +65,14 @@ named owner and a separate threat review.
   public destination; D027)
 - Upstream: `git@github.com:Verified-zkEVM/clean.git`
 - Integration branch: `clean-to-llzk/integration`
-- Lean toolchain: `leanprover/lean4:v4.30.0`
+- Lean toolchain: `leanprover/lean4:v4.32.2`
 
 The Clean revision is a base pin: frontend commits descend from it. The pin
-checker rejects a history that no longer contains it.
+checker rejects a history that no longer contains it. S25 fetched
+`Verified-zkEVM/clean` on 2026-08-21 and confirmed `upstream/main` still resolved
+to this exact 2026-08-04 merge commit before accepting it; the prior
+`1e563b9c27991b3795eb440c1ee0757edb4ce8b1` base remains provenance, not an
+accepted input.
 
 ## LLZK tools
 

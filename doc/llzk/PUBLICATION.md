@@ -92,7 +92,7 @@ run on an older staging-fork commit is not publication evidence.
 
 ## Publication procedure
 
-Only after S25, L0, S26, S28, promoted headline examples, and R8 are complete:
+Only after L0, S26, S28, promoted headline examples, and R8 are complete:
 
 1. Record the frozen candidate SHA and every accepted external pin.
 2. Choose new descriptive repository versus fork transfer explicitly.
