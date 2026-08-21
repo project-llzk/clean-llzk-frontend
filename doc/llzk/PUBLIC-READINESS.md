@@ -111,7 +111,7 @@ example increment.
 
 | Area | State | Evidence or next action |
 |---|---|---|
-| Stage-1 vertical slice | complete locally | `CURRENT.md`, R7, G0-G12; fork CI is seven commits behind |
+| Stage-1 vertical slice | complete locally | A7 G0-G12 on `a32593bf`; fork CI is seven commits behind integration and further behind this branch |
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
 | Upstream Clean alignment | pending explicit pin decision | S25 |
 | LLZK pin review | not started | live `main` is 25 commits ahead; isolate after S25 |
@@ -119,7 +119,7 @@ example increment.
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |
 | Renderer round-trip assurance | complete locally | A5; G0-G12 green on `28132f64` |
-| Copy-canonicalisation invariant | complete locally | A7; `step_preserves`, `run_preserves`, and `evidence/A7/` |
+| Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |
 | Final frozen-tree review | not started | R8 |
 | Organization access | available | active `project-llzk` admin verified 2026-08-21 |
 | Publication | not authorized | separate final action |

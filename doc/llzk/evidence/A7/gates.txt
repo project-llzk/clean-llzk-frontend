@@ -1,0 +1,31 @@
+A7 — copy-canonicalisation invariant
+Date: 2026-08-21
+
+Frozen code-and-document commit:
+  a32593bf3bf99859b23d84fc47bcd31032ffe768
+
+Focused checks:
+  lake build Clean.Backend.LLZK.WitnessCheck Clean.Backend.LLZK.Test.WitnessCheck
+  PASS — the source reader, copy chains, and computed-non-copy controls built
+
+  lake env lean doc/llzk/evidence/A7/probe.lean
+  'LLZK.WitnessSet.CopyCanon.step_preserves' depends on axioms: [propext, Quot.sound]
+  'LLZK.WitnessSet.CopyCanon.run_preserves' depends on axioms: [propext, Quot.sound]
+  PASS — no sorryAx, Classical.choice, or native_decide dependency
+
+Full command (using the accepted LLZK 3.0.0 installation recorded in PINS.md):
+  LLZK_SESSION=A7 LLZK_OPT=<pin>/bin/llzk-opt \
+    LLZK_WITGEN=<pin>/bin/llzk-witgen bash scripts/llzk/e2e.sh
+
+Final result:
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  12 circuit(s), 33 input vector(s), both witgen backends
+  2 renderer fixture(s), syntax only
+  G10a: all 12 + 2 modules admitted by --llzk-product-program
+  G10b: 10 modules lowered to SMT, 4 out of scope for a declared reason
+  G11: 43 harness error paths exercised
+
+A preliminary invocation stopped before G1 because the invoking shell did not
+carry LLZK_OPT or LLZK_WITGEN; G0 and G11 passed and the harness refused the
+missing tools as designed. The complete invocation above supplied the pinned
+paths and passed on the same frozen commit.

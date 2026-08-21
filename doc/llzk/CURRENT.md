@@ -24,7 +24,9 @@ explicit `CopyCanon.run` used by `WitnessSet.ofSource`.
 proves the whole-list invariant: the representative map preserves the value of
 every circuit variable. The existing copy-chain and non-copy red controls remain
 green; theorem evidence is in `evidence/A7/`. This feature branch has not been
-integrated or pushed.
+integrated or pushed. Full G0-G12 passed on clean commit `a32593bf`: 12 modules,
+33 vectors through both witness backends, 2 renderer fixtures, G10a 14/14, and
+G10b 10 lowered / 4 declared out of scope.
 
 Next session: **S25** — `sessions/S25-align-upstream.md`, **as corrected by R7**
 (read its Deliverable 2a first). Bootstrapped, not started; changing the Clean
@@ -289,6 +291,10 @@ an explicit decision, which was given.
 ## Last green gates
 
 Evidence under `doc/llzk/evidence/`.
+
+Latest complete run: A7, clean commit `a32593bf3bf99859b23d84fc47bcd31032ffe768`;
+see `evidence/A7/gates.txt`. The theorem probe reports only `propext` and
+`Quot.sound` for both copy-canonicalisation invariants.
 
 | Gate | Result |
 |---|---|
