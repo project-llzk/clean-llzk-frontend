@@ -1,0 +1,33 @@
+P0 — local publication hygiene
+Date: 2026-08-21
+
+Frozen hygiene commit:
+  29ba5ec2
+
+Prepared artifacts:
+  SECURITY.md
+  .github/PULL_REQUEST_TEMPLATE.md
+  doc/llzk/PUBLICATION.md
+
+Live organization checks (read-only GitHub API):
+  project-llzk organization profile: no Clean frontend entry
+  project-llzk/llzk-lib SECURITY.md: absent (HTTP 404)
+  project-llzk/llzk-lib private vulnerability reporting: disabled
+
+Local controls:
+  PASS — every required public/governance document exists and is non-empty
+  PASS — no /home/ path remains in the active public document set
+  PASS — prepared required checks match the actual CI job IDs:
+         build, llzk-harness, llzk-e2e, plonky3-backend
+  PASS — internal showcase source/proof link targets exist
+  PASS — scripts/check-consecutive-empty-lines.py
+  PASS — scripts/llzk/check-pins.sh
+  PASS — git diff --check
+
+The implementation and gate path are unchanged from clean commit b16bb83e,
+which passed G0-G12 with the checked showcase. The commits after it contain only
+documentation, the PR template, security policy, and captured evidence; no Lean,
+shell harness, workflow, pin, or generated artifact changed.
+
+No repository, remote, branch protection, private-reporting setting, or
+organization profile was created or modified.

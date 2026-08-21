@@ -120,7 +120,7 @@ example increment.
 | Stage-1 vertical slice | complete locally | G0-G12 plus the checked showcase on `b16bb83e`; fork CI is behind this branch |
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
-| Security and organization settings | prepared locally | `SECURITY.md`, PR template, and `PUBLICATION.md`; activation requires publication authority |
+| Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
 | Upstream Clean alignment | pending explicit pin decision | S25 |
 | LLZK pin review | not started | live `main` is 25 commits ahead; isolate after S25 |
 | Structural bitwise witness IR | pending S25 | S26 |

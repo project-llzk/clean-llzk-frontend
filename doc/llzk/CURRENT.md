@@ -36,6 +36,15 @@ the corpus ordering, denominator, vector total, source-backed count, and purpose
 coverage. Full G0-G12 passed on clean commit `b16bb83e`; evidence is in
 `evidence/P0/showcase.txt`.
 
+Latest completed repository-hygiene increment: `SECURITY.md` defines the future
+private-reporting path without pretending it is already enabled; the PR template
+requests pins, gates, trust-boundary changes, and public impact; and
+`PUBLICATION.md` prepares the organization metadata, four required checks,
+branch protection, security settings, and anonymous verification procedure.
+Active docs no longer depend on a developer-local path. Read-only GitHub checks
+confirmed the relevant security features are not inherited from `llzk-lib`.
+Evidence is in `evidence/P0/publication-hygiene.txt`; no external state changed.
+
 Next session: **S25** — `sessions/S25-align-upstream.md`, **as corrected by R7**
 (read its Deliverable 2a first). Bootstrapped, not started; changing the Clean
 pin remains an explicit decision boundary
