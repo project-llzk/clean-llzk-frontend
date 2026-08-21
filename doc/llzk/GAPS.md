@@ -315,12 +315,14 @@ ignores `constrain()`, so there is no executor for it in the pinned toolchain.
 
 ## 8. Small, named, and real
 
-- **The copy-canonicalisation premise.** `WitnessSet.ofSource` collapses a
+- **The copy-canonicalisation premise — closed by A7.** `WitnessSet.ofSource` collapses a
   witness cell that is a bare variable into the variable it copies, which is
   forced — the emitted module does not distinguish them. `WExpr.eval_rename` and
-  `WExpr.eval_congr` prove that renaming preserves meaning; the premise they are
-  applied to, that `canon` only ever maps a variable to one the program defines
-  it equal to, is checked by inspection of three lines rather than proved.
+  `WExpr.eval_congr` prove that renaming preserves meaning.
+  `WitnessSet.CopyCanon.step_preserves` now proves the premise for one cell, and
+  `run_preserves` proves it inductively for the whole witness-program list.
+  `ofSource` uses that proved `run` directly. The theorem-closure probe is in
+  `evidence/A7/`.
 - **`native_decide`** is in the trusted base of every concrete claim this project
   makes, through ten declarations. R5e reports that five of the eight uses in
   Clean's `Clean/Utils/Primes.lean` are literal `Nat` comparisons `decide` would

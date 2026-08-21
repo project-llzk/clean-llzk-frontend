@@ -18,11 +18,13 @@ blindness to the working tree (R7-01) did not. All findings repaired in the
 same session; the coverage sweep is now a checked test
 (`Test/Coverage.lean`), `CertifiedTable` carries a name tie, and S28
 (multi-column tables) joined the critical path  
-Latest completed feature session: **A5** — the supported renderer now parses
-the concrete `@constrain` surface back into typed statements, refuses a mismatch
-before returning text, and carries a generic round-trip theorem. Five mutations
-make the check go red. Full G0-G12 passed on clean commit `28132f64`; evidence is
-in `evidence/A5/`. This feature branch has not been integrated or pushed.
+Latest completed assurance session: **A7** — copy canonicalisation is now an
+explicit `CopyCanon.run` used by `WitnessSet.ofSource`.
+`CopyCanon.step_preserves` proves the single-cell update and `run_preserves`
+proves the whole-list invariant: the representative map preserves the value of
+every circuit variable. The existing copy-chain and non-copy red controls remain
+green; theorem evidence is in `evidence/A7/`. This feature branch has not been
+integrated or pushed.
 
 Next session: **S25** — `sessions/S25-align-upstream.md`, **as corrected by R7**
 (read its Deliverable 2a first). Bootstrapped, not started; changing the Clean
@@ -30,8 +32,9 @@ pin remains an explicit decision boundary
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/a5-renderer-roundtrip` (A5 assurance work
-on top of the public-readiness documentation; no pin or capability change)
+Active working branch: `clean-to-llzk/a7-copy-canonicalisation` (A7 assurance
+work on top of A5 and the public-readiness documentation; no pin or capability
+change)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -348,7 +351,8 @@ compiler, and R7 tied it to the table's *name*, but not to the circuit's own
 table); and `FieldExpr.lower_spec` is satisfied by five grossly wrong lowerings
 and does not compose. (§4 was on this list until A1 closed it; §3 until A2 —
 `spec_of_compile`, with R7-12's correction of what its lookup hypothesis says;
-§6 until A4; §2 until A5's checked textual constraint-surface round trip.)
+§6 until A4; §2 until A5's checked textual constraint-surface round trip; and
+§8's copy-canonicalisation premise until A7.)
 
 The lookup side, which R4a-6 found had no semantic theorem, has one:
 `Lookups.ofSource_lookups_iff`, the counterpart of `ofSource_eqs_iff`. This
@@ -481,8 +485,8 @@ order they are written in there.
    `Spec` holds", and `add8_spec_of_compile` is it for `Addition8FullCarry`.
    `Operations.FullGuarantees` turned out to be free — it quantifies over channel
    interactions, which `Analyze` refuses — so the chain is A1's lookup theorem
-   plus three of Clean's own steps. Soundness direction only; D017 and §2 still
-   stand between it and the text.
+   plus three of Clean's own steps. Soundness direction only; A5 now bridges the
+   protected surface to text, while D017's semantics assumption remains.
 3. **§1's second half — tie a certificate to the circuit's own table.** The
    largest open *soundness* gap: the caller picks both sides of `Certifies`, so
    it can certify a table the circuit does not look into. Closing it needs the
@@ -506,8 +510,13 @@ order they are written in there.
    *reader* has to be restated before `lower_spec` can be lifted through the
    assembly loops. Largest item in this track and the one with the least leverage
    per hour, because `agree` already refuses a wrong module.
-7. **§8 — the copy-canonicalisation premise**, currently three lines checked by
-   inspection under two theorems that are proved. Small.
+7. **§8 — done (A7).** `CopyCanon.step_preserves` proves that one
+   canonicalisation step preserves the semantic representative invariant, and
+   `run_preserves` lifts it across the whole witness-program list.
+   `WitnessSet.ofSource` uses that `run` rather than a mutable update. Together
+   with `WExpr.eval_rename` and `WExpr.eval_congr`, the copy-collapse argument no
+   longer has an inspection-only premise. The theorems use only `propext` and
+   `Quot.sound`; the probe is in `evidence/A7/`.
 
 ### B. CI — **done, and it was already done**
 
@@ -569,7 +578,7 @@ can close, because closing it means formalising LLZK.
 
 ### Recommended order
 
-**A1, A2, A4, A5 and B are done; R7 revalidated everything through A4.** The
+**A1, A2, A4, A5, A7 and B are done; R7 revalidated everything through A4.** The
 next thing is still **S25**, the upstream alignment — the pin is more than six
 weeks old and 70 upstream commits behind, the
 witness IR underneath us has been rebuilt (D025), and upstream has not moved
@@ -580,13 +589,13 @@ entry), then **S28** (multi-column tables — new, and the actual library
 unlock), then the witness-IR loop increment. S27 is returned for re-scoping and
 should not be executed as written (R7-09).
 
-The assurance track's A5 renderer item is now done: the on-disk constraint
-surface has the second line of defense R7-02 called for. Its next independent
-items are A6 (the preservation theorem, D021) and A7 (the
-copy-canonicalisation premise). A3 is more important than either but is a
-Clean-core session, so it should be *scheduled* rather than slipped into a
-backend increment — and G0 now enforces that, including against uncommitted
-edits (R7-01).
+The assurance track's A5 renderer and A7 copy-canonicalisation items are now
+done: the on-disk constraint surface has the second line of defense R7-02 called
+for, and the copy-collapse premise is proved rather than inspected. Its next
+independent backend item is A6 (the preservation theorem, D021). A3 is more
+important but is a Clean-core session, so it should be *scheduled* rather than
+slipped into a backend increment — and G0 now enforces that, including against
+uncommitted edits (R7-01).
 
 One process item, from B: **check the world, not the document.** Track B was on
 this list at all because three sessions in a row read a paragraph saying CI had

@@ -1079,3 +1079,34 @@ and its failure direction visible. This closes GAPS section 2 at the backend's
 concrete-text seam without claiming a formal LLZK semantics: D017 remains, and a
 future constraint-only statement constructor must extend this reader or reopen
 the claim.
+
+## D029 — Make copy canonicalisation a proved semantic step
+
+**Status:** accepted
+
+**Date:** 2026-08-21
+
+**Enacted by:** A7
+
+A bare witness copy has no fresh SSA definition in the emitted module, so the
+source and module readers must identify the copy cell with the variable it
+copies. The comparison was already pinned by copy chains and non-copy red
+controls, and `WExpr.eval_rename` plus `WExpr.eval_congr` proved the surrounding
+renaming facts. One premise remained prose: inspecting a mutable array update
+was the only argument that every chosen representative denoted the variable it
+replaced.
+
+`CopyCanon.step` now makes that update a named semantic operation. It renames the
+new witness expression through the accumulated representative function and
+extends that function only at the new cell: to the copied representative for a
+bare `cell`, or to itself otherwise. `CopyCanon.run` folds that operation over
+the witness-program list, and `WitnessSet.ofSource` calls `run` directly.
+
+`CopyCanon.step_preserves` proves that if the old representatives preserve
+values and the new witness cell denotes its unrenamed program, the extended map
+preserves values for every variable. Its proof composes the two existing
+renaming theorems and distinguishes the bare-copy and computed-cell cases.
+`CopyCanon.run_preserves` inducts that result through the entire list from the
+identity map. This closes GAPS section 8's copy-canonicalisation premise without
+strengthening the separate whole-vector witness claim or D017's reading of
+LLZK.

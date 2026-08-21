@@ -8,12 +8,13 @@ public reading path from the session and review record used to build it.
 
 The frontend accepts a documented, fail-closed subset of flattened Clean
 `FormalCircuit`s and emits a deterministic LLZK 3.0 module. The supported path
-has four assurance layers:
+has five assurance layers:
 
 1. Clean gadgets carry Lean soundness and completeness proofs against semantic
    specifications.
 2. The frontend compares the typed module's constraints and witness program
-   with the flattened Clean circuit before returning it.
+   with the flattened Clean circuit before returning it; copy canonicalisation
+   has a proved value-preserving invariant over the whole witness-program list.
 3. The rendered `@constrain` surface is parsed back and compared with the typed
    module before artifact text is returned.
 4. `llzk-opt` parses, verifies, round-trips, and analyzes each emitted artifact.
@@ -77,6 +78,7 @@ artifacts, so its output is attributable only when one session owns the tree.
 The strongest established generic result is that, subject to the named lookup
 hypothesis and the gadget's assumptions, satisfaction of the compiled typed
 module's constraints implies the gadget's `Spec`. A separate renderer theorem
-ties its protected constraint surface to the typed module. LLZK's concrete
-semantics remain outside both Lean theorems. `GAPS.md` is authoritative if a
-summary and a boundary ever disagree.
+ties its protected constraint surface to the typed module, and witness-side
+invariants prove copy canonicalisation value-preserving stepwise and as a whole.
+LLZK's concrete semantics remain outside these Lean theorems. `GAPS.md` is
+authoritative if a summary and a boundary ever disagree.

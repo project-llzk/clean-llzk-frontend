@@ -68,10 +68,12 @@ authorized.
 
 - Keep G0-G12 green and falsifiable; all negative fixtures and agreement-count
   pins remain green.
-- Close the renderer gap for the `@constrain`-only statement forms before the
-  release candidate: parse rendered `readMember`, `constrainEq`, and
-  `constrainIn` back into the typed representation and check their round trip, or
-  adopt an equivalently strong reviewed construction.
+- Keep the A5 renderer check on the release path: rendered `readMember`,
+  `constrainEq`, and `constrainIn` are parsed back into the typed representation
+  and must round-trip before text is returned.
+- Keep A7's copy-canonicalisation invariant in the theorem audit; the
+  representative map is built by `CopyCanon.run`, whose whole-list invariant is
+  proved by `run_preserves` from the single-step theorem.
 - Add example-specific instantiations of the generic soundness chain for the
   public headline examples, including multi-column lookup hypotheses rather
   than leaving them implicit in prose.
@@ -87,7 +89,7 @@ authorized.
 
 ```text
 P0 public documentation and repository hygiene
-  -> A5 renderer round-trip assurance (done)
+  -> A5 renderer + A7 copy-canonicalisation assurance (done)
   -> S25 upstream Clean / Lean alignment
   -> L0 LLZK pin review and compatibility run
   -> S26 structural U64 and bitwise lowering
@@ -101,7 +103,8 @@ S25 is intentionally isolated from capability work: a green bump says the
 existing frontend survived upstream change. L0 applies the same discipline to
 the live LLZK delta and either retains or advances the accepted tool pin with
 evidence. A5 has already strengthened the one assurance boundary R7 showed
-every LLZK binary gate can miss. S26 and S28 together create the impactful
+every LLZK binary gate can miss, and A7 removed the witness reader's remaining
+inspection-only semantic premise. S26 and S28 together create the impactful
 example increment.
 
 ## Current scorecard
@@ -116,6 +119,7 @@ example increment.
 | Multi-column tables | pending S26 | S28 |
 | Headline bitwise examples end to end | not started | promote after S28 |
 | Renderer round-trip assurance | complete locally | A5; G0-G12 green on `28132f64` |
+| Copy-canonicalisation invariant | complete locally | A7; `step_preserves`, `run_preserves`, and `evidence/A7/` |
 | Final frozen-tree review | not started | R8 |
 | Organization access | available | active `project-llzk` admin verified 2026-08-21 |
 | Publication | not authorized | separate final action |

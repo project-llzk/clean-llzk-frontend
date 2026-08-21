@@ -145,7 +145,8 @@ another circuit — and pins that the comparison goes red for each.
 return a module that fails, and `compile`/`emit` go through it.
 `agree_of_compileSource'` is the theorem, `witnessAgree_of_compileSourceVerified`
 its witness-side counterpart, and `eqs_iff_of_compileSource'` gives the first its
-meaning. So this holds for every circuit, not for the five in the corpus.
+meaning. So this holds for every circuit, not only for the circuits in the
+corpus.
 
 This paragraph used to say `compile`/`emit` were "the only public entry points".
 D018 retracted that in the R4 round and this file was not updated, so R5 found
@@ -171,11 +172,17 @@ say.
 `WExpr.eval_ofWitgen` proving that the Clean-side reading is `Witgen.FExpr.eval`.
 `compile` and `emit` live in `WitnessCheck.lean` and go through both.
 
+Since A7, the copy-collapse needed by the witness reader has no
+inspection-only premise: `CopyCanon.step_preserves` proves one extension and
+`run_preserves` proves the invariant across the whole witness-program list;
+`ofSource` uses that proved `run` directly. Copy chains and computed non-copies
+remain pinned in `Test/WitnessCheck.lean`.
+
 **What G9 does not establish.** D017's reading of the emitted IR: that `felt.add`
 is `+`, `constrain.eq` is equality, `constrain.in` is membership, and
 `felt.umod`/`felt.uintdiv` read their operands as canonical representatives.
 Nothing in Lean settles that without a formal model of LLZK; G5–G7 are the
-empirical evidence for the `@compute` half of it, on 30 vectors and two
+empirical evidence for the `@compute` half of it, on 33 vectors and two
 independent LLZK backends. The lookup *rows* used to be listed here; since S16
 they are proved — see D012 and `Clean/Backend/LLZK/TableCert.lean`.
 

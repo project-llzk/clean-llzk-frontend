@@ -230,10 +230,9 @@ copy to the variable it copies.
 Accepting both is sound because the module is a correct lowering of both: a copy
 cell is *defined* to hold the value it copies, so the two variables denote the
 same field element under every assignment the witness generator can produce.
-`eval_rename` and `eval_congr` above are the two halves of that argument; what
-they are applied to — that `canon` sends a variable only to one the program
-defines it equal to — is the three lines below, and is checked by inspection
-rather than proved. GAPS.md records it.
+`eval_rename` and `eval_congr` above are the two halves of that argument. The
+`CopyCanon.step_preserves` theorem below supplies the remaining premise: `canon`
+sends a variable only to one the program defines it equal to.
 
 R5c found the alternative the hard way: with the reader alone rebinding,
 `witness x; y === x; return x` — a proved `FormalCircuit` whose emitted module is
@@ -242,6 +241,81 @@ correct — was refused and told to file a backend bug.
 Only *bare* copies collapse. A cell computing `x + 0` is a fresh value with its
 own SSA statement, and stays distinct. -/
 
+namespace CopyCanon
+
+/-- Canonicalise one witness expression and extend the representative map.
+
+A bare copy maps the new circuit variable to the representative it copies;
+every other expression maps the new variable to itself. Returning the renamed
+expression as well keeps `ofSource`'s comparison output and the map update tied
+to one computation. -/
+def step (next : Nat) (canon : Nat → Nat) (w : WExpr) : (Nat → Nat) × WExpr :=
+  let renamed := w.rename canon
+  let representative := match renamed with | .cell j => j | _ => next
+  (fun i => if i = next then representative else canon i, renamed)
+
+/-- **The copy-canonicalisation invariant.**
+
+If every existing representative denotes the variable it replaces, and the new
+witness cell denotes its unrenamed program, then one `step` preserves that fact
+for every variable. Together with `WExpr.eval_rename`, this is the premise that
+used to be checked only by inspection in the three mutable lines of `ofSource`.
+-/
+theorem step_preserves (σ : Nat → F) (next : Nat) (canon : Nat → Nat) (w : WExpr)
+    (hcanon : ∀ i, σ (canon i) = σ i)
+    (hcell : σ next = WExpr.eval σ w) :
+    ∀ i, σ ((step next canon w).1 i) = σ i := by
+  intro i
+  by_cases hi : i = next
+  · subst i
+    have hrename : WExpr.eval σ (w.rename canon) = WExpr.eval σ w := by
+      rw [WExpr.eval_rename]
+      exact WExpr.eval_congr hcanon w
+    simp only [step, ↓reduceIte]
+    split
+    · rename_i j hcopy
+      have hj : σ j = WExpr.eval σ w := by
+        calc
+          σ j = WExpr.eval σ (.cell j) := rfl
+          _ = WExpr.eval σ (w.rename canon) :=
+            congrArg (WExpr.eval σ) hcopy.symm
+          _ = WExpr.eval σ w := hrename
+      exact hj.trans hcell.symm
+    · exact rfl
+  · simp [step, hi, hcanon]
+
+/-- Canonicalise a consecutive list of witness programs. -/
+def run (next : Nat) (canon : Nat → Nat) :
+    List WExpr → (Nat → Nat) × List WExpr
+  | [] => (canon, [])
+  | w :: ws =>
+      let (nextCanon, renamed) := step next canon w
+      let (finalCanon, rest) := run (next + 1) nextCanon ws
+      (finalCanon, renamed :: rest)
+
+/-- The sequential witness-cell equations needed by `run_preserves`. -/
+def ProgramsHold (σ : Nat → F) (next : Nat) : List WExpr → Prop
+  | [] => True
+  | w :: ws =>
+      σ next = WExpr.eval σ w ∧ ProgramsHold σ (next + 1) ws
+
+/-- Canonicalising a whole witness-program list preserves every variable's
+value. This is the induction from the identity map through all applications of
+`step_preserves`, so `ofSource` does not rely on an inspected mutable loop. -/
+theorem run_preserves (σ : Nat → F) (next : Nat) (canon : Nat → Nat)
+    (raw : List WExpr) (hcanon : ∀ i, σ (canon i) = σ i)
+    (hraw : ProgramsHold σ next raw) :
+    ∀ i, σ ((run next canon raw).1 i) = σ i := by
+  induction raw generalizing next canon with
+  | nil => simpa [run] using hcanon
+  | cons w ws ih =>
+      rcases hraw with ⟨hcell, hrest⟩
+      have hstep := step_preserves σ next canon w hcanon hcell
+      simpa only [run] using
+        ih (next := next + 1) (canon := (step next canon w).1) hstep hrest
+
+end CopyCanon
+
 /-- Read the Clean circuit's witness programs and outputs. -/
 def ofSource (src : Source F) : Option WitnessSet := do
   let mut raw : List WExpr := []
@@ -249,16 +323,12 @@ def ofSource (src : Source F) : Option WitnessSet := do
     if let .witness _ program := op then
       raw := raw ++ (← ofProgram program)
   -- `canon` sends each circuit variable to the one it is a copy of, or to
-  -- itself. Built in order, so a cell's references are always already resolved.
-  let mut canon : Array Nat := Array.range src.inputSize
-  let mut cells : Array WExpr := #[]
-  for w in raw do
-    let w := w.rename fun i => canon[i]?.getD i
-    canon := canon.push (match w with | .cell j => j | _ => canon.size)
-    cells := cells.push w
-  return { inputs := src.inputSize, cells := cells.toList,
+  -- itself. `run` builds it in order, so references are already resolved, and
+  -- `run_preserves` proves the resulting map preserves every variable's value.
+  let (canon, cells) := CopyCanon.run src.inputSize id raw
+  return { inputs := src.inputSize, cells := cells,
            outputs := src.outputs.toList.map fun e =>
-             (WExpr.ofExpression e).rename fun i => canon[i]?.getD i }
+             (WExpr.ofExpression e).rename canon }
 
 /-! ## Reading the emitted `@compute`
 

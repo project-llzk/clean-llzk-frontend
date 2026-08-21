@@ -25,7 +25,7 @@ Its dependency order is:
 
 ```text
 public documentation and hygiene
-  → renderer round-trip assurance (A5, done)
+  → renderer and copy-canonicalisation assurance (A5 + A7, done)
   → S25: current upstream Clean and Lean
   → L0: review or advance the LLZK toolchain pin
   → S26: structural U64, bitwise operations, and conditionals
@@ -38,10 +38,11 @@ This order joins the three goals that matter for publication. S25 removes the
 stale Clean foundation; L0 decides against a measured 25-commit LLZK delta
 rather than silently treating either the old pin or moving `main` as canonical;
 A5 has already strengthened the one artifact boundary every pinned LLZK binary
-accepts without checking semantic content. S26 plus S28 turns measured refusals
-into impactful examples. The release candidate is reached only when those
-examples are in the external-tool corpus, not when `LLZK.compile` merely returns
-`some`.
+accepts without checking semantic content; A7 removed the remaining
+inspection-only premise from copy canonicalisation. S26 plus S28 turns measured
+refusals into impactful examples. The release candidate is reached only when
+those examples are in the external-tool corpus, not when `LLZK.compile` merely
+returns `some`.
 
 The initial implementation lives under:
 
@@ -266,5 +267,10 @@ file.
   `Module.render_constraintSurface` ties every successfully returned text to the
   typed module's `readMember`, `constrainEq`, and `constrainIn` sequence. This
   closes GAPS item 2 without closing D017's assumption about LLZK semantics.
+- **Copy canonicalisation is proved stepwise (A7).**
+  `CopyCanon.step_preserves`, composed with `WExpr.eval_rename` and
+  `WExpr.eval_congr`, establishes the single-cell invariant; `run_preserves`
+  lifts it across the whole witness-program list and closes the former
+  inspection-only premise in GAPS item 8.
 - **The corpus is chosen, not exhaustive.** `Addition8FullCarry` is now tested
   outside its `Assumptions` (three of its nine vectors, S19).
