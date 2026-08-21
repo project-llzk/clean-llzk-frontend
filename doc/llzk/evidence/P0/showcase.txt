@@ -1,0 +1,28 @@
+P0 — checked public example showcase
+Date: 2026-08-21
+
+Frozen implementation-and-document commit:
+  b16bb83ead9d9fc8dabfcda4a2d9da2db2e765a5
+
+Focused checks:
+  lake build CleanTests
+  PASS — Showcase.markdown, the exact 12-entry ordering, 33-vector total,
+  6 source-backed entries, and complete purpose-label coverage
+
+  lake env lean --run Clean/Backend/LLZK/ShowcaseMain.lean <temporary-file>
+  diff -u doc/llzk/EXAMPLES.md <temporary-file>
+  PASS — generated and checked-in pages are byte-identical
+
+Red control:
+  changed "33 input vectors" to "32 input vectors" in a temporary copy
+  PASS — the stale public count is distinguished
+
+Full pinned-tool result:
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  12 circuit(s), 33 input vector(s), both witgen backends
+  2 renderer fixture(s), syntax only
+  G10a: all 12 + 2 modules admitted by --llzk-product-program
+  G10b: 10 modules lowered to SMT, 4 out of scope for a declared reason
+  G11: 43 harness error paths exercised
+
+The full run included the new G1 showcase regeneration and byte comparison.

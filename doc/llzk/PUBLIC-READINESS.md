@@ -114,9 +114,9 @@ example increment.
 
 | Area | State | Evidence or next action |
 |---|---|---|
-| Stage-1 vertical slice | complete locally | A7 G0-G12 on `a32593bf`; fork CI is seven commits behind integration and further behind this branch |
+| Stage-1 vertical slice | complete locally | G0-G12 plus the checked showcase on `b16bb83e`; fork CI is behind this branch |
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
-| Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus and enforced by G1 |
+| Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
 | Upstream Clean alignment | pending explicit pin decision | S25 |
 | LLZK pin review | not started | live `main` is 25 commits ahead; isolate after S25 |
 | Structural bitwise witness IR | pending S25 | S26 |
