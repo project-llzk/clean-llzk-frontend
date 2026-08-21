@@ -23,7 +23,8 @@ the table above remains authoritative.
 
 ## Clean repository
 
-- Fork: `git@github.com:alexanderlhicks/clean.git`
+- Development staging fork: `git@github.com:alexanderlhicks/clean.git` (not the
+  public destination; D027)
 - Upstream: `git@github.com:Verified-zkEVM/clean.git`
 - Integration branch: `clean-to-llzk/integration`
 - Lean toolchain: `leanprover/lean4:v4.30.0`
@@ -40,7 +41,9 @@ nix build --no-link --max-jobs 0 --print-out-paths \
   github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk
 ```
 
-- Store path: `/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0`
+- S01 evidence-machine output:
+  `/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0` (provenance,
+  not a portable path)
 - `LLZK_OPT` = `<that>/bin/llzk-opt`, reports `LLZK version 3.0.0`
 - `LLZK_WITGEN` = `<that>/bin/llzk-witgen`
 

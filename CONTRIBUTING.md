@@ -19,6 +19,8 @@ the [upstream Clean repository](https://github.com/Verified-zkEVM/clean).
   silently close a documented gap.
 - Preserve upstream attribution and avoid unrelated edits outside
   `Clean/Backend/LLZK/`; G0 checks the allowed Clean-core delta.
+- Report suspected vulnerabilities through [`SECURITY.md`](SECURITY.md), never
+  in a public pull request or issue with technical details.
 
 ## Checks
 

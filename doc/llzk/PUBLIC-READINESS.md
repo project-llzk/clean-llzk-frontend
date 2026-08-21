@@ -37,9 +37,12 @@ authorized.
 - The branch is aligned with the accepted upstream Clean revision, has a clean
   worktree, contains no generated build products, and has no unpublished commits
   that are part of the release candidate.
-- Licensing and upstream Clean attribution remain intact. A repository
-  description, topics, contribution path, security-reporting path, and branch
-  protection are prepared before publication.
+- Licensing and upstream Clean attribution remain intact. **Prepared locally:**
+  `PUBLICATION.md` specifies the repository description, topics, branch
+  protection, required checks, and security settings; `CONTRIBUTING.md`, the PR
+  template, and `SECURITY.md` supply the contribution and vulnerability paths.
+  Private reporting must still be enabled during the authorized publication
+  action.
 
 ### 2. Meaningful, demonstrable progress
 
@@ -117,6 +120,7 @@ example increment.
 | Stage-1 vertical slice | complete locally | G0-G12 plus the checked showcase on `b16bb83e`; fork CI is behind this branch |
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
+| Security and organization settings | prepared locally | `SECURITY.md`, PR template, and `PUBLICATION.md`; activation requires publication authority |
 | Upstream Clean alignment | pending explicit pin decision | S25 |
 | LLZK pin review | not started | live `main` is 25 commits ahead; isolate after S25 |
 | Structural bitwise witness IR | pending S25 | S26 |
@@ -136,9 +140,10 @@ Once every acceptance criterion above is met:
    prefer the descriptive repository unless preserving GitHub's fork relation is
    an explicit requirement.
 2. Record the release-candidate commit and all external pins.
-3. Confirm the full local gate run and organization-repository CI on that same
-   commit.
-4. Configure the repository description, topics, default branch, branch
-   protection, security reporting, and the LLZK organization profile link.
-5. Push or transfer only after explicit authorization, then verify links and
-   badges from an anonymous browser session.
+3. Create or transfer only after explicit authorization, then apply the
+   description, topics, protection, security, and Actions settings in
+   `PUBLICATION.md`.
+4. Push the frozen commit and require organization-repository CI on that exact
+   SHA.
+5. Add the LLZK organization-profile link, then verify links, security reporting,
+   badges, settings, and CI from an anonymous browser session.

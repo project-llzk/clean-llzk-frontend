@@ -43,6 +43,8 @@ For reproducibility and review:
 
 - [`PUBLIC-READINESS.md`](PUBLIC-READINESS.md) is the organization-publication
   acceptance contract.
+- [`PUBLICATION.md`](PUBLICATION.md) prepares the organization metadata,
+  protection, CI, and security settings without changing GitHub state.
 - [`PINS.md`](PINS.md) records every accepted external revision and tool.
 - [`GATES.md`](GATES.md) defines G0-G12 and their falsification controls.
 - [`DECISIONS.md`](DECISIONS.md) records semantic and trust-boundary decisions.

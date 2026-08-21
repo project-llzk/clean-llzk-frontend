@@ -42,8 +42,9 @@ pin remains an explicit decision boundary
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/public-showcase` (a generated public
-example page and its drift gate on top of A7; no pin or capability change)
+Active working branch: `clean-to-llzk/publication-hygiene` (security reporting,
+pull-request evidence, and reviewed organization settings on top of the checked
+showcase; no pin, capability, or external-state change)
 
 Integration commit: `doc/llzk/evidence/R7/gates.txt`
 
@@ -68,7 +69,7 @@ full compatibility matrix.
 
 - Clean: `1e563b9c27991b3795eb440c1ee0757edb4ce8b1`
 - LLZK source: `5db6f8f9baaa40787a1a40625796497445f2da36`
-- LLZK tools: `/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0`
+- LLZK tools: the Nix output of the pinned LLZK source; reports version 3.0.0
 - project-llzk VeIR: `eae1c27e7842c0503233ec99155c39791bd5f502`
 - upstream VeIR: `a4e6194d5810a02d74f0094ff6014cda6db6d617`
 
@@ -101,11 +102,12 @@ git remote add upstream git@github.com:Verified-zkEVM/clean.git
 #    from source, 1837 targets, and that dominates everything else here.
 lake exe cache get
 
-# 3. The pinned LLZK tools. This store path is one machine's; PINS.md has the
-#    `nix build` that produces it, including the --max-jobs 0 discipline and the
-#    substituter cache key. Get them from there before pasting this.
-export LLZK_OPT=/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/llzk-opt
-export LLZK_WITGEN=/nix/store/x2wpfaymqfrvk9gv0jbbd7w1qgxhl1x0-llzk-release-3.0.0/bin/llzk-witgen
+# 3. Build/substitute the pinned LLZK tools. The command prints a machine-local
+#    Nix store path; PINS.md records the required cache key.
+nix build --no-link --max-jobs 0 --print-out-paths \
+  github:project-llzk/llzk-lib/5db6f8f9baaa40787a1a40625796497445f2da36#llzk
+export LLZK_OPT=/the/printed/store/path/bin/llzk-opt
+export LLZK_WITGEN=/the/printed/store/path/bin/llzk-witgen
 
 # 4. The gates.
 bash scripts/llzk/worktree-lock.sh claim "what you are doing"
@@ -587,7 +589,7 @@ largest unscoped question in the project and it is not on any track above.
 ### E. VeIR — parallel, non-blocking
 
 D003 holds: VeIR consumes the frozen `.llzk` fixture corpus rather than being a
-dependency. `/home/alh/LLZK/clean-to-veir-readiness.md` has workstreams W0–W8 and
+dependency. Its separately tracked readiness plan has workstreams W0–W8 and
 milestones VM1–VM4; `GAPS.md` §7 (D017 has no formal basis) is the gap only VeIR
 can close, because closing it means formalising LLZK.
 

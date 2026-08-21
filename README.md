@@ -39,7 +39,9 @@ Start here:
 Project governance:
 
 - [Public-readiness milestone](doc/llzk/PUBLIC-READINESS.md)
+- [Prepared organization settings](doc/llzk/PUBLICATION.md)
 - [Contribution guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 
 To build the Lean project:
 
