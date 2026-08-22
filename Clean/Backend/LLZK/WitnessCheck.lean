@@ -995,19 +995,21 @@ private def step (fieldTy : Ty) (inputSize : Nat) (r : Reader) : Stmt → Option
 /-- Read the emitted module's `@compute`.
 
 The input count comes from the parameter list, and the cell and output counts
-from the order the writes appear in — so a module whose layout disagrees with
-Clean's is a mismatch rather than a blind spot shared by both sides. -/
+from the order the writes appear in. The final check requires those counts to
+match the exact ordered `w{k}` signal / `out{j}` public member layout, so a
+module whose names, order, types, or visibility disagree with Clean's is a
+mismatch rather than a blind spot shared by both sides. -/
 def ofModule (fieldTy : Ty) (m : Module) : Option WitnessSet := do
   let params := m.root.compute.params
   guard (params.zipIdx.all fun (p, i) => p.value.index = i)
   guard (params.all fun p => p.ty = fieldTy)
-  guard (m.root.members.all fun mem => mem.ty = fieldTy)
   let mut reader : Reader :=
     { slots := (Array.range params.size).map fun i => Slot.expr (.cell i)
       cells := [], outputs := [] }
   for stmt in m.root.compute.body do
     let some next := step fieldTy params.size reader stmt | none
     reader := next
+  guard (memberLayout fieldTy reader.cells.length reader.outputs.length m.root.members)
   return { inputs := params.size, cells := reader.cells, outputs := reader.outputs }
 
 /-- Whether the emitted `@compute` computes the circuit's witnesses and outputs.

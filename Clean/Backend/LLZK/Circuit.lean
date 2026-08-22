@@ -60,6 +60,22 @@ def witnessMember (k : Nat) : String := s!"w{k}"
 /-- Member holding output field element `j`. -/
 def outputMember (j : Nat) : String := s!"out{j}"
 
+/-- Whether a component has exactly the state layout the frontend specifies:
+`w0 … w{n-1}` as signals, followed by `out0 … out{m-1}` as public values,
+all in the configured field.
+
+The typed G9 readers use this independently of the lowering. Counting members
+by visibility was insufficient: a signal changed to public could still be read
+as a well-typed but differently shaped component. -/
+def memberLayout (fieldTy : Ty) (numWitnesses numOutputs : Nat)
+    (declared : Array Member) : Bool :=
+  declared.size = numWitnesses + numOutputs && declared.zipIdx.all fun (mem, i) =>
+    if i < numWitnesses then
+      mem.name = witnessMember i && mem.ty = fieldTy && mem.visibility = .signal
+    else
+      let j := i - numWitnesses
+      mem.name = outputMember j && mem.ty = fieldTy && mem.visibility = .pub
+
 /-- The component's state: one `{signal}` member per witness cell, then one
 `{llzk.pub}` member per output. -/
 private def members (r : Recognized) (fieldTy : Ty) : Array Member :=

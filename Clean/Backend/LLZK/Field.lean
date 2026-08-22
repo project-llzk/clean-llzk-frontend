@@ -52,14 +52,7 @@ class CanonicalRepr (F : Type) [FiniteField F] : Prop where
 
 namespace CanonicalRepr
 
-variable {F : Type} [FiniteField F]
-
-/-- A field has at least two elements: `val 0 = 0`, `val 1 = 1`, and `val` lands
-below `size`. -/
-theorem one_lt_size : 1 < FiniteField.size F :=
-  FiniteField.val_one (F := F) ▸ FiniteField.val_lt (1 : F)
-
-variable [CanonicalRepr F]
+variable {F : Type} [FiniteField F] [CanonicalRepr F]
 
 /-- **`val` is determined**: it sends `(n : F)` to `n % size`, so it is the
 canonical representative and not merely some injection into `[0, size)`.

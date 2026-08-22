@@ -1112,4 +1112,19 @@ field: configured field 'babybear-ish' with prime 2013265921 is not an entry of 
 #eval IO.print (renderResult (lowerRecognized unregisteredField
   (recognizedWith #[] #[.var 0])))
 
+/-! The exact member-layout predicate shared by both G9 readers. These are
+deliberately direct: renderer mutations happen after G9, while this predicate
+also has to reject malformed typed modules handed to `verify`. -/
+
+private def canonicalMembers : Array Member :=
+  #[{ name := "w0", ty := .felt "babybear", visibility := .signal },
+    { name := "out0", ty := .felt "babybear", visibility := .pub }]
+
+#guard memberLayout (.felt "babybear") 1 1 canonicalMembers
+#guard !memberLayout (.felt "babybear") 1 1
+  (canonicalMembers.set! 0 { name := "w0", ty := .felt "babybear", visibility := .pub })
+#guard !memberLayout (.felt "babybear") 1 1
+  (canonicalMembers.set! 0 { name := "w1", ty := .felt "babybear", visibility := .signal })
+#guard !memberLayout (.felt "babybear") 1 1 canonicalMembers.reverse
+
 end LLZK.Test.Circuit

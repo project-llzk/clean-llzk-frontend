@@ -40,11 +40,12 @@ Clean's assertions — *given* that `ofModule` reads the emitted IR the way LLZK
 does.
 
 The lookup half is data here and semantics in `Lookups.lean` and
-`Soundness.lean`. `lookups_perm_of_compileSource'` says each emitted
-`constrain.in` names the table Clean's `.lookup` named and queries the same
-ordered polynomial row. `Lookups.ofSource_lookups_iff` turns certified exported
-rows into `Lookup.Contains`; `Soundness.lookupRows_of_agree` bridges semantic
-satisfaction of the module reader's `C.lookups` to that source-indexed theorem.
+`Soundness.lean`. `agree_of_compileSource'`, unfolded through `agree`, says each
+emitted `constrain.in` names the table Clean's `.lookup` named and queries the
+same ordered polynomial row. `Lookups.ofSource_lookups_iff` turns certified
+exported rows into `Lookup.Contains`; `Soundness.lookupRows_of_agree` bridges
+semantic satisfaction of the module reader's `C.lookups` to that source-indexed
+theorem.
 The one premise the compiler still cannot derive is which certified raw table a
 source lookup came from, because `RawTable` erased the originating `Table`.
 
@@ -329,13 +330,14 @@ private def step (fieldTy : Ty) (inputSize numWitnesses numOutputs : Nat)
 
 /-- Read the emitted module's `@constrain`.
 
-The component's shape is re-derived from the module — the parameter count, the
-`{signal}` members and the `{llzk.pub}` members — rather than taken from the
-circuit, so a layout that disagrees with Clean's is a mismatch rather than a
+The component's shape is re-derived from the module — the parameter count and
+the exact ordered `w{k}`/`out{j}` member layout — rather than taken from the
+circuit, so a wrong name, order, type, or visibility is a mismatch rather than a
 blind spot shared by both sides (D014's known weakness, avoided here). -/
 def ofModule (fieldTy : Ty) (m : Module) : Option (ConstraintSet F) := do
   let numWitnesses := (m.root.members.filter (·.visibility = .signal)).size
   let numOutputs := (m.root.members.filter (·.visibility = .pub)).size
+  guard (memberLayout fieldTy numWitnesses numOutputs m.root.members)
   let params := m.root.constrain.params
   let some self := params[0]? | none
   guard (self.ty = rootTy)
@@ -349,7 +351,6 @@ def ofModule (fieldTy : Ty) (m : Module) : Option (ConstraintSet F) := do
   guard ((params.extract 1 params.size).all fun p => p.ty = fieldTy)
   -- The component's state and its constant arrays, likewise. A member or a
   -- global in another field is a mismatch here rather than only in `llzk-opt`.
-  guard (m.root.members.all fun mem => mem.ty = fieldTy)
   guard (m.globals.all fun g => g.elemTy = fieldTy)
   guard (m.globals.all fun g => g.arity > 0 && !g.rows.isEmpty &&
     g.rows.all (·.size = g.arity))
@@ -443,45 +444,6 @@ theorem agree_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F
       simp only [Except.ok.injEq] at h
       exact h ▸ ha
     · exact absurd h (by simp)
-
-/-- **The emitted equalities are Clean's constraints, semantically.**
-
-`agree_of_compileSource'` says the two polynomial sets match as data; this says
-what that means. For any module this backend emits, the polynomials read out of
-its `@constrain` vanish at an assignment exactly when Clean's
-`ConstraintsHoldFlat` holds there and each `@out{j}` carries its output
-expression — the definitional extension D008 adds, and which A4 previously argued
-informally.
-
-Order is irrelevant on both sides because the constraints are a conjunction, and
-that is why a permutation suffices. -/
-theorem eqs_iff_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F} {m : Module}
-    {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
-    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
-    (env : Environment F) (outs : Nat → F) :
-    (∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
-      ↔ (∀ e ∈ FlatOperation.constraints src.operations, e.eval env = 0)
-        ∧ (∀ e j, (e, j) ∈ src.outputs.toList.zipIdx → outs j = e.eval env) := by
-  have ha := agree_of_compileSource' h
-  simp only [agree, hm, Bool.and_eq_true] at ha
-  have hperm : C.eqs.Perm (ofSource cfg src).eqs := List.isPerm_iff.mp ha.1.2
-  rw [← ofSource_eqs_iff cfg src env outs]
-  exact ⟨fun hh p hp => hh p (hperm.mem_iff.mpr hp),
-         fun hh p hp => hh p (hperm.mem_iff.mp hp)⟩
-
-/-- **The emitted lookups are Clean's lookups.**
-
-Each `constrain.in` the module emits names the table Clean's `.lookup` named and
-queries the same polynomial, with the same multiplicity. What that *means* — that
-membership in the emitted array is Clean's `Contains` — is
-`TableCert.certified_membership`, and needs the table certified. -/
-theorem lookups_perm_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F}
-    {m : Module} {C : ConstraintSet F} (h : compileSource' cfg src = .ok m)
-    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C) :
-    C.lookups.Perm (ofSource cfg src).lookups := by
-  have ha := agree_of_compileSource' h
-  simp only [agree, hm, Bool.and_eq_true] at ha
-  exact List.isPerm_iff.mp ha.2
 
 end ConstraintSet
 

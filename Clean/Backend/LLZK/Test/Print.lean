@@ -56,6 +56,10 @@ info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
       %v6 = array.new %v3, %v4 : !array.type<2 x !felt.type<"babybear">>
       constrain.in %v5, %v6 : !array.type<2,2 x !felt.type<"babybear">>, !array.type<2 x !felt.type<"babybear">>
       constrain.eq %v4, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v7 = felt.const 0 : !felt.type<"babybear">
+      %v8 = felt.add %v3, %v4 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v9 = felt.mul %v8, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      constrain.eq %v9, %v7 : !felt.type<"babybear">, !felt.type<"babybear">
       function.return
     }
   }
@@ -87,13 +91,17 @@ info: module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
 #guard_msgs in
 #eval IO.print (renderResult (RendererFixture.emptyModule.mapError (#[·])))
 
-/-! ## A5 — the rendered constraint surface reads back
+/-! ## A5 — the rendered semantic surface reads back
 
-The five direct parser controls make the concrete grammar visible here rather
-than trusting only the renderer's own output. The module controls then pin both
-directions a gate needs: the real fixture succeeds, while each mutation R6/R7
-showed the LLZK binaries accept is refused by the Lean-side round trip.
+The direct parser controls make the concrete grammar visible here rather than
+trusting only the renderer's own output. The module controls then pin both
+directions a gate needs: the real fixture succeeds, while semantic mutations
+the LLZK binaries accept are refused by the Lean-side round trip.
 -/
+
+#guard RenderCheck.parseStmt
+    "struct.member @w0 : !felt.type<\"babybear\"> {signal}" =
+  some (.member "w0" (.felt "babybear") .signal)
 
 #guard RenderCheck.parseStmt
     "%v3 = struct.readm %v0[@w0] : !struct.type<@Main>, !felt.type<\"babybear\">" =
@@ -116,6 +124,18 @@ showed the LLZK binaries accept is refused by the Lean-side round trip.
       !array.type<2 x !felt.type<\"babybear\">>" =
   some (.constrainIn 5 6 (.array #[2, 2] (.felt "babybear"))
     (.array #[2] (.felt "babybear")))
+
+#guard RenderCheck.parseStmt
+    "%v7 = felt.const 0 : !felt.type<\"babybear\">" =
+  some (.feltConst 7 0 (.felt "babybear"))
+
+#guard RenderCheck.parseStmt
+    "%v9 = felt.mul %v8, %v1 : !felt.type<\"babybear\">, !felt.type<\"babybear\">" =
+  some (.feltBin 9 .mul 8 1 (.felt "babybear"))
+
+#guard RenderCheck.parseStmt
+    "%v5 = global.read @Bytes : !array.type<2,2 x !felt.type<\"babybear\">>" =
+  some (.globalRead 5 "Bytes" (.array #[2, 2] (.felt "babybear")))
 
 #guard RenderCheck.parseTy
   "!array.type<2,4 x !felt.type<\"babybear\">>" =
@@ -165,6 +185,31 @@ private def rejectsMutation (old replacement : String) : Bool :=
 #guard rejectsMutation
   "= [0, 1, 2, 3]"
   "= [0, 2, 1, 3]"
+
+-- Constraint arithmetic and constants determine the meaning of an equation;
+-- merely protecting the final `constrain.eq` operands was not enough.
+#guard rejectsMutation
+  "%v9 = felt.mul %v8, %v1 : !felt.type<\"babybear\">, !felt.type<\"babybear\">"
+  "%v9 = felt.add %v8, %v1 : !felt.type<\"babybear\">, !felt.type<\"babybear\">"
+
+#guard rejectsMutation
+  "%v7 = felt.const 0 : !felt.type<\"babybear\">"
+  "%v7 = felt.const 1 : !felt.type<\"babybear\">"
+
+#guard rejectsMutation
+  "%v5 = global.read @Bytes : !array.type<2,2 x !felt.type<\"babybear\">>"
+  "%v5 = global.read @Other : !array.type<2,2 x !felt.type<\"babybear\">>"
+
+-- Visibility is observable through `--output-scope=public`; the old A5 reader
+-- ignored member declarations and accepted this change.
+#guard rejectsMutation
+  "struct.member @w0 : !felt.type<\"babybear\"> {signal}"
+  "struct.member @w0 : !felt.type<\"babybear\"> {llzk.pub}"
+
+-- The constraint parameter list is part of the protected interface too.
+#guard rejectsMutation
+  "%v1: !felt.type<\"babybear\"> {function.arg_name = \"lhs\"},"
+  "%v1: !felt.type<\"babybear\"> {function.arg_name = \"rhs\"},"
 
 -- A shallower parser could accept these malformed/wrong-field row constructors;
 -- the protected readback refuses both before artifact release.

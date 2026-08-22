@@ -5,8 +5,8 @@ import Clean.Backend.LLZK.Lookups
 /-!
 # GAPS §3: from the emitted module's constraints to the gadget's `Spec`
 
-The statement a user most likely assumes this project has, and until now the one
-it did not. `eqs_iff_of_compileSource'` stops at `ConstraintsHoldFlat`; a
+The statement a user most likely assumes this project has, and before A2 the one
+it did not. G9's data-level agreement stops at `ConstraintsHoldFlat`; a
 `FormalCircuit`'s `soundness` field is stated over `ConstraintsHold.Soundness`,
 which is a different and stronger predicate — it replaces each subcircuit's
 constraints by its `Assumptions → Spec`.
@@ -75,11 +75,10 @@ def ConstraintSet.LookupRowsHold (C : ConstraintSet F)
       ∃ values ∈ rows,
         values.map FiniteField.fromNat = row.map (Poly.eval (assign env outs))
 
-/-- `eqs_iff_of_compileSource'` needs only the comparison, not the compile.
-
-Factored out because `compile` goes through `compileSourceVerified`, whose
-guarantee is `constraintsAgree_of_compileSourceVerified` — an `agree`, not a
-`compileSource'`. Same proof. -/
+/-- Give G9's equality agreement its semantic meaning without requiring a
+particular compilation entry point. `compile` goes through
+`compileSourceVerified`, whose guarantee is an `agree`, so this is the reusable
+form consumed by the soundness chain. -/
 theorem ConstraintSet.eqs_iff_of_agree {cfg : Config} {src : Source F} {m : Module}
     {C : ConstraintSet F} (ha : agree cfg src m = true) (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
     (env : Environment F) (outs : Nat → F) :

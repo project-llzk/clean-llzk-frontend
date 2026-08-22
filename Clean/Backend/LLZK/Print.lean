@@ -10,11 +10,12 @@ above it manipulates `Clean.Backend.LLZK.IR` values.
 The raw renderer is total and deterministic: it is a fold over the IR with no
 ordering choices, no name generation, and no configuration, so equal modules
 render to equal strings and the golden fixtures in `Test/` are stable. The
-public `Module.render` then parses the protected global and constraint-surface
-statement forms back out of that text and refuses to return it unless they equal
-the typed IR. This is A5: a dropped or mis-rendered constraint or table row is a
-diagnostic before an artifact can be written, even though every pinned LLZK
-binary accepts many such semantic mutations.
+public `Module.render` then parses the protected globals, component members,
+constraint parameters, and complete `@constrain` body back out of that text and
+refuses to return it unless they equal the typed IR. This is A5: a dropped or
+mis-rendered constraint, table row, or public-interface member is a diagnostic
+before an artifact can be written, even though the pinned LLZK binaries accept
+many such semantic mutations.
 
 Output shape follows the fixtures under `test/Witgen` and `test/Dialect` in the
 pinned LLZK revision:
@@ -188,15 +189,15 @@ private def Module.renderUnchecked (m : Module) : String :=
   let lines := braced ("module attributes " ++ moduleAttrs ++ " {") body "}"
   lines.foldl (fun acc line => acc ++ line ++ "\n") ""
 
-/-! ## A5: read the rendered constraint surface back
+/-! ## A5: read the rendered semantic surface back
 
 `llzk-opt` checks that `@constrain` is well typed, but it accepts an empty body,
-a dropped equation, and a member read silently redirected to another member of
-the same type. G9 cannot see a renderer defect because it compares typed
-`Module`s before rendering. Four statement forms below occur only on the
-constraint surface of modules the backend builds; `global.def` supplies the
-table shape and row-major values those statements consume. Together they are
-the exact seam without an independent check.
+a dropped equation, changed arithmetic, and a member read silently redirected
+to another member of the same type. It also accepts changing a `{signal}` member
+to `{llzk.pub}`, which changes `--output-scope=public`. G9 cannot see a renderer
+defect because it compares typed `Module`s before rendering. The reader below
+therefore protects every global, every member declaration, every constraint
+parameter, and every statement constructor in `@constrain`.
 
 This reader is deliberately textual. It does not call a renderer in order to
 decide what it saw: it splits the concrete spelling back into indices and names,
@@ -208,13 +209,20 @@ remain green.
 
 namespace RenderCheck
 
-/-- The information in the rendered global and constraint forms A5 protects.
+/-- The information in the rendered semantic forms A5 protects.
 
 SSA values are represented by their numeric indices so this independent reader
 does not need access to `Value`'s private constructor. -/
-inductive ConstraintStmt where
+inductive SurfaceItem where
   | global (name : String) (ty : Ty) (values : Array Nat)
+  | member (name : String) (ty : Ty) (visibility : Visibility)
+  | constrainParam (index : Nat) (ty : Ty) (argName : Option String)
+  | feltConst (dst value : Nat) (ty : Ty)
+  | feltBin (dst : Nat) (op : FeltBinOp) (lhs rhs : Nat) (ty : Ty)
+  | structNew (dst : Nat)
   | readMember (dst self : Nat) (member : String) (rootTy memberTy : Ty)
+  | writeMember (self : Nat) (member : String) (value : Nat) (rootTy memberTy : Ty)
+  | globalRead (dst : Nat) (name : String) (ty : Ty)
   | arrayNew (dst : Nat) (elements : Array Nat) (resultTy : Ty)
   | constrainEq (lhs rhs : Nat) (lhsTy rhsTy : Ty)
   | constrainIn (array element : Nat) (arrayTy elementTy : Ty)
@@ -271,7 +279,71 @@ def parseTy (text : String) : Option Ty := do
   let (ty, rest) ← parseTyChars text.toList
   if rest.isEmpty then some ty else none
 
-private def parseReadMember (line : String) : Option ConstraintStmt := do
+private def parseVisibility : String → Option Visibility
+  | "{signal}" => some .signal
+  | "{llzk.pub}" => some .pub
+  | _ => none
+
+private def parseFeltBinOp : String → Option FeltBinOp
+  | "felt.add" => some .add
+  | "felt.mul" => some .mul
+  | "felt.uintdiv" => some .uintdiv
+  | "felt.umod" => some .umod
+  | "felt.bit_and" => some .bitAnd
+  | "felt.bit_or" => some .bitOr
+  | "felt.bit_xor" => some .bitXor
+  | "felt.shl" => some .shl
+  | "felt.shr" => some .shr
+  | _ => none
+
+private def parseMember (line : String) : Option SurfaceItem := do
+  let (empty, tail) ← two (line.splitOn "struct.member @")
+  guard empty.isEmpty
+  let (name, typedVisibility) ← two (tail.splitOn " : ")
+  let parts := typedVisibility.splitOn " "
+  let visibilityText ← parts.getLast?
+  let typeText := String.intercalate " " parts.dropLast
+  return .member name (← parseTy typeText) (← parseVisibility visibilityText)
+
+private def parseParam (line : String) : Option SurfaceItem := do
+  let line := match line.toList.reverse with
+    | ',' :: rest => String.ofList rest.reverse
+    | _ => line
+  let (valueText, typedName) ← two (line.splitOn ": ")
+  let index ← valueIndex valueText
+  match typedName.splitOn " {function.arg_name = \"" with
+  | [typeText] => return .constrainParam index (← parseTy typeText) none
+  | [typeText, namedTail] => do
+      let (name, empty) ← two (namedTail.splitOn "\"}")
+      guard empty.isEmpty
+      return .constrainParam index (← parseTy typeText) (some name)
+  | _ => none
+
+private def parseFeltConst (line : String) : Option SurfaceItem := do
+  let (dstText, tail) ← two (line.splitOn " = felt.const ")
+  let (valueText, typeText) ← two (tail.splitOn " : ")
+  return .feltConst (← valueIndex dstText) (← valueText.toNat?) (← parseTy typeText)
+
+private def parseFeltBin (line : String) : Option SurfaceItem := do
+  let (dstText, tail) ← two (line.splitOn " = felt.")
+  let (operationAndOperands, types) ← two (tail.splitOn " : ")
+  let (operationChars, operandChars) ← takeUntil ' ' operationAndOperands.toList
+  let operation := String.ofList operationChars
+  let operands := String.ofList operandChars
+  let (lhsText, rhsText) ← two (operands.splitOn ", ")
+  let (lhsTypeText, rhsTypeText) ← two (types.splitOn ", ")
+  let lhsTy ← parseTy lhsTypeText
+  let rhsTy ← parseTy rhsTypeText
+  guard (lhsTy = rhsTy)
+  return .feltBin (← valueIndex dstText) (← parseFeltBinOp ("felt." ++ operation))
+    (← valueIndex lhsText) (← valueIndex rhsText) lhsTy
+
+private def parseStructNew (line : String) : Option SurfaceItem := do
+  let (dstText, typeText) ← two (line.splitOn " = struct.new : ")
+  guard ((← parseTy typeText) = rootTy)
+  return .structNew (← valueIndex dstText)
+
+private def parseReadMember (line : String) : Option SurfaceItem := do
   let (dstText, tail) ← two (line.splitOn " = struct.readm ")
   let (selfText, tail) ← two (tail.splitOn "[@")
   let (member, types) ← two (tail.splitOn "] : ")
@@ -282,7 +354,17 @@ private def parseReadMember (line : String) : Option ConstraintStmt := do
   let memberType ← parseTy memberTypeText
   return .readMember dst self member rootType memberType
 
-private def parseGlobal (line : String) : Option ConstraintStmt := do
+private def parseWriteMember (line : String) : Option SurfaceItem := do
+  let (empty, tail) ← two (line.splitOn "struct.writem ")
+  guard empty.isEmpty
+  let (selfText, tail) ← two (tail.splitOn "[@")
+  let (member, valueAndTypes) ← two (tail.splitOn "] = ")
+  let (valueText, types) ← two (valueAndTypes.splitOn " : ")
+  let (rootTypeText, memberTypeText) ← two (types.splitOn ", ")
+  return .writeMember (← valueIndex selfText) member (← valueIndex valueText)
+    (← parseTy rootTypeText) (← parseTy memberTypeText)
+
+private def parseGlobal (line : String) : Option SurfaceItem := do
   let (empty, tail) ← two (line.splitOn "global.def const @")
   guard empty.isEmpty
   let (name, typedInitializer) ← two (tail.splitOn " : ")
@@ -293,7 +375,12 @@ private def parseGlobal (line : String) : Option ConstraintStmt := do
   let values ← valuesText.splitOn ", " |>.mapM String.toNat?
   return .global name ty values.toArray
 
-private def parseConstrainEq (line : String) : Option ConstraintStmt := do
+private def parseGlobalRead (line : String) : Option SurfaceItem := do
+  let (dstText, tail) ← two (line.splitOn " = global.read @")
+  let (name, typeText) ← two (tail.splitOn " : ")
+  return .globalRead (← valueIndex dstText) name (← parseTy typeText)
+
+private def parseConstrainEq (line : String) : Option SurfaceItem := do
   let (empty, tail) ← two (line.splitOn "constrain.eq ")
   if !empty.isEmpty then none else
     let (operands, types) ← two (tail.splitOn " : ")
@@ -305,7 +392,7 @@ private def parseConstrainEq (line : String) : Option ConstraintStmt := do
     let rhsType ← parseTy rhsTypeText
     return .constrainEq lhs rhs lhsType rhsType
 
-private def parseArrayNew (line : String) : Option ConstraintStmt := do
+private def parseArrayNew (line : String) : Option SurfaceItem := do
   let (dstText, tail) ← two (line.splitOn " = array.new ")
   let (elementsText, typeText) ← two (tail.splitOn " : ")
   let dst ← valueIndex dstText
@@ -313,7 +400,7 @@ private def parseArrayNew (line : String) : Option ConstraintStmt := do
   let resultTy ← parseTy typeText
   return .arrayNew dst elements.toArray resultTy
 
-private def parseConstrainIn (line : String) : Option ConstraintStmt := do
+private def parseConstrainIn (line : String) : Option SurfaceItem := do
   let (empty, tail) ← two (line.splitOn "constrain.in ")
   if !empty.isEmpty then none else
     let (operands, types) ← two (tail.splitOn " : ")
@@ -326,72 +413,91 @@ private def parseConstrainIn (line : String) : Option ConstraintStmt := do
     return .constrainIn array element arrayType elementType
 
 /-- Parse one unindented statement from the protected concrete syntax. -/
-def parseStmt (line : String) : Option ConstraintStmt :=
-  parseGlobal line <|> parseReadMember line <|> parseArrayNew line <|>
-    parseConstrainEq line <|> parseConstrainIn line
+def parseStmt (line : String) : Option SurfaceItem :=
+  parseGlobal line <|> parseMember line <|> parseFeltConst line <|> parseFeltBin line <|>
+    parseStructNew line <|> parseReadMember line <|> parseWriteMember line <|>
+    parseGlobalRead line <|> parseArrayNew line <|> parseConstrainEq line <|>
+    parseConstrainIn line
 
 private def mentions (needle line : String) : Bool :=
   (line.splitOn needle).length > 1
 
-/-- `some none` is an unrelated line; `none` is a line that names one of the
-protected operations but is not in the exact grammar above. -/
-private def parseRelevant (line : String) : Option (Option ConstraintStmt) :=
-  let line := line.trimAscii.toString
-  if mentions "struct.readm" line || mentions "array.new" line || mentions "constrain.eq" line ||
-      mentions "constrain.in" line then
-    (parseStmt line).map some
-  else
-    some none
+/-- Inside `@constrain`, every non-terminator body line must be one of the
+modelled statement forms. This is intentionally fail-closed for future IR
+constructors as well as malformed spellings of current ones. -/
+private def parseRelevant (line : String) : Option SurfaceItem :=
+  parseStmt line.trimAscii.toString
 
-private def parseGlobalRelevant (line : String) : Option (Option ConstraintStmt) :=
+private def parseOuterRelevant (line : String) : Option (Option SurfaceItem) :=
   let line := line.trimAscii.toString
-  if mentions "global.def" line then (parseGlobal line).map some else some none
+  if mentions "global.def" line || mentions "struct.member" line then
+    (parseStmt line).map some
+  else some none
 
 private def parseLines :
-    List String → Array ConstraintStmt → Bool → Bool → Option (Array ConstraintStmt)
-  | [], acc, inConstrain, sawConstrain =>
-    if sawConstrain && !inConstrain then some acc else none
-  | line :: rest, acc, inConstrain, sawConstrain =>
+    List String → Array SurfaceItem → Bool → Bool → Bool → Option (Array SurfaceItem)
+  | [], acc, inConstrain, inBody, sawConstrain =>
+    if sawConstrain && !inConstrain && !inBody then some acc else none
+  | line :: rest, acc, inConstrain, inBody, sawConstrain =>
     let line := line.trimAscii.toString
     if line = "function.def @constrain(" then
-      if sawConstrain then none else parseLines rest acc true true
-    else if inConstrain && line = "}" then
-      parseLines rest acc false sawConstrain
-    else if inConstrain then do
+      if sawConstrain then none else parseLines rest acc true false true
+    else if inConstrain && !inBody && line = ") {" then
+      parseLines rest acc true true sawConstrain
+    else if inConstrain && !inBody then do
+      let parsed ← parseParam line
+      parseLines rest (acc.push parsed) true false sawConstrain
+    else if inBody && line = "function.return" then
+      parseLines rest acc true true sawConstrain
+    else if inBody && line = "}" then
+      parseLines rest acc false false sawConstrain
+    else if inBody then do
       let parsed ← parseRelevant line
-      parseLines rest (match parsed with | some stmt => acc.push stmt | none => acc)
-        true sawConstrain
+      parseLines rest (acc.push parsed) true true sawConstrain
     else do
-      let parsed ← parseGlobalRelevant line
-      parseLines rest (match parsed with | some stmt => acc.push stmt | none => acc)
-        false sawConstrain
+      let parsed ← parseOuterRelevant line
+      parseLines rest (match parsed with | some item => acc.push item | none => acc)
+        false false sawConstrain
 
 /-- Parse every protected statement from a rendered module, failing if a line
 mentions a protected operation but does not have its exact concrete grammar. -/
-def parse (text : String) : Option (Array ConstraintStmt) :=
-  parseLines (text.splitOn "\n") #[] false false
+def parse (text : String) : Option (Array SurfaceItem) :=
+  parseLines (text.splitOn "\n") #[] false false false
 
 /-- Project the same surface directly from one typed statement. -/
-def ConstraintStmt.ofStmt : Stmt → Option ConstraintStmt
-  | .readMember dst self member memberTy =>
-    some (.readMember dst.index self.index member rootTy memberTy)
-  | .arrayNew dst elements elemTy =>
-    some (.arrayNew dst.index (elements.map (·.index)) (.array #[elements.size] elemTy))
-  | .constrainEq lhs rhs ty =>
-    some (.constrainEq lhs.index rhs.index ty ty)
-  | .constrainIn array arrayTy element elementTy =>
-    some (.constrainIn array.index element.index arrayTy elementTy)
-  | .feltConst .. | .feltBin .. | .structNew .. | .writeMember .. | .globalRead .. => none
+def SurfaceItem.ofStmt : Stmt → SurfaceItem
+  | Stmt.feltConst dst value ty => .feltConst dst.index value ty
+  | Stmt.feltBin dst op lhs rhs ty => .feltBin dst.index op lhs.index rhs.index ty
+  | Stmt.structNew dst => .structNew dst.index
+  | Stmt.readMember dst self memberName memberTy =>
+    .readMember dst.index self.index memberName rootTy memberTy
+  | Stmt.writeMember self memberName value memberTy =>
+    .writeMember self.index memberName value.index rootTy memberTy
+  | Stmt.globalRead dst name ty => .globalRead dst.index name ty
+  | Stmt.arrayNew dst elements elemTy =>
+    .arrayNew dst.index (elements.map (·.index)) (.array #[elements.size] elemTy)
+  | Stmt.constrainEq lhs rhs ty =>
+    .constrainEq lhs.index rhs.index ty ty
+  | Stmt.constrainIn array arrayTy element elementTy =>
+    .constrainIn array.index element.index arrayTy elementTy
 
-private def ConstraintStmt.ofGlobal (g : ConstArray) : ConstraintStmt :=
+private def SurfaceItem.ofGlobal (g : ConstArray) : SurfaceItem :=
   .global g.name g.ty g.values
+
+private def SurfaceItem.ofMember (m : Member) : SurfaceItem :=
+  .member m.name m.ty m.visibility
+
+private def SurfaceItem.ofParam (p : Param) : SurfaceItem :=
+  .constrainParam p.value.index p.ty p.argName
 
 /-- The protected statements in `@constrain`, in render order. Keeping function
 context is load-bearing: a line moved into `@compute` must not compare equal just
 because the flattened sequence of protected statements stayed the same. -/
-def expected (m : Module) : Array ConstraintStmt :=
-  m.globals.map ConstraintStmt.ofGlobal
-    ++ m.root.constrain.body.filterMap ConstraintStmt.ofStmt
+def expected (m : Module) : Array SurfaceItem :=
+  m.globals.map SurfaceItem.ofGlobal
+    ++ m.root.members.map SurfaceItem.ofMember
+    ++ m.root.constrain.params.map SurfaceItem.ofParam
+    ++ m.root.constrain.body.map SurfaceItem.ofStmt
 
 /-- Check externally supplied text against a typed module. Public so mutation
 tests can establish that the check goes red; artifact production calls it only
@@ -400,16 +506,16 @@ def check (m : Module) (text : String) : Except Diagnostic Unit :=
   match parse text with
   | none =>
     .error { context := "LLZK renderer"
-             message := "the rendered constraint surface is malformed; refusing the artifact" }
+             message := "the rendered semantic surface is malformed; refusing the artifact" }
   | some actual =>
     if actual = expected m then .ok ()
     else
       .error { context := "LLZK renderer"
-               message := "the rendered constraint surface differs from the typed module; refusing the artifact" }
+               message := "the rendered semantic surface differs from the typed module; refusing the artifact" }
 
 end RenderCheck
 
-/-- Render and independently read back every constraint-surface statement.
+/-- Render and independently read back the semantic surface G9 cannot observe.
 
 Returning `Except` is part of the assurance boundary: an artifact producer
 cannot accidentally ignore a mismatch by using the supported renderer. -/
@@ -421,8 +527,9 @@ def Module.render (m : Module) : Except Diagnostic String := do
 /-- Every text successfully returned by `Module.render` has the protected
 surface extracted from the typed module. This is the A5 round-trip theorem; the
 positive and mutation tests in `Test/Print.lean` establish that success is not
-vacuous and that each protected constructor can make the check red. -/
-theorem Module.render_constraintSurface {m : Module} {text : String}
+vacuous and that every semantic form the compiler currently emits can make the
+check red. -/
+theorem Module.render_semanticSurface {m : Module} {text : String}
     (h : m.render = .ok text) :
     RenderCheck.parse text = some (RenderCheck.expected m) := by
   simp only [Module.render] at h
@@ -436,6 +543,13 @@ theorem Module.render_constraintSurface {m : Module} {text : String}
       subst text
       rw [hparse, heq]
     · contradiction
+
+/-- Compatibility spelling for the original A5 theorem name. The protected
+surface now includes members, parameters, and every `@constrain` statement. -/
+theorem Module.render_constraintSurface {m : Module} {text : String}
+    (h : m.render = .ok text) :
+    RenderCheck.parse text = some (RenderCheck.expected m) :=
+  Module.render_semanticSurface h
 
 /-- Render a compilation outcome: the module, or every reason there is none.
 

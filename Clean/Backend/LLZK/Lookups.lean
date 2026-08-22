@@ -98,17 +98,6 @@ theorem certified_lookup_contains_iff {T : RawTable F} {e : ExportTable}
           values.map FiniteField.fromNat = (entry.map env).toArray :=
   certified_membership hcert hcanon _ _
 
-/-- The queried value for the retained one-column compatibility path: the
-lookup's one expression, evaluated.
-
-`fromElements` for `field` is the first component, so this is the value
-`ConstraintSet.ofSource` reads as `Expression.toPoly`. Not `rfl`: `Vector.map`
-does not reduce on a literal, so it takes `explicit_provable_type`. -/
-theorem fromElements_map_env (x : Expression F) (env : Environment F) :
-    fromElements (M := field) ((#v[x] : Vector (Expression F) (size field)).map env)
-      = x.eval env := by
-  simp [explicit_provable_type]
-
 /-! ## The composed statement
 
 The shape mirrors `ConstraintSet.ofSource_eqs_iff`: the left-hand side is what
@@ -124,8 +113,9 @@ every `(name, p)` pair `ConstraintSet.ofSource` produces evaluates into the
 emitted table's values exactly when Clean's `Lookup.Contains` holds.
 
 Note which direction the quantifier runs: this is stated over the lookups of the
-*source*, so it composes with `lookups_perm_of_compileSource'`, which says the
-module's are a permutation of these. -/
+*source*. `ConstraintSet.lookupRows_of_agree` composes it with G9's data-level
+agreement to obtain the module-side premise used by `Soundness.spec_of_compile`.
+-/
 theorem ofSource_lookups_iff [CanonicalRepr F] {cfg : CertifiedConfig F} {src : Source F}
     {r : Recognized} (hrec : recognize cfg.toConfig src = .ok r) (env : Environment F)
     (resolve : ∀ l ∈ FlatOperation.lookups src.operations,

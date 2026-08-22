@@ -39,8 +39,9 @@ private def input (args : Array Value) (i : Nat) : Except Diagnostic Value :=
 `@compute` uses `felt.const` and every binary operation, including the
 non-native natural and bitwise families, so the rendered signature must carry
 `function.allow_non_native_field_ops`; it writes both members. `@constrain` reads
-both members back, reads a global, and emits both constraint forms. One parameter
-is named and one is not. -/
+both members back, reads a global, emits both constraint forms, and performs
+native arithmetic so the A5 readback exercises those forms in constraint
+context rather than only in `@compute`. One parameter is named and one is not. -/
 def demoModule : Except Diagnostic Module := do
   let root ← Builder.component (ε := Diagnostic)
     #[{ name := "w0", ty := felt, visibility := .signal },
@@ -68,7 +69,11 @@ def demoModule : Except Diagnostic Module := do
       let table ← Builder.globalRead "Bytes" bytes
       let row ← Builder.arrayNew #[w0, out0] felt
       Builder.constrainIn table bytes row bytePair
-      Builder.constrainEq out0 lhs felt)
+      Builder.constrainEq out0 lhs felt
+      let zero ← Builder.feltConst 0 felt
+      let sum ← Builder.feltBin .add w0 out0 felt
+      let product ← Builder.feltBin .mul sum lhs felt
+      Builder.constrainEq product zero felt)
   match root with
   | some root =>
       let bytesGlobal : ConstArray :=
