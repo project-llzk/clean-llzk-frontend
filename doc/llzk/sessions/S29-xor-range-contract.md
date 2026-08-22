@@ -1,6 +1,6 @@
 # S29 — Source-visible XOR byte range and headline promotion
 
-Status: Phase M complete on `ab0affd3`; Phase B backend bounds next
+Status: Phase B complete on `7a0f209c`; Phase X Xor32 promotion next
 Depends on: audited frontend baseline `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Base integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Frontend branch: `clean-to-llzk/s29-xor-range-contract`
@@ -135,6 +135,13 @@ because one side was unreadable is not a discriminator.
 Run targeted Lean builds and the theorem/axiom probe, then full G0-G12 on a
 clean B commit. Independent reviewers re-audit the source/emitter/reader
 triangle and every new red branch.
+
+Phase B is complete on exact clean implementation commit
+`7a0f209ca7806a0e97173ffe84b47b9aa1f20be5`. Its complete accepted-tool matrix
+passed with the unchanged 15-module/51-vector external corpus and 61 G11 paths.
+The capability sweep now compiles Xor32 and BLAKE3.G directly; neither is a
+promoted corpus claim yet. Proof, gate, and independent-review evidence is in
+`evidence/S29/bounds.md` and `evidence/S29/bounds-gates.txt`.
 
 ## Cross-cutting harness controls
 

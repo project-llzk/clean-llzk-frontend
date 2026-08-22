@@ -1439,20 +1439,20 @@ are complete.
 
 ## D035 — Make XOR byte bounds executable in witness semantics
 
-**Status:** accepted; Clean source contract enacted, frontend bounds pending
+**Status:** accepted; Clean source contract and frontend bounds enacted, promotion pending
 
 **Date:** 2026-08-22
 
 **Enacted by:** S29
 
-The existing Xor32 witness computes each limb as `x.val ^^^ y.val`. Its byte
+Before S29, the Xor32 witness computed each limb as `x.val ^^^ y.val`. Its byte
 bounds live in `FormalCircuit.Assumptions` and lookup constraints, neither of
 which is visible to the witness program or the frontend's independent witness
 reader. Teaching the backend to trust those hidden facts would invalidate
 D033's theorem-or-refusal boundary.
 
 S29 instead makes narrowing execute in the source witness IR. Each Xor32 limb
-will compute:
+now computes:
 
 ```text
 (x.val % 256) ^^^ (y.val % 256)
@@ -1463,7 +1463,7 @@ existing semantic `Spec` is unchanged. Outside the assumptions, the narrowing
 still executes in Clean and in emitted LLZK. This is not a trusted range
 annotation and does not infer a witness fact from constraints.
 
-The generic bound analysis gains two rules. For a nonzero literal divisor `d`,
+The generic bound analysis has two new rules. For a nonzero literal divisor `d`,
 if the recursively analyzed numerator has exclusive bound `ba`, modulo reports
 `min ba d`; the proof uses both `a % d ≤ a` and `a % d < d`. The existing
 operational checks still require `d < prime`, and emitter and independent reader
@@ -1493,15 +1493,15 @@ truncation, arbitrary `% d` does not, and S29 does not add the separate theorem
 needed to exploit that special case. Xor32 promotion is therefore scoped to the
 accepted Babybear configuration, not claimed for bn254 or grumpkin.
 
-The source change is Clean core, not a backend exception. It will live in a
-Clean-only commit based exactly on upstream `0e53b9f2`. The frontend adopts
-that commit by a reviewed merge which, in the same commit, advances the accepted
-Clean overlay pin and changes G0 to compare core byte identity from the overlay.
-G0 must retain the upstream base separately and verify that the overlay descends
-from it and changes only the reviewed Clean path. Xor32 must not be added to a
-backend allowlist.
+The source change is Clean core, not a backend exception. It lives in Clean-only
+commit `3d086f32`, based exactly on upstream `0e53b9f2`. Reviewed merge
+`0e9f5d03` atomically adopted that overlay and pin; control repair `ab0affd3`
+then sealed its exact path/status invariants. Frontend commit `7a0f209c` enacts
+the generic bounds and proofs. G0 retains the upstream base separately, verifies
+that the overlay descends from it, and permits only the reviewed Clean path.
+No Xor32 backend allowlist was added.
 
-Required red controls include the existing bare XOR; separate modulo-wrapped
+The enacted red controls include the existing bare XOR; separate modulo-wrapped
 additions whose intermediate exceeds the field prime and whose intermediate
 exceeds `2^64`; `.idx % 256`; dynamic, zero, prime-sized, and oversized modulo
 divisors; wide-field `.val % 3` and `.val % 256`; an XOR/OR envelope above the

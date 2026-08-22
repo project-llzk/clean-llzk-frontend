@@ -1,0 +1,106 @@
+S29 Phase B — frontend bound-proof gates
+==========================================
+
+Date: 2026-08-22
+
+Exact clean implementation commit tested:
+  7a0f209ca7806a0e97173ffe84b47b9aa1f20be5
+
+Accepted LLZK source:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Accepted immutable tool output:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+The worktree was clean at B before the pin/script/probe checks and the complete
+run. The complete run held the worktree lock under
+LLZK_SESSION=s29-bounds-7a0f209c.
+
+Focused exact-commit checks
+---------------------------
+
+Commands:
+
+  bash scripts/llzk/check-pins.sh
+  bash scripts/llzk/test-scripts.sh
+  lake env lean doc/llzk/evidence/S29/probe.lean
+
+Results:
+
+  check-pins.sh exit status: 0
+  test-scripts.sh exit status: 0
+  theorem probe exit status: 0
+  PASS: 61 error paths exercised
+
+The affected test targets were also reproduced during this later documentary
+closure. HEAD was still exact B and every source/proof/test path was
+byte-identical to B; only documentation/evidence paths were dirty, so this is
+not mislabeled as a clean-B run:
+
+  lake build --wfail Clean.Backend.LLZK.Test.WitnessCheck \
+    Clean.Backend.LLZK.Test.Circuit Clean.Backend.LLZK.Test.Coverage
+
+  targeted Lean build exit status: 0
+  Build completed successfully (1792 jobs).
+
+The theorem probe reported:
+
+  'LLZK.WExpr.eval_lt_upperBound' depends on axioms:
+  [propext, Classical.choice, Quot.sound]
+
+  'LLZK.WExpr.eval_ofWitgen' depends on axioms:
+  [propext, Classical.choice, Quot.sound]
+
+  'LLZK.witnessAgree_of_compileSourceVerified' depends on axioms:
+  [propext, Classical.choice, Quot.sound]
+
+There was no `sorryAx`, new `unsafe`, or `native_decide` in the Phase-B proof
+closure or diff.
+
+Complete accepted-tool matrix on exact B
+-----------------------------------------
+
+Command:
+
+  LLZK_SESSION=s29-bounds-7a0f209c \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result:
+
+  e2e.sh exit status: 0
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  15 circuit modules, 51 input vectors
+  both witness backends, full-witness and public output scopes
+  2 renderer fixtures
+  17/17 modules admitted by --llzk-product-program
+  10 modules lowered to SMT, 7 declared skips
+  61 harness error/falsification paths
+
+Tool versions and build surface:
+
+  Lean: v4.32.2
+  llzk-opt: LLZK version 3.0.0
+  llzk-witgen: sibling binary in the same immutable Nix output
+  Clean: 1876 jobs
+  CleanTests: 1810 jobs
+
+The only warnings were the ten inherited Clean test-helper `sorry`
+declarations recorded by the frontend audit. No new warning was attributed to
+Phase B.
+
+Promotion boundary
+------------------
+
+Xor32 and BLAKE3.G compile in the capability sweep. They remain outside the
+external emitted corpus, whose counts stay at 15 modules and 51 vectors. Phase
+X must add the independent references, perturbation controls, exact shapes,
+concrete lookup resolution, theorem instantiation, and complete external matrix
+before Xor32 is described as promoted.
+
+This evidence file is a later documentary commit. It records results obtained
+on B; it does not claim that the evidence commit itself received the full
+G0-G12 run.
+
+No branch was pushed and no external state changed.

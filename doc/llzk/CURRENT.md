@@ -23,8 +23,9 @@ The post-repair G0-G12 matrix passed on the accepted LLZK pin and on LLZK main
 admissions, and 10 SMT lowerings / 7 declared skips. The reviewed repair is
 frozen through clean audit commit `7c567f54`. See
 `review/FRONTEND-AUDIT-2026-08-22.md` and
-`evidence/AUDIT-2026-08-22/`. This is not R8: the XOR range contract and
-headline-example promotion still precede candidate freeze.
+`evidence/AUDIT-2026-08-22/`. This is not R8: S29 has since completed the XOR
+range contract, while headline-example promotion still precedes candidate
+freeze.
 
 Active capability session: **S29 — source-visible XOR byte range**. Its first
 commit is decision and process only: D035 selects executable `% 256` narrowing,
@@ -34,10 +35,15 @@ base `0e53b9f2`, passed targeted and full builds plus three independent reviews
 and is now the accepted source-semantics pin. Atomic adoption merge `0e9f5d03`
 plus adversarial control repair `ab0affd3` passed G0-G12 on the accepted tools:
 15 modules, 51 vectors, both backends and both output scopes, 17/17 admissions,
-10 SMT lowerings / 7 declared skips, and 61 G11 paths. Frontend bound proofs and
-example promotion remain pending. Independent adversarial review is required at
-every phase boundary. See `sessions/S29-xor-range-contract.md` and
-`evidence/S29/adoption-gates.txt`.
+10 SMT lowerings / 7 declared skips, and 61 G11 paths. Frontend commit
+`7a0f209c` now proves the recursively checked literal-modulo bound and common
+XOR/OR power-of-two envelope, retains the field-prime and u64 guards, and passes
+the same complete matrix. Xor32 and BLAKE3.G compile in the capability sweep,
+but remain outside the external corpus until Phase X/H supplies independent
+references, exact shapes, concrete lookup resolution, and theorem instances.
+Independent adversarial review is required at every phase boundary. See
+`sessions/S29-xor-range-contract.md`, `evidence/S29/bounds.md`, and
+`evidence/S29/bounds-gates.txt`.
 
 Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
@@ -125,7 +131,7 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase M complete; Phase B backend bounds next)
+Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase B complete; Phase X Xor32 promotion next)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
@@ -571,7 +577,7 @@ into the packets themselves. Read them in order.
 |---|---|---|
 | `sessions/S25-align-upstream.md` | bump to upstream `0e53b9f2` / Lean 4.32.2 | constructor inventory fixed (three errors); **Deliverable 2a added**: upstream `U64Expr.val` truncates, so `eval_ofWitgen` cannot be re-proved as stated — restating it costs bn254/grumpkin div/mod coverage and must be recorded as a decision (D026), which no gate can see |
 | `sessions/S26-witness-u64.md` | bounded structural `U64Expr` and direct `bitsOf`; `ite` remains refused | implemented locally as D033; adds lookup-free `LowByte`/`Bits8`, but correctly retains XOR whose bounds are not in witness IR |
-| `sessions/S28-multicolumn-tables.md` | **new** — retire D013: `array.new`, multi-dim `constrain.in`, certification at 65536×3 | unlocks `And8`; XOR-family promotion additionally needs a source-visible/proved range contract |
+| `sessions/S28-multicolumn-tables.md` | **new** — retire D013: `array.new`, multi-dim `constrain.in`, certification at 65536×3 | unlocks `And8`; at S28, XOR-family promotion still needed the source-visible range contract S29 Phase B now supplies |
 | `sessions/S27-fork-gadgets.md` | port `~/zkgolf/submission_gf2` onto fork `main` | **returned for re-scoping** (R7-09): the submission is GF(2) — not an LLZK field — has zero bitwise ops, and its real blocker is `letF`. The port survives as Clean-side library work; its backend payoff needs a decision first |
 
 S25 keeps the accepted subset exactly the size it was, so its gates say one
@@ -583,17 +589,19 @@ where capability grows; S28 is where the *library* does.
 ## Roadmap after R7
 
 Stage 1 is finished, reproduced, and reviewed three times by sessions that did
-not write it. What remains sorts into five tracks. S28 is accepted and under
-its requested post-completion review; the rest are choices or dependent follow-ups.
+not write it. What remains sorts into five tracks. S28 and its post-completion
+review are accepted; S29 Phase B is complete; Phase X promotion is the active
+dependent follow-up.
 
 **The two milestones, stated in the grant's terms.** Milestone 1 — one Clean
 circuit compiled through the whole LLZK pipeline, validated end to end — is
 **done and revalidated by R7**: gates green on this machine and in CI, the
 formal chain attacked and held. Milestone 2 — the *library* of Clean circuits —
 is what the corrected plan below is for, and its honest denominators are in
-`ROADMAP.md`'s coverage section: ~7 of ~128 tops measured-compiling today,
-S26+S28 plus a proved witness-visible range contract unlock the ~29-gadget
-bitwise family, the witness-IR loop increment
+`ROADMAP.md`'s coverage section. The checked 12-gadget sweep now has 10
+compile-capable rows: seven arithmetic rows plus Xor32, And8, and exact
+BLAKE3.G. S26+S28+S29 Phase B supplied those bitwise gains; raw-XOR Keccak
+remains refused. The witness-IR loop increment
 (`letF`/`mapRange`/`shr`) unlocks SHA256 and most Circomlib bit gadgets, `inv`+
 `ite` unlock the comparator family, and a `Compilable` story for
 `GeneralFormalCircuit`/`FormalAssertion` (37 tops have no entry point today)
@@ -678,9 +686,11 @@ one negative fixture):
 - **Multi-column tables** (D013 superseded by D034) — **S28, accepted locally**.
   Ordered `array.new` rows, multi-dimensional
   `constrain.in`, row-preserving G9, and certification at 65536×3 unlock `And8`.
-- **A range contract visible to witness lowering** before claiming end-to-end
-  Xor32/Keccak/BLAKE3: either source annotations or a proved constraint
-  analysis, never an unstated use of `FormalCircuit.Assumptions`.
+- **A range contract visible to witness lowering** — **S29 Phase B, implemented
+  locally**. Executable source narrowing plus proved generic modulo/XOR/OR
+  bounds now compile narrowed Xor32 and the checked BLAKE3.G instantiation
+  without using `FormalCircuit.Assumptions`. Raw-XOR Keccak remains refused,
+  and Xor32/BLAKE3.G still require external-corpus promotion evidence.
 - **The rest of the witness IR**: `let`-steps and `mapRange` → `scf.for` (this
   is SHA256's real blocker, R7-07, and the zkGolf Add32 ports' too, R7-09),
   `inv` → `felt.inv` (with `ite`, the `IsZero`/comparator family), `listGet` →
@@ -721,9 +731,9 @@ theorem domain. L0 advanced the LLZK input to exact SHA `25fb3740` after the old
 and new tools passed the unchanged same-tree matrix. **S26 is implemented
 locally**: D033, structural lowering, direct `bitsOf`, proofs, corpus, and
 remeasured coverage are in place. **S28 is green on its clean implementation
-commit**; after its post-completion review come a
-witness-visible range contract for the XOR family and the witness-IR loop
-increment. S27 remains returned for re-scoping (R7-09).
+commit**, and **S29 Phase B has completed the witness-visible Xor32/BLAKE3.G
+range contract on `7a0f209c`**. Headline promotion comes next; the witness-IR
+loop increment remains later. S27 remains returned for re-scoping (R7-09).
 
 The assurance track's A5 renderer and A7 copy-canonicalisation items are now
 done: the on-disk constraint surface has the second line of defense R7-02 called

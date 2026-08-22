@@ -61,10 +61,11 @@ authorized.
   unchanged complete matrix; D032 advances the accepted pin because the
   candidate's witness, memory, lowering, and build fixes justify the move. The
   immutable SHA, not the unchanged 3.0.0 banner, identifies the accepted input.
-- Retire the capability blockers identified and refined by R7/S26: bounded
-  structural `U64Expr` plus direct `bitsOf` (S26), multi-column lookup tables and
-  their certificates (S28), then a source-visible or proved range contract for
-  XOR witnesses. Conditionals remain a separate control-flow increment.
+- **Done locally:** retire the capability blockers identified and refined by
+  R7/S26: bounded structural `U64Expr` plus direct `bitsOf` (S26), multi-column
+  lookup tables and their certificates (S28), and the source-visible Xor32
+  range contract plus proved generic modulo/XOR/OR bounds (S29 Phase B at
+  `7a0f209c`). Conditionals remain a separate control-flow increment.
 - Promote at least `Xor32` and one composed bitwise gadget (`BLAKE3.G` or
   `Keccak256.Theta`) from the checked coverage sweep into the end-to-end corpus.
   Each promoted example must reach `llzk-opt`, both witness backends, the Clean
@@ -106,8 +107,8 @@ P0 public documentation and repository hygiene
   -> S25 upstream Clean / Lean alignment (done locally)
   -> L0 LLZK pin review and compatibility run (done locally)
   -> S26 bounded structural U64 and bitwise lowering (implemented locally)
-  -> S28 multi-column lookup tables
-  -> proved witness-visible range contract for XOR
+  -> S28 multi-column lookup tables (done locally)
+  -> S29 proved witness-visible range contract for XOR (done locally)
   -> P1 promote headline examples into the full corpus
   -> R8 frozen-candidate adversarial review
   -> explicit publication decision
@@ -119,8 +120,9 @@ boundary. L0 applied the same discipline to the live LLZK delta and advanced
 the accepted tool pin to `25fb3740` with same-tree evidence. A5 has already
 strengthened the one assurance boundary R7 showed every LLZK binary gate can
 miss, and A7 removed the witness reader's remaining inspection-only semantic
-premise. S26 and S28 unlock `And8`; the XOR headline increment additionally
-needs the range contract D033 exposed.
+premise. S26 and S28 unlock `And8`; S29 Phase B supplies the range contract
+D033 exposed. The remaining XOR headline work is external-corpus promotion,
+independent references, concrete theorem instances, and their adversarial gates.
 
 ## Current scorecard
 
@@ -135,7 +137,7 @@ needs the range contract D033 exposed.
 | LLZK pin review | complete locally | D032; `25fb3740` accepted after both exact outputs passed, then G0-G12 passed on committed pin `5fe8f465`; `evidence/L0/` |
 | Structural bitwise witness IR | complete locally | S26/D033; G0-G12 green on `8951f016`, `evidence/S26/` |
 | Multi-column tables | complete and adversarially reviewed locally | S28/D034; full 65536×3 certificate, row-preserving G9, six-vector `And8`, and both review repairs passed G0-G12 on `129fbe6e`; `evidence/S28/adversarial-review.md` |
-| Headline bitwise examples end to end | not started | tables plus a proved range contract, then promote |
+| Headline bitwise examples end to end | in progress | S28 tables and S29 Phase-B range contract are complete; promote Xor32, then BLAKE3.G, with independent references and theorem instances |
 | Renderer round-trip assurance | strengthened locally | A5 plus the 2026-08-22 audit: complete constraint/member/parameter readback, public-output checks, and mutation regressions; final G0-G12 result recorded in the audit report |
 | Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |
 | Final frozen-tree review | not started | R8 |

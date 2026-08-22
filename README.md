@@ -63,6 +63,12 @@ bash scripts/llzk/worktree-lock.sh claim "full LLZK conformance run"
 bash scripts/llzk/e2e.sh
 ```
 
+The latest recorded run passed 15 corpus modules and 51 vectors through both
+LLZK witness backends in both full-witness and public-output scopes, with all
+17 emitted modules admitted to the product-program pipeline. Exact commit,
+tool, proof, and gate evidence is linked from
+[`doc/llzk/CURRENT.md`](doc/llzk/CURRENT.md).
+
 ## About Clean
 
 `clean` is an embedded Lean DSL for writing zk circuits, targeting popular arithmetizations like AIR, PLONK and R1CS.

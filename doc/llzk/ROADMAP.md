@@ -30,7 +30,7 @@ public documentation and hygiene
   → L0: review or advance the LLZK toolchain pin (done locally)
   → S26: bounded structural U64 and `bitsOf` (done locally)
   → S28: multi-column lookup tables and certificates (complete locally)
-  → witness-range contract or proved constraint-to-witness bounds for XOR
+  → S29: source-visible XOR range contract and generic bounds (complete locally)
   → end-to-end Xor32 plus one composed bitwise gadget
   → frozen-candidate adversarial review
 ```
@@ -44,10 +44,9 @@ decision as D033 before lowering code. A5 has already strengthened the one
 artifact
 boundary every pinned LLZK binary accepts without checking semantic content;
 A7 removed the remaining inspection-only premise from copy canonicalisation.
-S26, S28, and a proved range contract turn measured refusals into impactful
-examples. The release
-candidate is reached only when those examples are in the external-tool corpus,
-not when `LLZK.compile` merely returns `some`.
+S26, S28, and S29 Phase B turn measured refusals into compile-capable examples.
+The release candidate is reached only when those examples are in the
+external-tool corpus, not when `LLZK.compile` merely succeeds.
 
 The initial implementation lives under:
 
@@ -92,7 +91,7 @@ Accept:
 - assertions;
 - lookup tables resolved by an explicit export registry;
 - bounded structural `U64Expr` add/mul/div/mod and bitwise/shift trees under
-  D033, including literal divisor and shift-count side conditions;
+  D033/D035, including literal divisor and shift-count side conditions;
 - `VExpr.bitsOf` output blocks.
 
 Reject before rendering:
@@ -132,9 +131,9 @@ ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen them):
 | `Rotation32` | compiles |
 | `Rotation64` | compiles |
 | `Not.Not64` | compiles |
-| `Xor32` | refused — 1 × `lxor`; no table refusal remains |
+| `Xor32` | **compiles** — source-visible byte narrowing plus four certified arity-three lookups |
 | `And.And8` | **compiles** — `land` plus one certified arity-three lookup |
-| `BLAKE3.G` | refused — 4 × `lxor`; no table refusal remains |
+| `BLAKE3.G` | **compiles** for the checked `G 0 1 2 3` instantiation |
 | `Keccak256.Theta` | refused — 50 × `lxor`; no table refusal remains |
 | `IsZeroField` | refused — `ite` (and the expression also needs `inv`) |
 | `SHA256.SHA256Round` | n/a — needs `Fact (p > 2^33)`; but see below, field width is not its real blocker |
@@ -143,26 +142,31 @@ ran; these are *not* corpus entries, so no `llzk-opt` or witgen has seen them):
 `Addition32Full` and `Rotation64` are compositions several gadgets deep. That is
 a real result and it was the surprise of the original sweep.
 
-**The bitwise half has two remaining boundaries after S28.** Every byte-oriented
-gadget looks up `ByteXorTable` or a sibling — **3-column, 65536-row tables**;
-S28/D034 now preserves and certifies those rows. S26 additionally proved that
-the witness syntax itself cannot justify every bitwise result:
+**The bitwise half has one retained raw-XOR boundary after S29 Phase B.** Every
+byte-oriented gadget looks up `ByteXorTable` or a sibling — **3-column,
+65536-row tables**; S28/D034 preserves and certifies those rows. S26 proved that
+the witness syntax itself could not justify every bitwise result, and S29/D035
+then added executable source narrowing plus generic structural bounds:
 
 - D033 removes `And8`'s `land` refusal because `x &&& y ≤ x` preserves the
   checked Babybear bound.
-- It retains the XOR rows: their byte bounds live in `FormalCircuit.Assumptions`
-  and constraints, not in `Witgen.U64Expr`, so the witness reader cannot prove a
-  `.val`-rooted `lxor` result remains below the prime.
+- Xor32 now executes `% 256` on both operands before `lxor`; the recursively
+  proved modulo bound and common power-of-two XOR/OR envelope make Xor32 and the
+  checked BLAKE3.G instantiation compile without importing assumptions or
+  constraints.
+- Keccak Theta retains 50 raw `.val`-rooted `lxor` refusals. S29 does not infer
+  their range from circuit constraints or assumptions.
 - **Multi-column tables are no longer a blocker.** S28 retires D013, certifies
   the full 65536×3 table through a heterogeneous `CertifiedConfig`, and promotes
   `And8` into the external-tool corpus. Scale measurements are in
   `evidence/S28/scale.md`.
 
-After S28, end-to-end Xor32/Keccak/BLAKE3 still require a source-level range
-contract or a proved constraint-to-witness analysis. Treating their assumptions
-as if the witness recognizer could see them would make G9's semantic theorem
-false. Named subcomponents remain behind these capability issues because they
-are a scaling concern, not a capability one.
+S29 Phase B retires the compile-time Xor32/BLAKE3.G range refusal, but compile
+success is not external promotion. Xor32 and BLAKE3.G still need independent
+fixed references, exact shape guards, concrete lookup resolution, theorem
+instances, and the complete two-backend/two-scope corpus matrix. Keccak remains
+outside S29's promotion scope. Treating assumptions as if the witness recognizer
+could see them would still make G9's semantic theorem false.
 
 Denominators, stated so the table cannot imply them (R7-07): this sweep is 12
 gadgets. `Clean/Gadgets/` has ~61 `FormalCircuit` tops; `Clean/Circomlib/`
@@ -175,9 +179,11 @@ field-width story: its witnesses use `let`-steps, `mapRange` outputs and `>>>`
 (`Clean/Gadgets/SHA256/Add32.lean`), all refused, so it needs the witness-IR
 loop increment *and* a `goldilocks`/`bn254` instantiation.
 
-One smaller observation worth keeping: `Keccak256.Theta` produced 450
-diagnostics rather than stopping at the first — D009's non-cascading property
-working at a scale nothing had tested it at.
+One historical observation worth keeping: before S28 registered ByteXor,
+`Keccak256.Theta` produced 450 diagnostics (400 table refusals plus 50 XOR
+refusals) rather than stopping at the first — D009's non-cascading property at a
+scale nothing had tested. The current S29 sweep reports exactly the retained 50
+raw-XOR refusals.
 
 ## Capability-boundary tracking
 
@@ -196,10 +202,10 @@ controls. The current u64-related boundaries are:
 
 | boundary | local authority | owner / issue state |
 |---|---|---|
-| XOR byte bounds are invisible to witness lowering | D033, GAPS §8, coverage and exact negative fixtures | Clean source/range-analysis enhancement; [Clean #429](https://github.com/Verified-zkEVM/clean/issues/429) and [PR #442](https://github.com/Verified-zkEVM/clean/pull/442) explain the prior u64 migration but do not provide exporter-visible evidence. A focused follow-up issue is warranted and not yet opened. |
+| source-visible XOR byte bounds for Xor32/BLAKE3.G | D035, S29 coverage, exact raw-XOR and hidden-intermediate fixtures | Resolved locally by the reviewed Clean overlay and generic Phase-B bounds at `7a0f209c`; external promotion remains Phase X/H. Keccak's raw XOR witnesses remain refused and no upstream issue was opened. |
 | shift counts at least 64 or dynamically unproved | D033 and exact shift-count fixtures | Intentional adapter refusal: Clean masks modulo 64 while LLZK consumes the felt count. Not an upstream bug; schedule a local masked-lowering increment only if needed. |
 | multi-column static lookup rows | D013 superseded by D034; row-shape, renderer, and G9 red controls | Resolved by S28 from S26 evidence tip `91d43ffd`; dynamic tables remain out of scope. |
-| wide-field `.val` | D033, GAPS §8, and exact `wideFieldValWitness` refusal fixture | Resolved for the current contract by refusal; general support shares the range-contract/limb-design owner above. |
+| wide-field `.val` | D033, GAPS §8, exact `wideFieldValWitness`, and S29's bn254-width `% 3` / `% 256` refusals | Resolved for the current contract by refusal. Generic wide-field narrowing or a limb representation is separately unscheduled and outside S29; it has no current implementation owner. |
 
 This register should be updated in the same commit whenever a refusal is added,
 retired, or changes owner. It prevents a sound refusal from becoming an
@@ -264,9 +270,9 @@ Status against that definition:
 | Requirement | State |
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
-| unsupported cases fail with structured diagnostics | done — 35 negative fixtures pin exact messages, including S25's five new constructor paths and the pre-S28 wide-field `.val` control. This is still not claimed to be one per rejection path |
+| unsupported cases fail with structured diagnostics | done — exact negative-message fixtures cover the accepted boundary, including S29's raw-XOR, hidden-intermediate, modulo, and wide-field controls; this is not claimed to be one fixture per rejection path |
 | `llzk-opt` accepts and round-trips | done — 15 modules and 2 renderer fixtures, G3 and G4 |
-| every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 14 |
+| every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 17 emitted modules (15 corpus plus 2 renderer fixtures) |
 | both witgen backends agree | done — 51 input vectors in full-witness and public scopes, G5 and G6 |
 | witnesses match Clean on a corpus | done — G7, via `--check-output` against `FlatOperation.witgen` |
 | the emitted constraints are Clean's | done — G9, and since S17 a precondition of emission, so for every circuit |
