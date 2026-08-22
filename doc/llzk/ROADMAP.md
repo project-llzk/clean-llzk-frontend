@@ -31,7 +31,7 @@ public documentation and hygiene
   → S26: bounded structural U64 and `bitsOf` (done locally)
   → S28: multi-column lookup tables and certificates (complete locally)
   → S29: source-visible XOR range contract and generic bounds (complete locally)
-  → end-to-end Xor32 plus one composed bitwise gadget
+  → end-to-end Xor32 (complete on `06b80f2f`) plus BLAKE3.G Phase H
   → frozen-candidate adversarial review
 ```
 
@@ -45,8 +45,10 @@ artifact
 boundary every pinned LLZK binary accepts without checking semantic content;
 A7 removed the remaining inspection-only premise from copy canonicalisation.
 S26, S28, and S29 Phase B turn measured refusals into compile-capable examples.
-The release candidate is reached only when those examples are in the
-external-tool corpus, not when `LLZK.compile` merely succeeds.
+Xor32 is now promoted through the external-tool corpus on `06b80f2f`;
+BLAKE3.G remains the composed headline obligation. The release candidate is
+reached only when both examples carry that evidence, not when `LLZK.compile`
+merely succeeds.
 
 The initial implementation lives under:
 
@@ -162,11 +164,12 @@ then added executable source narrowing plus generic structural bounds:
   `evidence/S28/scale.md`.
 
 S29 Phase B retires the compile-time Xor32/BLAKE3.G range refusal, but compile
-success is not external promotion. Xor32 and BLAKE3.G still need independent
-fixed references, exact shape guards, concrete lookup resolution, theorem
-instances, and the complete two-backend/two-scope corpus matrix. Keccak remains
-outside S29's promotion scope. Treating assumptions as if the witness recognizer
-could see them would still make G9's semantic theorem false.
+success alone is not external promotion. Xor32 separately completed its fixed
+references, exact shape and lookup proofs, theorem instance, and full
+two-backend/two-scope corpus matrix on `06b80f2f`. BLAKE3.G still needs those
+Phase-H obligations. Keccak remains outside S29's promotion scope. Treating
+assumptions as if the witness recognizer could see them would still make G9's
+semantic theorem false.
 
 Denominators, stated so the table cannot imply them (R7-07): this sweep is 12
 gadgets. `Clean/Gadgets/` has ~61 `FormalCircuit` tops; `Clean/Circomlib/`
@@ -202,7 +205,7 @@ controls. The current u64-related boundaries are:
 
 | boundary | local authority | owner / issue state |
 |---|---|---|
-| source-visible XOR byte bounds for Xor32/BLAKE3.G | D035, S29 coverage, exact raw-XOR and hidden-intermediate fixtures | Resolved locally by the reviewed Clean overlay and generic Phase-B bounds at `7a0f209c`; external promotion remains Phase X/H. Keccak's raw XOR witnesses remain refused and no upstream issue was opened. |
+| source-visible XOR byte bounds for Xor32/BLAKE3.G | D035, S29 coverage, exact raw-XOR and hidden-intermediate fixtures | Resolved locally by the reviewed Clean overlay and generic Phase-B bounds at `7a0f209c`; Xor32 external promotion is complete on `06b80f2f`, while BLAKE3.G remains Phase H. Keccak's raw XOR witnesses remain refused and no upstream issue was opened. |
 | shift counts at least 64 or dynamically unproved | D033 and exact shift-count fixtures | Intentional adapter refusal: Clean masks modulo 64 while LLZK consumes the felt count. Not an upstream bug; schedule a local masked-lowering increment only if needed. |
 | multi-column static lookup rows | D013 superseded by D034; row-shape, renderer, and G9 red controls | Resolved by S28 from S26 evidence tip `91d43ffd`; dynamic tables remain out of scope. |
 | wide-field `.val` | D033, GAPS §8, exact `wideFieldValWitness`, and S29's bn254-width `% 3` / `% 256` refusals | Resolved for the current contract by refusal. Generic wide-field narrowing or a limb representation is separately unscheduled and outside S29; it has no current implementation owner. |
@@ -271,9 +274,9 @@ Status against that definition:
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
 | unsupported cases fail with structured diagnostics | done — exact negative-message fixtures cover the accepted boundary, including S29's raw-XOR, hidden-intermediate, modulo, and wide-field controls; this is not claimed to be one fixture per rejection path |
-| `llzk-opt` accepts and round-trips | done — 15 modules and 2 renderer fixtures, G3 and G4 |
-| every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 17 emitted modules (15 corpus plus 2 renderer fixtures) |
-| both witgen backends agree | done — 51 input vectors in full-witness and public scopes, G5 and G6 |
+| `llzk-opt` accepts and round-trips | done — 16 modules and 2 renderer fixtures, G3 and G4 |
+| every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 18 emitted modules (16 corpus plus 2 renderer fixtures) |
+| both witgen backends agree | done — 61 input vectors in full-witness and public scopes, G5 and G6 |
 | witnesses match Clean on a corpus | done — G7, via `--check-output` against `FlatOperation.witgen` |
 | the emitted constraints are Clean's | done — G9, and since S17 a precondition of emission, so for every circuit |
 | the emitted witnesses are Clean's | done — G9's witness half, S19/D020, likewise a precondition of emission |

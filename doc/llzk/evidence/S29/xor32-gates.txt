@@ -1,0 +1,162 @@
+S29 Phase XC — Xor32 external-promotion gates
+===============================================
+
+Date: 2026-08-22
+
+Exact clean implementation commit tested:
+  06b80f2f48b3c6c7c850062e596dde92ab11d82e
+
+Sole parent (Xor32 proof evidence tip):
+  e2b73edeb08891969313683600b0e6c63d48cae1
+
+Accepted LLZK source:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Accepted immutable tool output:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+Scope
+-----
+
+X changed exactly twelve paths:
+
+  Clean/Backend/LLZK/Corpus.lean
+  Clean/Backend/LLZK/Showcase.lean
+  Clean/Backend/LLZK/Test/Constraints.lean
+  Clean/Backend/LLZK/Test/Corpus.lean
+  Clean/Backend/LLZK/Test/Coverage.lean
+  Clean/Backend/LLZK/Test/Showcase.lean
+  doc/llzk/EXAMPLES.md
+  doc/llzk/GATES.md
+  doc/llzk/evidence/S29/xor32_oracle.py
+  scripts/llzk/e2e.sh
+  scripts/llzk/lib.sh
+  scripts/llzk/test-scripts.sh
+
+The committed diff is 1,072 insertions and 82 deletions. No Clean-core,
+lowering, witness-bound, theorem/XP, BLAKE3, or Keccak implementation path
+changed. The worktree was clean before and after the exact-commit checks.
+
+Focused exact-commit checks
+---------------------------
+
+Commands:
+
+  bash scripts/llzk/check-pins.sh
+  bash scripts/llzk/test-scripts.sh
+  lake env lean doc/llzk/evidence/S29/xor32-probe.lean
+  python3 doc/llzk/evidence/S29/xor32_oracle.py
+  python3 -O doc/llzk/evidence/S29/xor32_oracle.py
+
+Results:
+
+  pin check: PASS at exact HEAD 06b80f2f
+  verbatim harness banner (the matrix also includes positive baselines):
+    PASS: 143 error paths exercised
+  theorem probe exit status: 0
+  Python: 3.12.3
+  normal and optimized oracle stdout SHA-256:
+    75e2a3ebbbe92a60850b6c6a84458a1bf76fa1ab8125e257197991b29921e0d3
+  oracle source SHA-256:
+    e1efb2f5fe852b60b1be7265c79b99b772db787cb444937a964b273204f8720c
+  e2e.sh SHA-256, pinned by G11:
+    4e8098e681f78665f260fbdb4c3f7444fb0e8c20778d84b1fcb02b5c835b0178
+
+The theorem probe named both Xor32 spec-of-compile forms, the concrete table
+identity theorem, and concrete lookup resolution. Each reported exactly:
+
+  [propext, Classical.choice, Quot.sound,
+   instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+   primeBabybear._native.native_decide.ax_1]
+
+There was no sorryAx. The two native-decision facts are the inherited
+Babybear `Fact (pBabybear > 512)` and `Fact pBabybear.Prime` instances; X did
+not add an axiom, sorry, unsafe declaration, or native-decision proof.
+
+Complete accepted-tool matrix on exact X
+-----------------------------------------
+
+Command:
+
+  LLZK_SESSION=s29-xor32-promotion \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result:
+
+  e2e.sh exit status: 0
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  16 circuit modules, 61 input vectors
+  10/16 source-backed modules checked by both halves of G9
+  6 registry modules correctly reported as not applicable to G9
+  both witness backends, full-witness and public output scopes
+  2 renderer fixtures
+  18/18 modules admitted by --llzk-product-program
+  10 modules lowered to SMT, 8 declared skips
+  143 G11 control cases
+  widest general self-test artifact: Bits8
+
+Lean built 1,876 Clean jobs and 1,811 CleanTests jobs. The only warnings were
+the ten inherited Clean test-helper sorry declarations recorded by the frontend
+audit.
+
+Tool versions and provenance:
+
+  Lean: v4.32.2
+  llzk-opt: LLZK version 3.0.0 (LLVM 20.1.8)
+  llzk-witgen: sibling binary in the same immutable Nix output; its own version
+    surface does not identify LLZK, so provenance is carried by llzk-opt and the
+    shared output path
+
+All Xor32 indices 0 through 9 ran through both backends in both scopes as part
+of G5-G7. The extra Xor discriminator exhaustively mutated out0, out1, out2,
+and out3 in full and public expectations on compute-only indices 7, 8, and 9.
+Index 9 additionally supplied the exact retired `(raw XOR) % Babybear` full
+witness and public result, under PID-derived non-raw scratch names, and both
+backends rejected both scopes. Indices 7 and 8 received exhaustive output
+mutations but not a separate external raw-pair alternate.
+
+Harness falsification and independent review
+----------------------------------------------
+
+Three continuously assigned read-only reviewers covered semantic soundness,
+process/attribution, and red-control quality. They returned NO-GO repeatedly
+while the candidate was still dirty:
+
+- scalar validation initially admitted Python booleans or lossy floats;
+- one-sided alternate pairs, input/signal association, and full/public layout
+  branches needed direct red controls;
+- predictable semantic `raw` paths allowed a path-specializing shim to evade
+  the alternate check, so probes now use PID-derived non-raw scratch names and
+  explicitly make no secrecy claim;
+- first/middle/last sampling omitted Xor32 out1, requiring exhaustive output
+  mode and out1-omitting shims;
+- the e2e calls themselves were initially unpinned; a substring pin then stayed
+  green with an early `continue`, and a bounded block digest stayed green when
+  an outside conditional made the block unreachable.
+
+The final G11 suite has positive content-aware baselines plus separate omitted
+field, raw-accepting, and path-specializing false-greens. It pins the whole
+e2e.sh digest outside that file. One mutation inserts an early `continue`;
+another wraps the Xor block in a syntactically valid `if false`; both are red.
+After the repairs, all three reviewers independently inspected exact X, ran or
+reviewed their lane-relevant checks, and returned final GO. No reviewer edited
+the candidate.
+
+Boundary and attribution
+------------------------
+
+The seven normalized rows lie within `xor32_spec_of_compile` assumptions. The
+three wide rows are compute-only because witgen ignores constraints; runtime
+does not establish lookup satisfaction or Spec. Independent fixed references
+cover public outputs, while internal witness cells retain Clean/G9 differential
+provenance. D017 and the absence of a formal LLZK semantics remain open.
+
+This was an accepted-pin run only, not a new LLZK-main compatibility run.
+X promotes Xor32, not BLAKE3.G; it does not freeze R8 or authorize publication.
+
+This evidence file is added by a later documentation/status commit. It records
+the clean full run on exact X; it does not claim that the later documentary
+commit itself received G0-G12. No branch was pushed and no external state
+changed.

@@ -24,9 +24,9 @@ has five assurance layers:
 
 Stage 1 demonstrates that chain on `Addition8FullCarry`. `EXAMPLES.md` derives
 the exact conformance-corpus counts from Lean. This is a strong vertical slice,
-not broad library coverage: the measured coverage sweep currently finds roughly
-seven compiling gadgets among approximately 128 top-level circuits, and only the
-corpus has reached the external LLZK tools.
+not broad library coverage: the checked 12-gadget sweep currently has exactly
+10 compile-capable rows among approximately 128 top-level circuits, and only
+the corpus has reached the external LLZK tools.
 
 ## Reading path
 
@@ -69,7 +69,15 @@ bash scripts/llzk/worktree-lock.sh claim "reproduce Clean to LLZK"
 bash scripts/llzk/e2e.sh
 ```
 
-The recorded Stage-1 result is:
+The recorded S29 Phase-X result on clean implementation commit `06b80f2f` is:
+
+```text
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+16 circuit(s), 61 input vector(s), both witgen backends,
+full-witness and public output scopes
+```
+
+For historical comparison, the recorded pre-Xor32 result was:
 
 ```text
 PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12

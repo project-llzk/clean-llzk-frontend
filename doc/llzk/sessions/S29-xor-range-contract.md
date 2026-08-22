@@ -1,6 +1,6 @@
 # S29 — Source-visible XOR byte range and headline promotion
 
-Status: Xor32 proof and exact shape sealed on `8045dbb7`; ten-vector corpus promotion next
+Status: Xor32 external promotion sealed on `06b80f2f`; BLAKE3.G Phase H next
 Depends on: audited frontend baseline `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Base integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Frontend branch: `clean-to-llzk/s29-xor-range-contract`
@@ -211,6 +211,25 @@ concrete ByteXor lookup resolution, and `spec_of_compile` for Xor32. Update
 coverage guards, showcase generation, exact counts, and both full/public
 expectations. Acceptance is G0-G12 on clean X plus theorem probe, reference red
 mutation, and independent review.
+
+Phase X is complete on exact clean implementation commit
+`06b80f2f48b3c6c7c850062e596dde92ab11d82e`. XP's source, exact-shape,
+lookup-resolution, and theorem chain are byte-identical here. X adds Xor32 as
+the sixteenth external module with seven normalized spec vectors and three
+compute-only wide-input vectors, all carrying fixed independent public
+references. All ten rows execute in both witness backends and both output
+scopes. Compute rows 7, 8, and 9 additionally receive exhaustive out0–out3
+mutations; row 9 alone receives and rejects the paired exact pre-D035 raw full
+witness and public output.
+
+The accepted-tool matrix passed G0–G12 with 61 vectors, G9 on 10/16 source
+modules, 18/18 product-program admissions, a measured aggregate 10/8 SMT split,
+and 143 G11 control cases. G11 pins the whole e2e driver and makes both an early
+`continue` and a valid-shell outside conditional red. The exact theorem probe
+has no `sorryAx`; the independent oracle is stable under normal and optimized
+Python. Three continuously assigned read-only reviewers returned final GO on
+the immutable commit. Evidence is in `evidence/S29/xor32.md` and
+`evidence/S29/xor32-gates.txt`. Phase H is now the active S29 increment.
 
 ## Phase H — promote BLAKE3.G
 
