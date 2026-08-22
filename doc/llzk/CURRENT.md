@@ -111,18 +111,20 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s28-multicolumn-tables` (S28 complete and adversarially reviewed)
+Active working branch: `clean-to-llzk/s29-xor-range-contract` (bootstrap recovery; no feature code yet)
 
-Integration commit: `doc/llzk/evidence/R7/gates.txt`
+Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
 Pinned Clean base: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
 
-Publication state, verified 2026-08-21: local `clean-to-llzk/integration` is at
-`97390fac`, seven commits ahead of the fork remote. The open fork PR #1 is still
-at `7ff51310`; all four CI jobs are green there, but A4 and R7 have therefore
-been reproduced only by their committed local evidence, not by CI at their own
-commits. A public release candidate must put the branch, evidence, and CI on the
-same frozen commit. No push is authorized by this status update.
+Local integration state, reconciled 2026-08-22: `clean-to-llzk/integration` was
+fast-forwarded from stale R7 tip `97390fac` to audited baseline `9b46264c`; the
+feature branch starts at that exact commit. The local integration ref is 109
+commits ahead of the locally recorded fork ref. External publication state was
+last verified 2026-08-21: fork PR #1 was at `7ff51310`, with all four CI jobs
+green there. A public release candidate must put the branch, evidence, and CI
+on the same frozen commit. No push or other external change occurred during
+this reconciliation.
 
 Dependency state, also verified 2026-08-21: Clean upstream remains exactly
 `0e53b9f2`, S25's accepted base. LLZK `main` is `25fb3740`, now the accepted
