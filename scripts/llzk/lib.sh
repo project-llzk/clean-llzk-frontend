@@ -55,13 +55,16 @@ both must come from the same LLZK installation"
 # require_llzk_witgen_discriminates ARTIFACT INPUTS EXPECTED PUBLIC_EXPECTED WORKDIR
 #   [sampled|strict-sampled|exhaustive-outputs] [EXPECTED_OUTPUTS]
 #   [ALTERNATE_FULL ALTERNATE_PUBLIC]
+# or
+#   exhaustive-interface EXPECTED_INPUTS EXPECTED_WITNESSES EXPECTED_OUTPUTS
 #
 # Proves, on a real emitted artifact, that llzk-witgen --check-output can go both
 # green and red. For both output scopes, the expected document must succeed and
 # independently corrupted documents must fail. Sampled mode checks numeric
 # first, middle, and last positions. Exhaustive-output mode checks every
 # `out{j}` in both scopes and can additionally require a semantically distinct
-# alternate full/public witness pair to go red.
+# alternate full/public witness pair to go red. Exhaustive-interface mode also
+# checks the exact input/signal layouts and mutates every `w{k}` one at a time.
 #
 # Without this, every green below is unfalsifiable: the harness cannot tell a
 # passing check from a binary that exits 0 unconditionally. The expanded probes
@@ -70,20 +73,39 @@ both must come from the same LLZK installation"
 # every run and strengthened for S29's wide outputs.
 require_llzk_witgen_discriminates() {
   local artifact="$1" inputs="$2" expected="$3" public_expected="$4" workdir="$5"
-  local mode="${6:-sampled}" expected_outputs="${7:-}"
-  local alternate_full="${8:-}" alternate_public="${9:-}"
+  local mode="${6:-sampled}" arg7="${7:-}" arg8="${8:-}" arg9="${9:-}" arg10="${10:-}"
+  local expected_inputs="" expected_witnesses="" expected_outputs=""
+  local alternate_full="" alternate_public=""
   case "${mode}" in
     sampled|strict-sampled)
-      [[ -z "${expected_outputs}${alternate_full}${alternate_public}" ]] \
+      [[ -z "${arg7}${arg8}${arg9}${arg10}" ]] \
         || llzk_fail "llzk-witgen self-test: ${mode} mode takes no output count or alternate"
       ;;
     exhaustive-outputs)
+      expected_outputs="${arg7}"
+      alternate_full="${arg8}"
+      alternate_public="${arg9}"
       [[ "${expected_outputs}" =~ ^[1-9][0-9]*$ ]] \
         || llzk_fail "llzk-witgen self-test: exhaustive-output count must be a positive integer"
       if [[ -n "${alternate_full}" || -n "${alternate_public}" ]]; then
         [[ -n "${alternate_full}" && -n "${alternate_public}" ]] \
           || llzk_fail "llzk-witgen self-test: alternate full and public expectations must be supplied together"
       fi
+      [[ -z "${arg10}" ]] \
+        || llzk_fail "llzk-witgen self-test: exhaustive-output mode takes at most an output count and two alternates"
+      ;;
+    exhaustive-interface)
+      expected_inputs="${arg7}"
+      expected_witnesses="${arg8}"
+      expected_outputs="${arg9}"
+      [[ "${expected_inputs}" =~ ^[1-9][0-9]*$ ]] \
+        || llzk_fail "llzk-witgen self-test: exhaustive-interface input count must be a positive integer"
+      [[ "${expected_witnesses}" =~ ^[1-9][0-9]*$ ]] \
+        || llzk_fail "llzk-witgen self-test: exhaustive-interface witness count must be a positive integer"
+      [[ "${expected_outputs}" =~ ^[1-9][0-9]*$ ]] \
+        || llzk_fail "llzk-witgen self-test: exhaustive-interface output count must be a positive integer"
+      [[ $# -eq 9 ]] \
+        || llzk_fail "llzk-witgen self-test: exhaustive-interface mode takes exactly three counts"
       ;;
     *) llzk_fail "llzk-witgen self-test: unknown discriminator mode ${mode}" ;;
   esac
@@ -99,7 +121,14 @@ require_llzk_witgen_discriminates() {
   local alternate_public_probe="${public_corrupted_prefix}-alternate.json"
   local witness_positions=(first middle last)
   local output_positions=(first middle last)
-  if [[ "${mode}" == "exhaustive-outputs" ]]; then
+  if [[ "${mode}" == "exhaustive-interface" ]]; then
+    witness_positions=()
+    local witness_index
+    for ((witness_index = 0; witness_index < expected_witnesses; witness_index++)); do
+      witness_positions+=("index-${witness_index}")
+    done
+  fi
+  if [[ "${mode}" == "exhaustive-outputs" || "${mode}" == "exhaustive-interface" ]]; then
     output_positions=()
     local output_index
     for ((output_index = 0; output_index < expected_outputs; output_index++)); do
@@ -108,7 +137,8 @@ require_llzk_witgen_discriminates() {
   fi
 
   python3 - "${expected}" "${corrupted_prefix}" \
-      "${public_expected}" "${public_corrupted_prefix}" "${mode}" "${expected_outputs}" \
+      "${public_expected}" "${public_corrupted_prefix}" "${mode}" \
+      "${expected_inputs}" "${expected_witnesses}" "${expected_outputs}" "${inputs}" \
       "${alternate_full}" "${alternate_public}" \
       "${alternate_full_probe}" "${alternate_public_probe}" <<'PYEOF' \
     || llzk_fail "llzk-witgen self-test: \
@@ -152,13 +182,51 @@ witness_keys = numbered_keys(signals, "w")
 output_keys = numbered_keys(signals, "out")
 if not witness_keys and not output_keys:
     raise SystemExit("expected full witness has no signal or output to perturb")
-mode, expected_count = sys.argv[5:7]
+mode, expected_input_count, expected_witness_count, expected_output_count, inputs_path = \
+    sys.argv[5:10]
 if mode == "strict-sampled":
     for label, values in (("witness cells", witness_keys),
                           ("full-witness outputs", output_keys)):
         if len(values) < 3:
             raise SystemExit(f"widest artifact has only {len(values)} distinct {label}; need 3")
-corrupt_positions(witness, witness_keys, sys.argv[2], "witness signals", "witness")
+
+if mode == "exhaustive-interface":
+    input_count = int(expected_input_count)
+    witness_count = int(expected_witness_count)
+    output_count = int(expected_output_count)
+    exact_input_keys = [f"arg{i}" for i in range(input_count)]
+    exact_witness_keys = [f"w{i}" for i in range(witness_count)]
+    exact_output_keys = [f"out{i}" for i in range(output_count)]
+    with open(inputs_path) as source:
+        inputs = json.load(source)
+    if not isinstance(inputs, dict) or list(sorted(inputs, key=lambda key:
+            int(key[3:]) if key.startswith("arg") and key[3:].isdigit() else -1)) != exact_input_keys \
+            or set(inputs) != set(exact_input_keys):
+        raise SystemExit(f"inputs are not exactly arg0 through arg{input_count - 1}")
+    if witness.get("inputs") != inputs:
+        raise SystemExit("full-witness inputs disagree with the supplied input document")
+    if witness_keys != exact_witness_keys or output_keys != exact_output_keys \
+            or set(signals) != set(exact_witness_keys + exact_output_keys):
+        raise SystemExit("full witness has the wrong exact w{k}/out{j} signal layout")
+
+    def canonical_babybear(value):
+        if isinstance(value, bool):
+            return False
+        if isinstance(value, int):
+            parsed = value
+        elif isinstance(value, str) and value.isdecimal() and value == str(int(value)):
+            parsed = int(value)
+        else:
+            return False
+        return 0 <= parsed < 2_013_265_921
+
+    if not all(canonical_babybear(value) for value in inputs.values()):
+        raise SystemExit("input document contains a noncanonical Babybear scalar")
+    if not all(canonical_babybear(value) for value in signals.values()):
+        raise SystemExit("full witness contains a noncanonical Babybear scalar")
+    corrupt_all(witness, witness_keys, sys.argv[2], "witness signals", "witness")
+else:
+    corrupt_positions(witness, witness_keys, sys.argv[2], "witness signals", "witness")
 
 with open(sys.argv[3]) as source:
     public = json.load(source)
@@ -169,13 +237,16 @@ if len(public_keys) != len(public):
     raise SystemExit("public expectation contains a key other than out{j}")
 if mode == "strict-sampled" and len(public_keys) < 3:
     raise SystemExit(f"widest artifact has only {len(public_keys)} distinct public outputs; need 3")
-if mode == "exhaustive-outputs":
-    count = int(expected_count)
+if mode in ("exhaustive-outputs", "exhaustive-interface"):
+    count = int(expected_output_count)
     exact_keys = [f"out{i}" for i in range(count)]
     if output_keys != exact_keys:
         raise SystemExit(f"full witness outputs are {output_keys}, expected exactly {exact_keys}")
     if public_keys != exact_keys:
         raise SystemExit(f"public outputs are {public_keys}, expected exactly {exact_keys}")
+    if mode == "exhaustive-interface" and not all(
+            canonical_babybear(value) for value in public.values()):
+        raise SystemExit("public output contains a noncanonical Babybear scalar")
     if any(str(signals[key]) != str(public[key]) for key in exact_keys):
         raise SystemExit("full and public output expectations disagree")
     corrupt_all(witness, output_keys, sys.argv[2], "full-witness outputs", "output")
@@ -185,7 +256,7 @@ else:
     corrupt_positions(public, public_keys, sys.argv[4], "public output", "output")
 
 alternate_full_path, alternate_public_path, alternate_full_probe, alternate_public_probe = \
-    sys.argv[7:11]
+    sys.argv[10:14]
 if alternate_full_path:
     with open(alternate_full_path) as source:
         alternate_witness = json.load(source)
@@ -280,6 +351,10 @@ incomplete."
   if [[ "${mode}" == "strict-sampled" ]]; then
     echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, \
 red on distinct first/middle/last witness-cell, full-output, and public-output perturbations"
+  elif [[ "${mode}" == "exhaustive-interface" ]]; then
+    echo "llzk-witgen self-test: both backends and both scopes green on exact \
+${expected_inputs}-input/${expected_witnesses}-witness/${expected_outputs}-output JSON, \
+red on every witness cell and every full/public output"
   elif [[ "${mode}" == "exhaustive-outputs" ]]; then
     echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, \
 red on first/middle/last witness cells and every one of ${expected_outputs} full/public outputs${alternate_full:+ plus alternate expectations}"

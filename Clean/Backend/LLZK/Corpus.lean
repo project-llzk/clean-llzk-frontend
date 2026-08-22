@@ -231,8 +231,9 @@ These six normalized rows exercise exactly `G 0 1 2 3`. Inputs flatten the
 sixteen state words, then `x`, then `y`; outputs flatten the complete state.
 Words use four little-endian byte limbs. The fixed results come from the
 standalone official-reference transcription in
-`doc/llzk/evidence/S29/blake3g_oracle.py`, not from Clean. This entry remains
-outside `corpus` until the proof and external-harness phases are frozen. -/
+`doc/llzk/evidence/S29/blake3g_oracle.py`, not from Clean. The entry is promoted
+together with its external controls, after the proof/shape boundary was
+frozen. -/
 
 private def leBytes32 (word : Nat) : Array Nat :=
   #[word % 256, word / 256 % 256, word / (256 ^ 2) % 256, word / (256 ^ 3) % 256]
@@ -394,6 +395,7 @@ def corpus : Array Entry :=
        #[#[0, 0], #[1, 2], #[128, 255], #[255, 255], #[256, 1],
          #[2013265920, 2013265920]],
      xor32Entry,
+     blake3gEntry,
      -- No carry, carry out of the low byte, and both extremes of the documented
      -- input range (two bytes plus a boolean carry-in) -- then three vectors
      -- *outside* the gadget's `Assumptions`, which R2's C5 recorded as untested.

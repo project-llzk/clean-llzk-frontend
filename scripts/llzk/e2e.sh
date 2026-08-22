@@ -162,6 +162,29 @@ for xor_index in 7 8 9; do
 done
 echo
 
+# BLAKE3.G's marker row has the widest interface in the corpus. The ordinary
+# loop below executes all six fixed-reference vectors; this preflight also pins
+# their exact indices, and the dedicated discriminator proves no one of the 96
+# witness cells is ignored by either backend in full scope, and no one of the 64
+# outputs is ignored by either backend in either scope.
+echo "== BLAKE3.G exhaustive interface self-test =="
+blake_artifact="${out_dir}/BLAKE3G.llzk"
+[[ -f "${blake_artifact}" ]] || fail "BLAKE3.G promotion artifact is missing"
+for blake_index in 0 1 2 3 4 5; do
+  for blake_suffix in inputs expected public; do
+    blake_path="${out_dir}/BLAKE3G.${blake_index}.${blake_suffix}.json"
+    [[ -f "${blake_path}" ]] \
+      || fail "BLAKE3.G vector ${blake_index} ${blake_suffix} artifact is missing"
+  done
+done
+require_llzk_witgen_discriminates \
+  "${blake_artifact}" \
+  "${out_dir}/BLAKE3G.5.inputs.json" \
+  "${out_dir}/BLAKE3G.5.expected.json" \
+  "${out_dir}/BLAKE3G.5.public.json" \
+  "${out_dir}" exhaustive-interface 72 96 64
+echo
+
 # G10 is in two halves.
 #
 # G10a — admissibility. `--llzk-full-inlining --llzk-product-program` must
@@ -184,9 +207,9 @@ echo
 # reviewed from the named logs. These literals are deliberately not environment
 # overrides: changing a count is a source diff (R4b-5, S29).
 readonly LLZK_EXPECTED_SMT_OK=10
-readonly LLZK_EXPECTED_SMT_SKIPPED=8
-readonly LLZK_EXPECTED_ARTIFACTS=16
-readonly LLZK_EXPECTED_VECTORS=61
+readonly LLZK_EXPECTED_SMT_SKIPPED=9
+readonly LLZK_EXPECTED_ARTIFACTS=17
+readonly LLZK_EXPECTED_VECTORS=67
 readonly LLZK_EXPECTED_FIXTURES=2
 smt_ok=0
 smt_skipped=0

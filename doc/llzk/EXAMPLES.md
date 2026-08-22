@@ -47,10 +47,35 @@ Clean before both full-witness and public JSON are emitted.
 - Independent oracle:
   [`doc/llzk/evidence/S29/xor32_oracle.py`](evidence/S29/xor32_oracle.py).
 
+## Composed bitwise headline: `BLAKE3.G`
+
+Exact `G 0 1 2 3` composes six 32-bit additions, four bytewise XORs,
+and four rotations. Its pinned source and typed module have 72 inputs,
+96 witness cells, 64 public outputs, 56 `Bytes` lookups, and 16
+`ByteXor` lookups. The concrete lookup identities and complete mixed-table
+resolution are proved rather than inferred from emitted names.
+`Test/Soundness.blake3g_spec_of_compile` proves the exact compiled
+constraint implication under the gadget's normalization assumptions,
+equality satisfaction, and lookup-row premises.
+
+The corpus carries 6 normalized spec vectors and
+0 compute-only vectors. All 64 public outputs
+come from a fixed official-reference-derived oracle transcription and must
+equal Clean before emission. The 96 internal witness cells remain
+Clean-derived. Both witness backends check the complete full-witness and
+public scopes for every vector; the lane-marker row also makes every
+individual witness and output field independently go red when perturbed.
+
+- Source and proof:
+  [`Clean/Gadgets/BLAKE3/BLAKE3G.lean`](../../Clean/Gadgets/BLAKE3/BLAKE3G.lean) and
+  [`Clean/Backend/LLZK/Test/Soundness.lean`](../../Clean/Backend/LLZK/Test/Soundness.lean).
+- Independent oracle:
+  [`doc/llzk/evidence/S29/blake3g_oracle.py`](evidence/S29/blake3g_oracle.py).
+
 ## Checked conformance corpus
 
-The current corpus contains 16 emitted modules and 61 input vectors.
-10 modules come from a flattened Clean circuit and pass both halves of G9; the
+The current corpus contains 17 emitted modules and 67 input vectors.
+11 modules come from a flattened Clean circuit and pass both halves of G9; the
 remaining 6 are independent field-registry probes,
 so source agreement is deliberately reported as not applicable rather than passing.
 
@@ -62,6 +87,7 @@ so source agreement is deliberately reported as not applicable rather than passi
 | `Bits8` | `babybear` | yes — constraints and witnesses agree | 6 | First-class `bitsOf` decomposition with felt shifts |
 | `And8` | `babybear` | yes — constraints and witnesses agree | 6 | Three-column certified ByteXor row membership |
 | `Xor32` | `babybear` | yes — constraints and witnesses agree | 10 | Proved four-byte XOR with fixed independent public references |
+| `BLAKE3G` | `babybear` | yes — constraints and witnesses agree | 6 | Composed 32-bit mixing gadget with fixed independent public references |
 | `Addition8FullCarry` | `babybear` | yes — constraints and witnesses agree | 9 | Headline proved byte addition with a certified lookup |
 | `Passthrough` | `babybear` | yes — constraints and witnesses agree | 3 | Direct public output with no witness cells |
 | `ConstOut` | `babybear` | yes — constraints and witnesses agree | 2 | Constant public output with no witness cells |
@@ -75,8 +101,8 @@ so source agreement is deliberately reported as not applicable rather than passi
 
 Every row is parsed, verified, round-tripped, and admitted to LLZK's analysis
 pipeline. Every vector is executed by both `llzk-witgen` backends and compared
-against a checked expected witness. Xor32's public fields come from fixed
-independent references which must first equal Clean; historical entries derive
+against a checked expected witness. Xor32 and BLAKE3.G public fields come from
+fixed independent references which must first equal Clean; historical entries derive
 them directly from Clean. For source-backed rows, emission also requires the
 typed `@constrain` and `@compute` readers to agree with the circuit.
 
@@ -84,7 +110,7 @@ typed `@constrain` and `@compute` readers to agree with the circuit.
 
 | Layer | Repository evidence |
 |---|---|
-| Gadget semantics | Clean soundness/completeness proofs; specific compiled implications for `Addition8FullCarry` and `Xor32` |
+| Gadget semantics | Clean soundness/completeness proofs; specific compiled implications for `Addition8FullCarry`, `Xor32`, and `BLAKE3.G` |
 | Lookup values | `byteTable_certified` and `byteXorTable_certified` prove the exported rows |
 | Typed translation | G9 independently reads source and module constraints and witnesses |
 | Concrete constraint text | A5 parses the protected rendered surface back before returning text |
@@ -115,6 +141,7 @@ lake env lean --run Clean/Backend/LLZK/ShowcaseMain.lean doc/llzk/EXAMPLES.md
 This is a deep vertical slice, not broad Clean-library coverage. The corpus is
 selected rather than exhaustive. Lean establishes properties of the typed module
 and the renderer's protected surface, while the concrete semantics assigned by
-LLZK remain the explicit D017 assumption. The caller-to-circuit lookup-table
-identity gap also remains open. See [`GAPS.md`](GAPS.md) for the authoritative
+LLZK remain the explicit D017 assumption. The generic caller-to-circuit
+lookup-table identity gap also remains open beyond the headline instantiations.
+See [`GAPS.md`](GAPS.md) for the authoritative
 claim boundary.

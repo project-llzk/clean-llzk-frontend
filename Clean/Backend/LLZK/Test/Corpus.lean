@@ -222,11 +222,11 @@ private def failedWitness : VectorCase :=
   context := "Xor32 reference control"
   message := "fixed public reference output 2 is 69, but Clean's witness produced 68" }
 
-/-! ## BLAKE3.G reference boundary before external promotion
+/-! ## BLAKE3.G promoted reference boundary
 
 This is intentionally a second, independently written transcription of the
-six oracle rows. `blake3gEntry` is compiled and checked here, but HR keeps it
-absent from the external corpus until its exact proof/shape boundary is frozen.
+six oracle rows. `blake3gEntry` is compiled, checked, and carried exactly once
+by the external corpus after its exact proof/shape boundary was frozen.
 -/
 
 private def blakeSrc : Source Bab :=
@@ -338,8 +338,12 @@ private def reinput (vector : VectorCase) (inputs : Array Nat) : VectorCase :=
 #guard expectedBlakeReferences.all fun vector =>
   vector.outputs.extract 16 64 == vector.inputs.extract 16 64
 
--- HR is a reference freeze, not an external promotion. This guard must flip in HC.
-#guard (Corpus.corpus.filter fun entry => entry.name = "BLAKE3G").isEmpty
+#guard (Corpus.corpus.filter fun entry => entry.name = "BLAKE3G").size = 1
+#guard (Corpus.corpus.find? fun entry => entry.name = "BLAKE3G").map
+  (fun entry =>
+    (entry.publicReferencePolicy, entry.constraintsAgree, entry.witnessAgree,
+      entry.vectors.map blakeCarriedReference)) ==
+    some (.fixedRequired, some true, some true, expectedBlakeReferences.map some)
 
 /-! Every fixed output in every row is live, including all unchanged tail lanes. -/
 

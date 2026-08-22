@@ -11,12 +11,13 @@ count, and editorial coverage reviewed diffs. `e2e.sh` additionally regenerates
 namespace LLZK.Test.Showcase
 
 #guard Showcase.markdown.isOk
-#guard Showcase.totalVectors == 61
-#guard Showcase.sourceBacked == 10
-#guard Corpus.corpus.size == 16
+#guard Showcase.totalVectors == 67
+#guard Showcase.sourceBacked == 11
+#guard Corpus.corpus.size == 17
 #guard Corpus.corpus.all fun entry => (Showcase.purpose entry.name).isSome
 #guard Corpus.corpus.map (·.name) ==
-  #[ "Multiply", "Decompose", "LowByte", "Bits8", "And8", "Xor32", "Addition8FullCarry", "Passthrough", "ConstOut", "CopyCell"
+  #[ "Multiply", "Decompose", "LowByte", "Bits8", "And8", "Xor32", "BLAKE3G",
+     "Addition8FullCarry", "Passthrough", "ConstOut", "CopyCell"
    , "Square_babybear", "Square_mersenne31", "Square_koalabear", "Square_goldilocks"
    , "Square_bn254", "Square_grumpkin" ]
 

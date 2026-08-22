@@ -54,25 +54,26 @@ expect() {
   passed=$(( passed + 1 ))
 }
 
-# Pin the complete e2e driver, not only landmarks within the Xor32 block.
+# Pin the complete e2e driver, not only landmarks within the headline blocks.
 # Substring counts stayed green when an early `continue` made every real-tool
 # call unreachable; a bounded block digest stayed green when an outside
 # conditional enclosed the block. The whole-file digest and mutation controls
 # near G11's tail close both false-greens.
-check_xor_e2e_wiring() {
+check_e2e_wiring() {
   python3 - "$1" <<'PYEOF'
 import hashlib, pathlib, sys
 
 source = pathlib.Path(sys.argv[1]).read_text()
 start = 'echo "== Xor32 exhaustive output and narrowing self-test =="'
+blake = 'echo "== BLAKE3.G exhaustive interface self-test =="'
 end = "# G10 is in two halves."
-if source.count(start) != 1 or source.count(end) != 1:
-    print("Xor32 e2e block markers are not unique")
+if source.count(start) != 1 or source.count(blake) != 1 or source.count(end) != 1:
+    print("headline e2e block markers are not unique")
     raise SystemExit(1)
 actual = hashlib.sha256(source.encode()).hexdigest()
-expected = "4e8098e681f78665f260fbdb4c3f7444fb0e8c20778d84b1fcb02b5c835b0178"
+expected = "bf0e65b8b2007087040267c9ccf91c5fe7fa619d40434833059c7e2a08420383"
 if actual != expected:
-    print(f"Xor32 e2e file digest mismatch: {actual}")
+    print(f"headline e2e file digest mismatch: {actual}")
     raise SystemExit(1)
 PYEOF
 }
@@ -1323,6 +1324,233 @@ expect "PID-derived non-raw path catches the public path-specializing checker" 1
        "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
        "${workdir}/xor-raw-expected.json" "${workdir}/xor-raw-public.json"
 
+# BLAKE3.G's promoted interface is 72 inputs, 96 witness cells, and 64 public
+# outputs. Build a synthetic carrier of exactly that shape, then use a
+# content-aware shim which rejects only genuine one-key 1 -> 0 mutations. Its
+# log proves the exhaustive helper reaches every distinct key on both backends.
+python3 - "${workdir}" <<'PYEOF'
+import copy, json, pathlib, sys
+
+directory = pathlib.Path(sys.argv[1])
+inputs = {f"arg{i}": str(i % 256) for i in range(72)}
+signals = {f"w{i}": "1" for i in range(96)}
+signals.update({f"out{i}": "1" for i in range(64)})
+full = {"inputs": inputs, "signals": signals}
+public = {f"out{i}": "1" for i in range(64)}
+
+def write(name, value):
+    (directory / name).write_text(json.dumps(value))
+
+write("blake-inputs.json", inputs)
+write("blake-expected.json", full)
+write("blake-public.json", public)
+changed = copy.deepcopy(full); changed["signals"]["w42"] = "0"
+write("blake-full-w42-mutated.json", changed)
+changed = copy.deepcopy(full); del changed["signals"]["w95"]
+write("blake-full-missing-w95.json", changed)
+changed = copy.deepcopy(full); changed["signals"]["w96"] = "1"
+write("blake-full-extra-w96.json", changed)
+changed = copy.deepcopy(full); changed["signals"]["w01"] = "1"
+write("blake-full-malformed-w01.json", changed)
+changed = copy.deepcopy(full); del changed["signals"]["out63"]
+write("blake-full-missing-out63.json", changed)
+changed = copy.deepcopy(public); changed["out64"] = "1"
+write("blake-public-extra-out64.json", changed)
+changed = copy.deepcopy(inputs); del changed["arg71"]
+write("blake-inputs-missing-arg71.json", changed)
+changed = copy.deepcopy(inputs); changed["arg72"] = "1"
+write("blake-inputs-extra-arg72.json", changed)
+changed = copy.deepcopy(full); changed["inputs"]["arg0"] = "2"
+write("blake-full-input-drift.json", changed)
+changed = copy.deepcopy(full); changed["signals"]["out17"] = "2"
+write("blake-full-public-disagree.json", changed)
+changed = copy.deepcopy(full); changed["signals"]["w42"] = True
+write("blake-full-boolean.json", changed)
+changed = copy.deepcopy(public); changed["out17"] = 1.5
+write("blake-public-float.json", changed)
+changed = copy.deepcopy(inputs); changed["arg0"] = "2013265921"
+write("blake-inputs-noncanonical.json", changed)
+changed_full = copy.deepcopy(full); changed_full["inputs"] = changed
+write("blake-full-noncanonical-input.json", changed_full)
+PYEOF
+
+> "${workdir}/shim/llzk-witgen-blake-controlled" cat <<'SHIM'
+#!/usr/bin/env bash
+scope=full-witness
+backend=interpreter
+check=""
+for a in "$@"; do
+  case "${a}" in
+    --output-scope=*) scope="${a#--output-scope=}" ;;
+    --backend=*) backend="${a#--backend=}" ;;
+    --check-output) check="next" ;;
+    *) [[ "${check}" == "next" ]] && check="${a}" ;;
+  esac
+done
+python3 - "${BLAKE_SHIM_MODE:-exact}" "${BLAKE_SHIM_LOG:-}" \
+  "${backend}" "${scope}" "${check}" <<'PYEOF'
+import json, sys
+
+mode, log_path, backend, scope, path = sys.argv[1:]
+with open(path) as source:
+    actual = json.load(source)
+inputs = {f"arg{i}": str(i % 256) for i in range(72)}
+if scope == "full-witness":
+    baseline = {f"w{i}": "1" for i in range(96)}
+    baseline.update({f"out{i}": "1" for i in range(64)})
+    if actual.get("inputs") != inputs or not isinstance(actual.get("signals"), dict):
+        raise SystemExit(0)
+    values = actual["signals"]
+else:
+    baseline = {f"out{i}": "1" for i in range(64)}
+    values = actual
+if not isinstance(values, dict) or set(values) != set(baseline):
+    raise SystemExit(0)
+differences = [key for key in baseline if values[key] != baseline[key]]
+if not differences:
+    label = "baseline"
+    status = 0
+elif len(differences) == 1 and values[differences[0]] == "0":
+    label = differences[0]
+    status = 0 if mode == "ignore-w42" and scope == "full-witness" and label == "w42" else 1
+else:
+    label = "malformed"
+    status = 0
+if log_path:
+    with open(log_path, "a") as log:
+        log.write(f"{backend} {scope} {label}\n")
+raise SystemExit(status)
+PYEOF
+SHIM
+chmod +x "${workdir}/shim/llzk-witgen-blake-controlled"
+
+expect "BLAKE exhaustive interface reaches every exact key" 0 \
+  "red on every witness cell and every full/public output" \
+  -- env BLAKE_SHIM_MODE=exact BLAKE_SHIM_LOG="${workdir}/blake-shim.log" \
+       LLZK_WITGEN="${workdir}/shim/llzk-witgen-blake-controlled" \
+       bash -c ': > "$7"; source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 72 96 64' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}" \
+       "${workdir}/blake-shim.log"
+
+expect "BLAKE exhaustive interface mutation log is complete" 0 "" \
+  -- python3 - "${workdir}/blake-shim.log" <<'PYEOF'
+import collections, sys
+
+with open(sys.argv[1]) as source:
+    actual = collections.Counter(line.strip() for line in source if line.strip())
+expected = collections.Counter()
+for backend in ("interpreter", "execution-engine"):
+    expected[f"{backend} full-witness baseline"] += 1
+    expected[f"{backend} public baseline"] += 1
+    for i in range(96):
+        expected[f"{backend} full-witness w{i}"] += 1
+    for i in range(64):
+        expected[f"{backend} full-witness out{i}"] += 1
+        expected[f"{backend} public out{i}"] += 1
+raise SystemExit(0 if actual == expected else 1)
+PYEOF
+
+expect "BLAKE partial checker accepts its baseline" 0 "" \
+  -- env BLAKE_SHIM_MODE=ignore-w42 "${workdir}/shim/llzk-witgen-blake-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/blake-expected.json"
+expect "BLAKE partial checker demonstrably ignores w42" 0 "" \
+  -- env BLAKE_SHIM_MODE=ignore-w42 "${workdir}/shim/llzk-witgen-blake-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/blake-full-w42-mutated.json"
+expect "BLAKE exhaustive interface catches a checker that ignores w42" 1 \
+  "witness group's index-42 field perturbed" \
+  -- env BLAKE_SHIM_MODE=ignore-w42 \
+       LLZK_WITGEN="${workdir}/shim/llzk-witgen-blake-controlled" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 72 96 64' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}"
+
+expect "BLAKE exhaustive interface requires an input count" 1 \
+  "input count must be a positive integer" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}"
+expect "BLAKE exhaustive interface rejects a zero witness count" 1 \
+  "witness count must be a positive integer" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 72 0 64' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}"
+expect "BLAKE exhaustive interface rejects a nonnumeric output count" 1 \
+  "output count must be a positive integer" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 72 96 sixty-four' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}"
+expect "BLAKE exhaustive interface rejects an empty tenth and nonempty eleventh argument" 1 \
+  "mode takes exactly three counts" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 72 96 64 "" bypass' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}"
+expect "BLAKE exhaustive interface uses a valid positive input count" 1 \
+  "inputs are not exactly arg0 through arg70" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 71 96 64' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}"
+expect "BLAKE exhaustive interface uses a valid positive witness count" 1 \
+  "full witness has the wrong exact w{k}/out{j} signal layout" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 72 95 64' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}"
+expect "BLAKE exhaustive interface uses a valid positive output count" 1 \
+  "full witness has the wrong exact w{k}/out{j} signal layout" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 72 96 63' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+       "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}"
+
+while IFS='|' read -r blake_count_label blake_count_message blake_count_words; do
+  read -r -a blake_count_args <<<"${blake_count_words}"
+  expect "BLAKE exhaustive interface rejects ${blake_count_label}" 1 \
+    "${blake_count_message}" \
+    -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+         bash -c 'source "$1/lib.sh"; shift; require_llzk_witgen_discriminates "$@"' \
+         _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/blake-inputs.json" \
+         "${workdir}/blake-expected.json" "${workdir}/blake-public.json" "${workdir}" \
+         exhaustive-interface "${blake_count_args[@]}"
+done <<'COUNT_CASES'
+a zero input count|input count must be a positive integer|0 96 64
+a nonnumeric input count|input count must be a positive integer|seventy-two 96 64
+a missing witness count|witness count must be a positive integer|72
+a nonnumeric witness count|witness count must be a positive integer|72 ninety-six 64
+a missing output count|output count must be a positive integer|72 96
+a zero output count|output count must be a positive integer|72 96 0
+an extra argument|mode takes exactly three counts|72 96 64 extra
+COUNT_CASES
+
+while IFS='|' read -r blake_label blake_full blake_inputs blake_public blake_error; do
+  expect "BLAKE exhaustive interface rejects ${blake_label}" 1 \
+    "${blake_error}" \
+    -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+         bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-interface 72 96 64' \
+         _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/${blake_inputs}" \
+         "${workdir}/${blake_full}" "${workdir}/${blake_public}" "${workdir}"
+done <<'BLAKE_BAD_CASES'
+missing-w95|blake-full-missing-w95.json|blake-inputs.json|blake-public.json|full witness has the wrong exact w{k}/out{j} signal layout
+extra-w96|blake-full-extra-w96.json|blake-inputs.json|blake-public.json|full witness has the wrong exact w{k}/out{j} signal layout
+malformed-w01|blake-full-malformed-w01.json|blake-inputs.json|blake-public.json|full witness has the wrong exact w{k}/out{j} signal layout
+missing-out63|blake-full-missing-out63.json|blake-inputs.json|blake-public.json|full witness has the wrong exact w{k}/out{j} signal layout
+extra-public-out64|blake-expected.json|blake-inputs.json|blake-public-extra-out64.json|public outputs are
+missing-arg71|blake-expected.json|blake-inputs-missing-arg71.json|blake-public.json|inputs are not exactly arg0 through arg71
+extra-arg72|blake-expected.json|blake-inputs-extra-arg72.json|blake-public.json|inputs are not exactly arg0 through arg71
+full-input-drift|blake-full-input-drift.json|blake-inputs.json|blake-public.json|full-witness inputs disagree with the supplied input document
+full-public-disagree|blake-full-public-disagree.json|blake-inputs.json|blake-public.json|full and public output expectations disagree
+boolean-signal|blake-full-boolean.json|blake-inputs.json|blake-public.json|full witness contains a noncanonical Babybear scalar
+float-public|blake-expected.json|blake-inputs.json|blake-public-float.json|public output contains a noncanonical Babybear scalar
+noncanonical-input|blake-full-noncanonical-input.json|blake-inputs-noncanonical.json|blake-public.json|input document contains a noncanonical Babybear scalar
+BLAKE_BAD_CASES
+
 mkdir -p "${workdir}/public-widths"
 printf '{"out0":"1"}\n' > "${workdir}/public-widths/AThin.0.public.json"
 printf '{"out0":"1","out1":"2","out2":"3"}\n' \
@@ -1374,8 +1602,8 @@ expect "exact count rejects a larger value" 1 "got 11, expected exactly 10" \
 expect "exact count rejects a non-natural value" 1 "counts must be natural numbers" \
   -- run_helper llzk_require_exact_count "test split" ten 10
 
-expect "e2e Xor32 exhaustive wiring is source pinned" 0 "" \
-  -- check_xor_e2e_wiring "${script_dir}/e2e.sh"
+expect "e2e headline discriminator wiring is source pinned" 0 "" \
+  -- check_e2e_wiring "${script_dir}/e2e.sh"
 
 python3 - "${script_dir}/e2e.sh" "${workdir}/e2e-xor-unreachable.sh" <<'PYEOF'
 import pathlib, sys
@@ -1387,8 +1615,8 @@ if source.count(needle) != 1:
 pathlib.Path(sys.argv[2]).write_text(source.replace(needle, needle + "  continue\n", 1))
 PYEOF
 expect "e2e Xor32 source pin rejects unreachable discriminator calls" 1 \
-  "Xor32 e2e file digest mismatch" \
-  -- check_xor_e2e_wiring "${workdir}/e2e-xor-unreachable.sh"
+  "headline e2e file digest mismatch" \
+  -- check_e2e_wiring "${workdir}/e2e-xor-unreachable.sh"
 
 python3 - "${script_dir}/e2e.sh" "${workdir}/e2e-xor-wrapped.sh" <<'PYEOF'
 import pathlib, sys
@@ -1405,16 +1633,47 @@ PYEOF
 expect "e2e Xor32 outside-wrapper fixture is valid shell" 0 "" \
   -- bash -n "${workdir}/e2e-xor-wrapped.sh"
 expect "e2e Xor32 source pin rejects an unreachable wrapped block" 1 \
-  "Xor32 e2e file digest mismatch" \
-  -- check_xor_e2e_wiring "${workdir}/e2e-xor-wrapped.sh"
+  "headline e2e file digest mismatch" \
+  -- check_e2e_wiring "${workdir}/e2e-xor-wrapped.sh"
+
+python3 - "${script_dir}/e2e.sh" "${workdir}/e2e-blake-unreachable.sh" <<'PYEOF'
+import pathlib, sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+needle = "for blake_index in 0 1 2 3 4 5; do\n"
+if source.count(needle) != 1:
+    raise SystemExit("could not construct the BLAKE3.G unreachable-control fixture")
+pathlib.Path(sys.argv[2]).write_text(source.replace(needle, needle + "  continue\n", 1))
+PYEOF
+expect "e2e BLAKE3.G source pin rejects unreachable vector preflights" 1 \
+  "headline e2e file digest mismatch" \
+  -- check_e2e_wiring "${workdir}/e2e-blake-unreachable.sh"
+
+python3 - "${script_dir}/e2e.sh" "${workdir}/e2e-blake-wrapped.sh" <<'PYEOF'
+import pathlib, sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+start = 'echo "== BLAKE3.G exhaustive interface self-test =="\n'
+end = "# G10 is in two halves.\n"
+if source.count(start) != 1 or source.count(end) != 1:
+    raise SystemExit("could not construct the BLAKE3.G outside-wrapper fixture")
+wrapped = source.replace(start, "if false; then\n" + start, 1)
+wrapped = wrapped.replace(end, end + "fi\n", 1)
+pathlib.Path(sys.argv[2]).write_text(wrapped)
+PYEOF
+expect "e2e BLAKE3.G outside-wrapper fixture is valid shell" 0 "" \
+  -- bash -n "${workdir}/e2e-blake-wrapped.sh"
+expect "e2e BLAKE3.G source pin rejects an unreachable wrapped block" 1 \
+  "headline e2e file digest mismatch" \
+  -- check_e2e_wiring "${workdir}/e2e-blake-wrapped.sh"
 
 expect "e2e exact counts are literal source pins" 0 "" \
   -- bash -c '
        for assignment in \
          LLZK_EXPECTED_SMT_OK=10 \
-         LLZK_EXPECTED_SMT_SKIPPED=8 \
-         LLZK_EXPECTED_ARTIFACTS=16 \
-         LLZK_EXPECTED_VECTORS=61 \
+         LLZK_EXPECTED_SMT_SKIPPED=9 \
+         LLZK_EXPECTED_ARTIFACTS=17 \
+         LLZK_EXPECTED_VECTORS=67 \
          LLZK_EXPECTED_FIXTURES=2
        do
          rg --fixed-strings --line-regexp "readonly ${assignment}" "$1/e2e.sh" >/dev/null \

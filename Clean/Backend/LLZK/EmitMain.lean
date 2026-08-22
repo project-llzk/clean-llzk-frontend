@@ -7,17 +7,20 @@ For each entry of `LLZK.Corpus.corpus`, writes
 
 * `<Name>.llzk` — the module;
 * `<Name>.<i>.inputs.json` — the `i`th input vector, for `llzk-witgen --inputs`;
-* `<Name>.<i>.expected.json` — Clean's own witness for it, in the shape
-  `llzk-witgen --output-scope=full-witness --check-output` compares against.
-* `<Name>.<i>.public.json` — Clean's public outputs, in the shape
+* `<Name>.<i>.expected.json` — Clean's witness cells plus the vector's checked
+  public outputs, in the shape `llzk-witgen --output-scope=full-witness
+  --check-output` compares against;
+* `<Name>.<i>.public.json` — the vector's checked public outputs, in the shape
   `llzk-witgen --output-scope=public --check-output` compares against.
+  Fixed-reference entries replace these outputs only after exact equality with
+  Clean; their internal witness cells remain Clean-derived.
 
 For each entry of `LLZK.Corpus.syntaxFixtures`, writes `<dir>/syntax/<Name>.llzk`
 — a renderer fixture with no input vectors, checked by `llzk-opt` alone.
 
-`scripts/llzk/e2e.sh` then makes both LLZK backends check themselves against
-Clean, so gate G7 is a non-zero exit rather than two JSON dumps for a reader to
-compare.
+`scripts/llzk/e2e.sh` then makes both LLZK backends check themselves against the
+checked expectations, so gate G7 is a non-zero exit rather than two JSON dumps
+for a reader to compare.
 
 Fails closed: a corpus entry that stops compiling, or an input vector Clean
 refuses, is reported on stderr and makes the exit status non-zero. A failing
@@ -118,8 +121,8 @@ def emitMain (args : List String) : IO UInt32 := do
   | _ =>
     IO.eprintln "usage: llzk-emit <output-directory>"
     IO.eprintln ""
-    IO.eprintln "Writes the LLZK module, input vectors and Clean's expected"
-    IO.eprintln "full witnesses and public outputs for every entry of LLZK.Corpus.corpus, and the"
+    IO.eprintln "Writes the LLZK module, input vectors, checked full witnesses and"
+    IO.eprintln "public outputs for every entry of LLZK.Corpus.corpus, and the"
     IO.eprintln "renderer fixtures under <output-directory>/syntax."
     return 2
 

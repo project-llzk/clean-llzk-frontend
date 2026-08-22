@@ -137,9 +137,12 @@ endpoints and the artifact selected from emitted JSON as having the widest
 public interface. Xor32 additionally checks every one of its four outputs in
 both scopes on all three compute-only rows. Its both-wide row must reject the
 exact old raw-XOR full witness and public result, presented under PID-derived
-non-raw scratch names. G11 has separate partial-checker attacks that validate only `w0`
-or `out0`, omit Xor32 `out1`, accept the raw full/public alternate, or
-specialize on predictable paths.
+non-raw scratch names. BLAKE3.G's lane-marker row additionally pins exact
+72-input/96-witness/64-output layouts and perturbs every one of its 96 witness
+cells and 64 outputs independently in both backends; outputs are checked in
+both full and public scopes. G11 has separate partial-checker attacks that
+validate only `w0` or `out0`, omit Xor32 `out1`, ignore BLAKE3.G `w42`, accept
+the raw full/public alternate, or specialize on predictable paths.
 R2-06 showed why this is necessary: with `llzk-witgen` replaced by a two-line
 `exit 0` script sitting next to a symlinked `llzk-opt`, the harness reported
 PASS and exited 0. Provenance by co-location was necessary and not sufficient;
@@ -213,7 +216,7 @@ remain pinned in `Test/WitnessCheck.lean`.
 is `+`, `constrain.eq` is equality, `constrain.in` is membership, and natural,
 bitwise, and shift operations read their operands as canonical representatives.
 Nothing in Lean settles that without a formal model of LLZK; G5–G7 are the
-empirical evidence for the `@compute` half of it, on 61 vectors (55 from Clean
+empirical evidence for the `@compute` half of it, on 67 vectors (61 from Clean
 sources) and two independent LLZK backends; S26 also probes every new operation spelling
 directly. The lookup *rows* used to be listed here; since S16
 they are proved — see D012 and `Clean/Backend/LLZK/TableCert.lean`.
@@ -239,8 +242,8 @@ actually produces, because a tolerance nothing exercises can only ever excuse
 something. At the LLZK 3.0.0 pin those are natural and bitwise/shift felt
 operations, which the lowering marks illegal, and a module with no felt type,
 whose prime field cannot be deduced. Both sides of the split are exact gates,
-not floors: at the pre-promotion S29 harness boundary, ten of the seventeen
-corpus-plus-fixture modules lower and seven are out of scope for exactly those
+not floors: at the BLAKE3.G promotion boundary, ten of the nineteen
+corpus-plus-fixture modules lower and nine are out of scope for exactly those
 declared reasons.
 
 **The solver step is not reachable from the pinned tools.** `llzk-smt-check`
@@ -290,7 +293,7 @@ the cases are the negative direction of
 positive direction ran on the real tools every time while the direction that
 matters ran never.
 
-There are now 143 cases. The witness controls reject a permissive shim, a stub
+There are now 177 cases. The witness controls reject a permissive shim, a stub
 execution backend, a checker permissive for public output, and three
 content-aware partial checkers: public `out0` only, full-witness `w0` plus all
 outputs, and full-witness all cells plus `out0`. Each partial checker is first
@@ -301,12 +304,17 @@ double-digit fields, and pin widest-interface selection, empty/malformed/missing
 selector inputs, deterministic ties, literal count pins, and both directions of
 exact-count enforcement. Xor32 adds exhaustive four-output full/public attacks,
 exact old-raw full/public alternates, PID-derived non-raw alternate paths, and every
-validation failure of the raw-reference and exhaustive-output helpers. Each
+validation failure of the raw-reference and exhaustive-output helpers.
+BLAKE3.G adds an exact-layout exhaustive-interface helper with a content-aware
+452-call log covering four green baselines and all 448 isolated red mutations;
+it rejects wrong arity, missing, extra, malformed, and drifted interface
+carriers, plus nonnumeric counts and noncanonical scalars, and demonstrates that
+a checker ignoring `w42` is caught. Each
 partial or path-specializing shim has its own green, checked-field red, ignored
 field/alternate false-green, and whole-helper red demonstration. The complete
 e2e driver is digest-pinned, with an inserted early-`continue` and a valid-shell
-outside conditional independently proving unreachable real-tool calls turn G11
-red. Seven S29 overlay controls
+outside conditional independently proving unreachable Xor32 or BLAKE3.G calls
+turn G11 red. Seven S29 overlay controls
 independently reject a missing overlay, unrelated overlay, indirect overlay,
 an extra overlay path, wrong status on the expected path, and committed or
 uncommitted post-overlay Xor32 drift. Ten enforce
@@ -320,5 +328,6 @@ repository's real workflows are checked as the final positive control.
 
 It needs no LLZK tools and no Lean build: `lib.sh`'s helpers are called
 directly and `check-pins.sh` is driven against throwaway `--shared` clones, so
-it costs about a second. The clones get the *working tree's* scripts copied in,
+it completes in roughly twenty seconds on the audit host. The clones get the
+*working tree's* scripts copied in,
 so an uncommitted regression is caught.
