@@ -38,5 +38,6 @@ Confirmed bootstrap findings incorporated into D035 and the S29 packet include:
 - BLAKE3.G lookup resolution must cover both Byte and ByteXor tables;
 - `GATES.md` still said 53 rather than the audited 54 G11 paths.
 
-No feature source or lowering code changed during bootstrap. Record the exact
-decision commit here after it is created.
+No feature source or lowering code changed during bootstrap. The independently
+reviewed decision and session packet is commit
+`d0eed96074d05ccdd0f628eee66e7a2f3d0f0463`.
