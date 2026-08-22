@@ -1,6 +1,6 @@
 # S29 — Source-visible XOR byte range and headline promotion
 
-Status: Phase-X harness controls complete on `8f0fab79`; Xor32 corpus promotion next
+Status: Xor32 proof and exact shape sealed on `8045dbb7`; ten-vector corpus promotion next
 Depends on: audited frontend baseline `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Base integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Frontend branch: `clean-to-llzk/s29-xor-range-contract`
@@ -176,6 +176,27 @@ reference implementation/version, exact command, source inputs, word outputs,
 and word-to-little-endian-limb conversion in the phase evidence. Do not generate
 the oracle from a Clean definition, `LLZK.witness`, or an emitted module.
 
+The fixed-reference carrier is frozen on exact commit `046ec9494617c1ee8f536e55badf1152105291aa`.
+It binds each name, input, Clean witness, scope, and fixed public expectation in
+one vector record; validates association, exact width, canonicality, complete
+positional equality, and fixed-required policy; and supplies the checked result
+to both full and public JSON. Its real-Xor controls cover every output position,
+row mutations, permutations, short/long/empty references, noncanonical values,
+policy downgrade, input drift, and Clean-witness failure. It adds no corpus row.
+
+The Xor32 proof and exact-shape boundary is frozen on clean commit
+`8045dbb70e46ec94df61960e7c14500ad54ef955`. Independent source, recognized,
+typed-module, witness, and constraint readers pin the eight inputs, four
+narrowed-XOR cells, four ordered full-table ByteXor lookups, and four outputs.
+Concrete lookup resolution and `xor32_spec_of_compile` are instantiated, with
+normalized assumptions explicit and emitted lookup satisfaction required by
+the primary theorem. The committed axiom probe has no `sorryAx`; its only
+nonstandard closure is the inherited Babybear prime/size native-decision facts.
+The accepted-tool G0-G12 run retained 15 modules, 51 vectors, 17 admissions,
+the 10/7 SMT split, 88 G11 cases, and `Bits8` as widest. Evidence is in
+`evidence/S29/xor32-proof-gates.txt`. No Xor32 external-tool or fixed-oracle
+promotion claim is made at this boundary.
+
 ## Phase X — promote Xor32
 
 Add Xor32 under `withBytesAndXor` to the external corpus. Use separately named
@@ -235,6 +256,7 @@ Preserve under `doc/llzk/evidence/S29/`:
 - `adoption-gates.txt` — clean M matrix;
 - `bounds.md`, `probe.lean`, and `bounds-gates.txt` — B proofs and gates;
 - `harness-gates.txt` — cross-cutting Phase-X falsification and exact-count gates;
+- `xor32-probe.lean` and `xor32-proof-gates.txt` — XP exact shapes, theorem, probe, and gates;
 - `xor32.md` and `xor32-gates.txt` — vectors, theorem, and X gates;
 - `blake3g.md` and `blake3g-gates.txt` — references, theorem, and H gates;
 - phase-specific independent review findings and dispositions.

@@ -42,13 +42,18 @@ the same complete matrix. Cross-cutting Phase-X gate commit `8f0fab79` then
 expanded G11 to 88 harness control cases, pins exact corpus and SMT counts, and
 probes first/middle/last witness cells and output members in full-witness scope
 plus public outputs in public scope; its complete accepted-tool matrix passed,
-with `Bits8` derived as the widest current interface. Xor32 and BLAKE3.G compile
-in the capability sweep, but remain outside the external corpus until Phase X/H
-supplies independent references, exact shapes, concrete lookup resolution, and
-theorem instances.
+with `Bits8` derived as the widest current interface. Fixed-reference carrier
+commit `046ec949` and proof/shape commit `8045dbb7` now give Xor32 its checked
+reference infrastructure, exact source/module/readback shapes, certified
+lookup resolution, red mutations, and concrete spec-of-compile theorem. Xor32
+still remains outside the external corpus until Phase X supplies the fixed
+ten-vector set, documented independent oracle, and complete external-tool run.
+BLAKE3.G remains capability-only until its later Phase-H reference, proof, and
+promotion obligations are complete.
 Independent adversarial review is required at every phase boundary. See
 `sessions/S29-xor-range-contract.md`, `evidence/S29/bounds.md`,
-`evidence/S29/bounds-gates.txt`, and `evidence/S29/harness-gates.txt`.
+`evidence/S29/bounds-gates.txt`, `evidence/S29/harness-gates.txt`, and
+`evidence/S29/xor32-proof-gates.txt`.
 
 Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
@@ -136,7 +141,7 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase-X harness controls complete on `8f0fab79`; Xor32 corpus promotion next)
+Active working branch: `clean-to-llzk/s29-xor-range-contract` (Xor32 proof and exact shape sealed on `8045dbb7`; ten-vector corpus promotion next)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
@@ -415,20 +420,29 @@ an explicit decision, which was given.
   confirmed issues, repaired both, and reran G0-G12 on clean commit `129fbe6e`.
   No confirmed review finding remains open; residual project-wide boundaries
   remain named in `GAPS.md`.
+- Completed locally: **S29 Xor32 proof and exact-shape boundary**. The source,
+  recognized form, typed module, independent witness and constraint readers,
+  four certified ByteXor lookups, red mutations, and concrete
+  `xor32_spec_of_compile` instantiation are pinned on clean commit `8045dbb7`.
+  G0-G12 passed with the deliberately unchanged 15-module/51-vector corpus;
+  Xor32 external-tool promotion remains the next phase.
 - Blocked: none.
 
 ## Last green gates
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete accepted-tool run: S29 Phase-X gate commit
-`8f0fab79732789795b0c09599f768c4b662a768b`; see
-`evidence/S29/harness-gates.txt`. All G0-G12 passed. The latest two-toolchain
+Latest complete accepted-tool run: S29 Xor32 proof/shape commit
+`8045dbb70e46ec94df61960e7c14500ad54ef955`; see
+`evidence/S29/xor32-proof-gates.txt`. All G0-G12 passed with the intentionally
+unchanged 15 modules, 51 vectors, 17 admissions, 10/7 SMT split, 88 G11 cases,
+and `Bits8` widest probe. The latest two-toolchain
 run remains frontend audit commit `7c567f5451c2e40b7be88e96d8a519a7bf82495e`;
 see `evidence/AUDIT-2026-08-22/`. That audit's axiom probe covers its frozen
 frontend theorem closure, including concrete Add8 and And8 spec chains, with no
-`sorryAx`. Phase B's later modulo/XOR/OR theorem probe is recorded separately in
-`evidence/S29/bounds-gates.txt`, likewise with no `sorryAx`.
+`sorryAx`. Phase B's modulo/XOR/OR probe and XP's Xor32 theorem probe are
+recorded in `evidence/S29/bounds-gates.txt` and
+`evidence/S29/xor32-proof-gates.txt`; neither contains `sorryAx`.
 
 | Gate | Result |
 |---|---|

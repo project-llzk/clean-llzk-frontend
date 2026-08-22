@@ -1,0 +1,136 @@
+S29 Phase XP — Xor32 proof and exact-shape gates
+==================================================
+
+Date: 2026-08-22
+
+Exact clean implementation commit tested:
+  8045dbb70e46ec94df61960e7c14500ad54ef955
+
+Sole parent (fixed-reference carrier):
+  046ec9494617c1ee8f536e55badf1152105291aa
+
+Accepted LLZK source:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Accepted immutable tool output:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+Scope
+-----
+
+XP changed exactly five paths:
+
+  Clean/Backend/LLZK/Test/WitnessCheck.lean
+  Clean/Backend/LLZK/Test/Constraints.lean
+  Clean/Backend/LLZK/Test/Lookups.lean
+  Clean/Backend/LLZK/Test/Soundness.lean
+  doc/llzk/evidence/S29/xor32-probe.lean
+
+The committed diff is 264 insertions and zero deletions across those five
+paths.
+
+The tests pin Xor32's exact eight-input source witness, four narrowed-XOR
+cells, four ordered ByteXor lookups, four outputs, recognized form, typed
+module members, independently read witness program, and independently read
+constraint system. Green self-baselines precede red mutations for a wrong
+divisor, operator, operand, output order, and a missing emitted lookup. The
+concrete lookup identity and resolution use the certified full 65,536-row
+ByteXor table. The primary `xor32_spec_of_compile` theorem consumes emitted
+`ConstraintSet.LookupRowsHold` and retains the gadget's normalized-byte
+assumptions explicitly.
+
+Focused exact-commit checks
+---------------------------
+
+Commands:
+
+  lake build --wfail Clean.Backend.LLZK.Test.WitnessCheck \
+    Clean.Backend.LLZK.Test.Constraints \
+    Clean.Backend.LLZK.Test.Lookups \
+    Clean.Backend.LLZK.Test.Soundness
+
+  lake env lean doc/llzk/evidence/S29/xor32-probe.lean
+  bash scripts/llzk/check-pins.sh
+  bash scripts/llzk/test-scripts.sh
+
+Results:
+
+  targeted Lean build exit status: 0 (1766 jobs)
+  theorem probe exit status: 0
+  pin check: PASS at exact HEAD 8045dbb7
+  PASS: 88 error paths exercised
+
+The probe named both Xor32 spec-of-compile forms, the concrete table-identity
+theorem, and concrete lookup resolution. Each reported exactly:
+
+  [propext, Classical.choice, Quot.sound,
+   instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+   primeBabybear._native.native_decide.ax_1]
+
+There was no `sorryAx`. The two native-decision facts are the pre-existing
+Babybear `Fact (pBabybear > 512)` and `Fact pBabybear.Prime` instances in
+`Clean/Utils/Primes.lean`; XP introduced no `native_decide`, `sorry`, `unsafe`,
+or axiom declaration.
+
+Complete accepted-tool matrix on exact XP
+------------------------------------------
+
+The worktree was clean before and after the run and held under
+`LLZK_SESSION=s29-xor32-promotion`. Command:
+
+  LLZK_SESSION=s29-xor32-promotion \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result:
+
+  e2e.sh exit status: 0
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  15 circuit modules, 51 input vectors
+  9/15 source-backed modules checked by G9
+  both witness backends, full-witness and public output scopes
+  2 renderer fixtures
+  17/17 modules admitted by --llzk-product-program
+  10 modules lowered to SMT, 7 declared skips
+  88 G11 control cases
+  widest derived self-test artifact: Bits8
+
+Lean built 1876 Clean jobs and 1811 CleanTests jobs. The only warnings were
+the ten inherited Clean test-helper `sorry` declarations recorded by the
+frontend audit.
+
+Tool versions and provenance:
+
+  Lean: v4.32.2
+  llzk-opt: LLZK version 3.0.0
+  llzk-witgen: sibling binary in the same immutable Nix output; its own version
+    surface does not identify LLZK, so provenance is carried by llzk-opt and the
+    shared output path
+
+Independent adversarial review
+------------------------------
+
+Three continuously assigned read-only reviewers covered semantic soundness
+(`/root/xor_soundness_audit`), process and attribution
+(`/root/xor_process_audit`), and red-control/non-vacuity quality
+(`/root/xor_controls_audit`). The soundness lane returned one NO-GO during
+review: two docstrings called certified registry rows “emitted” although only
+the primary theorem consumes emitted lookup rows. The wording was narrowed to
+match the theorem types, then all three lanes independently rebuilt/re-probed
+the candidate and returned GO. No reviewer edited the candidate.
+
+Promotion boundary
+------------------
+
+XP proves and gates Xor32's compilation shape and concrete theorem chain. It
+does not add Xor32 to `Corpus.corpus`, change any aggregate count, or run Xor32
+through external `llzk-opt`/`llzk-witgen`. No ten-vector promotion reference set
+or documented promotion oracle exists at XP. Those are Phase XC acceptance
+obligations; Xor32 is not called promoted here.
+
+This evidence file is added by a later three-document commit. It records the
+clean full run on exact XP; it does not claim that the later documentary commit
+itself received G0-G12.
+
+No branch was pushed and no external state changed.
