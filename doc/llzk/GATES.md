@@ -276,10 +276,11 @@ the cases are the negative direction of
 positive direction ran on the real tools every time while the direction that
 matters ran never.
 
-There are now 58 cases. The audit control rejects a witgen shim that is honest
-for full-witness output but permissive for public output. Four S29 controls
-independently reject a missing overlay, unrelated overlay, indirect overlay, and
-wrong overlay path/status. Ten enforce
+There are now 61 cases. The audit control rejects a witgen shim that is honest
+for full-witness output but permissive for public output. Seven S29 controls
+independently reject a missing overlay, unrelated overlay, indirect overlay,
+an extra overlay path, wrong status on the expected path, and committed or
+uncommitted post-overlay Xor32 drift. Ten enforce
 the public CI policy in
 `check-actions-pinned.sh`: mutable action tags, moving hosted-runner or Rust
 inputs, writable default tokens, and implicitly enabled hosted or self-hosted

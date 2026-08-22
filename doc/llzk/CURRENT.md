@@ -75,10 +75,11 @@ commit SHA; hosted jobs name Ubuntu 24.04; Plonky3 names Rust 1.98.0; and the
 main token defaults to contents read-only. The LLZK job uses the accepted public
 substituter/key with source builds disabled. All hosted and self-hosted benchmark
 entry points are inert unless `CLEAN_BENCH_ENABLED == 'true'`, which publication
-keeps unset pending a runner threat review. G11 now exercises 54 error paths,
-including ten controls for these policies. Full G0-G12 passed on clean commit
-`9b809e32`; evidence is in `evidence/P0/ci-hardening.txt`. The workflows have
-not run remotely at this commit, and no external state changed.
+keeps unset pending a runner threat review. At that commit G11 exercised 53
+error paths, including ten controls for these policies; the later frontend
+audit added the public-scope discriminator as path 54. Full G0-G12 passed on
+clean commit `9b809e32`; evidence is in `evidence/P0/ci-hardening.txt`. The
+workflows have not run remotely at this commit, and no external state changed.
 
 Latest completed dependency session: **L0** — both the previous LLZK input
 `5db6f8f9` and candidate `25fb3740` were materialized by exact Nix flake

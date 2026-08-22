@@ -116,15 +116,33 @@ expect "Clean overlay is not a direct child" 1 "not a direct single-parent child
 
 clone="$(make_clone wrong-overlay-delta)"
 git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
-original_head="$(git -C "${clone}" rev-parse HEAD)"
-git -C "${clone}" checkout --quiet --detach 0e53b9f2d05f06defa2aa0a859f549b611583f10
-echo "-- wrong overlay path" >> "${clone}/Clean/Utils/Primes.lean"
-git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet -am "wrong overlay"
+git -C "${clone}" checkout --quiet --force --detach \
+  0e53b9f2d05f06defa2aa0a859f549b611583f10
+git -C "${clone}" checkout --quiet \
+  3d086f32a71d17cbddfb46c0dea63cd36c8aa552 -- Clean/Gadgets/Xor/Xor32.lean
+echo "-- unexpected second overlay path" >> "${clone}/Clean/Utils/Primes.lean"
+git -C "${clone}" add Clean/Gadgets/Xor/Xor32.lean Clean/Utils/Primes.lean
+git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet -m "expanded overlay"
 wrong_overlay="$(git -C "${clone}" rev-parse HEAD)"
-git -C "${clone}" checkout --quiet "${original_head}"
+mkdir -p "${clone}/scripts/llzk"
+cp "${script_dir}"/*.sh "${script_dir}"/*.py "${clone}/scripts/llzk/"
 sed -i "s/^clean_base=.*/clean_base=\"${wrong_overlay}\"/" \
   "${clone}/scripts/llzk/check-pins.sh"
-expect "unexpected Clean overlay delta" 1 "differs from the reviewed one-path delta" \
+expect "unexpected extra Clean overlay path" 1 "differs from the reviewed one-path delta" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
+clone="$(make_clone wrong-overlay-status)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+git -C "${clone}" checkout --quiet --force --detach \
+  0e53b9f2d05f06defa2aa0a859f549b611583f10
+git -C "${clone}" rm --quiet Clean/Gadgets/Xor/Xor32.lean
+git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet -m "delete overlay target"
+wrong_status_overlay="$(git -C "${clone}" rev-parse HEAD)"
+mkdir -p "${clone}/scripts/llzk"
+cp "${script_dir}"/*.sh "${script_dir}"/*.py "${clone}/scripts/llzk/"
+sed -i "s/^clean_base=.*/clean_base=\"${wrong_status_overlay}\"/" \
+  "${clone}/scripts/llzk/check-pins.sh"
+expect "unexpected Clean overlay status" 1 "differs from the reviewed one-path delta" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
 # A history that exists but does not descend from the pinned overlay.
@@ -159,6 +177,24 @@ clone="$(make_clone core-dirty)"
 git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
 echo "-- uncommitted working-tree edit" >> "${clone}/Clean/Utils/Primes.lean"
 expect "an uncommitted change to Clean's core is caught" 1 "uncommitted changes" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
+# S29. Xor32 is deliberately ordinary Clean core after K. These path-specific
+# controls prevent a later exclusion for the adopted overlay path from hiding
+# either committed or working-tree drift while the generic Primes probes above
+# remain green.
+clone="$(make_clone xor32-drift)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+echo "-- forbidden post-overlay Xor32 edit" >> "${clone}/Clean/Gadgets/Xor/Xor32.lean"
+git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet -am "touch Xor32"
+expect "a committed post-overlay Xor32 change is caught" 1 \
+  "no longer byte-identical to the accepted overlay" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
+clone="$(make_clone xor32-dirty)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+echo "-- forbidden uncommitted Xor32 edit" >> "${clone}/Clean/Gadgets/Xor/Xor32.lean"
+expect "an uncommitted post-overlay Xor32 change is caught" 1 "uncommitted changes" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
 clone="$(make_clone happy)"

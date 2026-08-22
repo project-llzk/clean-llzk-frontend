@@ -83,13 +83,15 @@ named owner and a separate threat review.
 - Integration branch: `clean-to-llzk/integration`
 - Lean toolchain: `leanprover/lean4:v4.32.2`
 
-The Clean revision is a base pin: frontend commits descend from it. The pin
-checker rejects a history that no longer contains it. S25 fetched
+The upstream provenance base U is `0e53b9f2`; S25 fetched
 `Verified-zkEVM/clean` on 2026-08-21 and confirmed `upstream/main` still resolved
-to this exact 2026-08-04 merge commit before accepting it; the prior
+to this exact 2026-08-04 merge commit before accepting it. The accepted source
+overlay K is the unpublished direct child `3d086f32`; frontend commits descend
+from K, while the pin checker separately requires the exact U object and
+configured upstream URL, the exact U-to-K one-file delta, and K ancestry. The prior
 `1e563b9c27991b3795eb440c1ee0757edb4ce8b1` base remains provenance, not an
-accepted input. Fetch, merge, constructor-diff, and full-gate evidence are in
-`evidence/S25/`.
+accepted input. S25 fetch, merge, constructor-diff, and full-gate evidence are
+in `evidence/S25/`; S29 overlay evidence is in `evidence/S29/`.
 
 ## LLZK tools
 

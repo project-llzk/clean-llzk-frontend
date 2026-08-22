@@ -130,7 +130,7 @@ needs the range contract D033 exposed.
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
-| CI supply-chain policy | complete locally | commit `9b809e32` plus the public-scope discriminator; immutable action SHAs, fixed Ubuntu/Rust/Nix-cache inputs, 54 G11 controls; organization CI still required on the frozen SHA |
+| CI supply-chain policy | complete locally | commit `9b809e32` had 53 controls; the audit baseline added the public-scope discriminator as control 54; immutable action SHAs and fixed Ubuntu/Rust/Nix-cache inputs; organization CI still required on the frozen SHA |
 | Upstream Clean alignment | complete locally | S25; G0-G12 on `6ccca6f8`, `evidence/S25/`; `0e53b9f2` / Lean 4.32.2, D026 recorded |
 | LLZK pin review | complete locally | D032; `25fb3740` accepted after both exact outputs passed, then G0-G12 passed on committed pin `5fe8f465`; `evidence/L0/` |
 | Structural bitwise witness IR | complete locally | S26/D033; G0-G12 green on `8951f016`, `evidence/S26/` |
