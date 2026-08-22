@@ -7,7 +7,7 @@ accumulated gates from a clean checkout.
 |---|---|
 | G0 — State | Correct worktree/branch, exact pins, clean or documented status |
 | G1 — Lean | Targeted Lean compilation/tests; broader build when required |
-| G2 — Renderer | Deterministic text equals the reviewed fixture; the protected constraint surface parses back to the typed IR |
+| G2 — Renderer | Deterministic text equals the reviewed fixture; globals, members, parameters, and the complete constraint body parse back to the typed IR |
 | G3 — LLZK verify | Pinned `llzk-opt` parses and verifies |
 | G4 — Round trip | Pinned `llzk-opt --verify-roundtrip` succeeds |
 | G5 — Interpreter | Pinned witgen interpreter produces the expected witness |
@@ -97,9 +97,12 @@ version appears.
 ## G5–G7 — witness generation, differentially
 
 `LLZK.Corpus.corpus` carries input vectors alongside each circuit. The emitter
-writes, per vector, the `--inputs` object and Clean's own witness for it, in the
-shape `--output-scope=full-witness --check-output` compares against. Clean's side
-uses `FlatOperation.witgen`, the array-backed reference interpreter that
+writes, per vector, the `--inputs` object, Clean's full witness, and Clean's
+public outputs. Both LLZK backends compare both
+`--output-scope=full-witness` and `--output-scope=public` with `--check-output`.
+The public check is separate because full-witness JSON groups signal and public
+members together and cannot detect a visibility mistake. Clean's side uses
+`FlatOperation.witgen`, the array-backed reference interpreter that
 `witgen_eq_dynamicWitnesses` proves agrees with the semantic definition.
 
 So G7 is not a separate run: `--check-output` carries it inside G5 and G6, and a
@@ -155,9 +158,9 @@ columns, and regrouping a global without changing its flattened scalar bag.
 *precondition of emission*: `ConstraintSet.compileSource'` runs it and refuses to
 return a module that fails, and `compile`/`emit` go through it.
 `agree_of_compileSource'` is the theorem, `witnessAgree_of_compileSourceVerified`
-its witness-side counterpart, and `eqs_iff_of_compileSource'` gives the first its
-meaning. So this holds for every circuit, not only for the circuits in the
-corpus.
+its witness-side counterpart, and `eqs_iff_of_agree` plus
+`lookups_perm_of_agree` give the constraint agreement its semantic meaning. So
+this holds for every circuit, not only for the circuits in the corpus.
 
 This paragraph used to say `compile`/`emit` were "the only public entry points".
 D018 retracted that in the R4 round and this file was not updated, so R5 found
@@ -171,11 +174,10 @@ the renderer entry in `GAPS.md`.
 
 That is translation validation rather than a verified translator: a lowering bug
 would surface as a refusal to compile rather than as a compile-time
-impossibility. The stronger statement — a preservation theorem about `lower`
-itself — needs a simulation argument over the `BuilderM` state monad.
-`FieldExpr.lower_spec` is the fragment of it that exists, and R5a showed it is
-much weaker than it reads; `GAPS.md` records exactly what it does and does not
-say.
+impossibility. The 2026-08-22 audit retired the unused `FieldExpr.lower_spec`
+fragment after R5a showed that it neither composed nor excluded grossly wrong
+lowerings. `GAPS.md` item 5 records the requirements for a future whole-translator
+proof.
 
 **G9 has two halves, and both are preconditions of emission.**
 `Constraints.lean` compares `@constrain` against the circuit's constraints;

@@ -125,22 +125,32 @@ content and field correctness each rest on a *single* Lean-side check with no
 independent downstream confirmation, which is the strongest argument this file
 has for the parser.
 
-**A5 closes the internal renderer gap.** `RenderCheck.parse` reads
-`global.def`, `struct.readm`, `array.new`, `constrain.eq`, and `constrain.in`
-from the concrete text and compares their names, dimensions, row-major values,
-SSA indices, member names, operand order, and independently reconstructed types
-with a projection of the typed IR. It also checks the function boundary, so
-moving the same lines into
-`@compute` is not an agreement. `Module.render` now returns `Except`; no
-supported artifact path receives text unless this comparison succeeds, and
-`EmitMain` reports a diagnostic rather than writing a partial artifact.
+**A5 closes the internal renderer gap.** The 2026-08-22 audit found its first
+implementation incomplete: it ignored `felt.const`, `felt.add`/`mul`,
+`global.read`, member declarations, and constraint parameters. Changing a
+constraint-side `felt.mul` to `felt.add`, or changing `@w0` from `{signal}` to
+`{llzk.pub}`, passed the old readback, G3/G4, and both full-witness checks; the
+latter mutation observably changed `--output-scope=public`.
+
+`RenderCheck.parse` now reads every `global.def`, every `struct.member`, every
+constraint parameter, and every `Stmt` constructor in `@constrain`. It compares
+names, visibility, dimensions, row-major values, SSA indices, operations,
+operands, and independently reconstructed types with a projection of the typed
+IR. Unknown body statements fail closed. It also checks the function boundary,
+so moving the same lines into `@compute` is not an agreement. `Module.render`
+returns `Except`; no supported artifact path receives text unless this
+comparison succeeds, and `EmitMain` reports a diagnostic rather than writing a
+partial artifact.
 
 `Module.render_constraintSurface` proves that every successfully returned text
 parses to exactly the typed module's protected surface. `Test/Print.lean` makes
 success non-vacuous on both renderer fixtures and makes the check go red for a
 same-typed member substitution, dropped equality/lookup/row construction,
-changed global shape or row ordering, malformed row construction, renamed
-`@constrain` function, and changed field type. The full corpus also passes
+changed global shape or row ordering, malformed row construction, changed
+constraint arithmetic/constant/table read/parameter, changed member visibility,
+renamed `@constrain` function, and changed field type. Both witness backends now
+also compare `--output-scope=public` against Clean for every corpus vector, so
+the visibility contract is executed independently of A5. The full corpus passes
 through the checked renderer before G3-G10 see it.
 
 What this does **not** close is D017: the parser establishes what concrete text
@@ -148,8 +158,9 @@ the backend wrote, not that LLZK's implementation gives that text the semantics
 Clean assumes. It is deliberately not a general LLZK parser either; the
 `@compute` surface retains its two-backend differential evidence, while every
 other rendered form remains covered by typed construction, goldens, and
-`llzk-opt` well-formedness. A new table/constraint-surface constructor must be
-added to `RenderCheck.ConstraintStmt` or the assurance claim must be reopened.
+`llzk-opt` well-formedness. A new `Stmt` constructor makes the typed projection
+non-exhaustive at compile time, while an unknown rendered constraint statement
+is rejected by the parser.
 
 ## 3. The chain from the emitted constraints to a gadget's `Spec` — **closed by A2**
 
@@ -243,7 +254,7 @@ whose patterns overlap, so Lean generates no equation lemmas and `split` fails o
 it; and its `for` loop hid the field check inside `forIn`. Both are now shapes a
 proof can name, with identical behaviour and identical diagnostics.
 
-## 5. `FieldExpr.lower_spec` is much weaker than its name
+## 5. No verified translator; the misleading `lower_spec` fragment was retired
 
 R5a abstracted its statement over the lowering function and proved it, with no
 `sorry` and clean axioms, of five alternatives: one throwing on every expression,
@@ -262,8 +273,17 @@ the reader ignores; and the emitted bounds do not imply the distinctness
 `ofModule` requires. A whole-function preservation theorem needs the reader
 restated first, not the current one lifted.
 
-Nothing outside `IR.lean` uses it. `ConstraintSet.agree` still does the work at
-every compile.
+Nothing outside `IR.lean` used it. The 2026-08-22 audit removed the entire
+`ExprAlgebra`/`Assign`/`readStmts`/`lower_spec` block rather than retain roughly
+390 lines of proof code that supported no active correctness claim and imposed
+a second statement vocabulary to maintain. `ConstraintSet.agree` and
+`WitnessSet.agree` remain the checks that do the work at every compile.
+
+The gap is therefore stated without the misleading partial result: this is a
+translation-validating frontend, not a verified translator. A future
+preservation theorem must model every emitted statement, connect to the active
+module readers, and compose through whole-function assembly; it should not
+revive the retired statement unchanged.
 
 ## 6. G9 compares no types — **closed by A4**
 

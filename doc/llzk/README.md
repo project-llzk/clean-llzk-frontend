@@ -15,11 +15,12 @@ has five assurance layers:
 2. The frontend compares the typed module's constraints and witness program
    with the flattened Clean circuit before returning it; copy canonicalisation
    has a proved value-preserving invariant over the whole witness-program list.
-3. The rendered `@constrain` surface is parsed back and compared with the typed
-   module before artifact text is returned.
+3. The rendered globals, members, constraint parameters, and complete
+   `@constrain` body are parsed back and compared with the typed module before
+   artifact text is returned.
 4. `llzk-opt` parses, verifies, round-trips, and analyzes each emitted artifact.
 5. Both `llzk-witgen` backends are checked against Clean's witness interpreter
-   over a boundary-oriented input corpus.
+   in full-witness and public-output scopes over a boundary-oriented input corpus.
 
 Stage 1 demonstrates that chain on `Addition8FullCarry`. `EXAMPLES.md` derives
 the exact conformance-corpus counts from Lean. This is a strong vertical slice,
@@ -48,6 +49,8 @@ For reproducibility and review:
 - [`PINS.md`](PINS.md) records every accepted external revision and tool.
 - [`GATES.md`](GATES.md) defines G0-G12 and their falsification controls.
 - [`DECISIONS.md`](DECISIONS.md) records semantic and trust-boundary decisions.
+- [`review/FRONTEND-AUDIT-2026-08-22.md`](review/FRONTEND-AUDIT-2026-08-22.md)
+  is the latest complete frontend audit and release recommendation.
 - [`review/`](review/) contains adversarial findings and dispositions.
 - [`evidence/`](evidence/) contains captured gate and probe results.
 - [`sessions/`](sessions/) is the historical execution record; it is not the
@@ -70,7 +73,7 @@ The recorded Stage-1 result is:
 
 ```text
 PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
-12 circuit(s), 33 input vector(s), both witgen backends
+15 circuit(s), 51 input vector(s), both witgen backends
 ```
 
 The worktree lock is part of the evidence protocol: the run rebuilds generated
@@ -81,7 +84,9 @@ artifacts, so its output is attributable only when one session owns the tree.
 The strongest established generic result is that, subject to the named lookup
 hypothesis and the gadget's assumptions, satisfaction of the compiled typed
 module's constraints implies the gadget's `Spec`. A separate renderer theorem
-ties its protected constraint surface to the typed module, and witness-side
+ties its protected globals, members, constraint parameters, and complete
+`@constrain` body to the typed module; both backends also execute the public
+output contract. Witness-side
 invariants prove copy canonicalisation value-preserving stepwise and as a whole.
 LLZK's concrete semantics remain outside these Lean theorems. `GAPS.md` is
 authoritative if a summary and a boundary ever disagree.

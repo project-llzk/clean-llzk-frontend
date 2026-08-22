@@ -22,10 +22,11 @@ came from. The [generated example showcase](doc/llzk/EXAMPLES.md) derives the
 current module and vector counts from the tested corpus and explains exactly
 what each example establishes.
 
-The project is deliberately explicit about its boundary: this is a verified
-source-to-typed-module pipeline with differential checks over the rendered
-artifact; it is not yet a formal semantics of LLZK text. Open assurance gaps are
-kept in one [gap register](doc/llzk/GAPS.md), rather than hidden behind a general
+The project is deliberately explicit about its boundary: this is a
+translation-validating source-to-typed-module pipeline with proved component
+lemmas and differential checks over the rendered artifact; it is not a verified
+translator or a formal semantics of LLZK text. Open assurance gaps are kept in
+one [gap register](doc/llzk/GAPS.md), rather than hidden behind a general
 "verified" label.
 
 Start here:
@@ -35,6 +36,7 @@ Start here:
 - [Current status and exact next action](doc/llzk/CURRENT.md)
 - [Capability roadmap](doc/llzk/ROADMAP.md)
 - [Assurance gaps and claim boundary](doc/llzk/GAPS.md)
+- [Latest complete frontend audit](doc/llzk/review/FRONTEND-AUDIT-2026-08-22.md)
 
 Project governance:
 
@@ -55,6 +57,8 @@ The full LLZK conformance run needs the pinned tools described in
 
 ```bash
 export LLZK_SESSION=my-session
+export LLZK_OPT=/path/to/llzk-opt
+export LLZK_WITGEN=/path/to/llzk-witgen
 bash scripts/llzk/worktree-lock.sh claim "full LLZK conformance run"
 bash scripts/llzk/e2e.sh
 ```

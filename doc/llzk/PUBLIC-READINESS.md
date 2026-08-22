@@ -1,11 +1,15 @@
 # Public-readiness milestone
 
-Updated: 2026-08-21
+Updated: 2026-08-22
 
 Status: active
 
 Target: a frozen release-candidate commit suitable for an organization-owned
 repository under `project-llzk`
+
+Latest audit: `review/FRONTEND-AUDIT-2026-08-22.md`. Its repairs pass the full
+matrix on both the accepted LLZK pin and current LLZK main. It is a pre-freeze
+audit, not the required R8 review.
 
 ## Outcome
 
@@ -76,9 +80,10 @@ authorized.
 
 - Keep G0-G12 green and falsifiable; all negative fixtures and agreement-count
   pins remain green.
-- Keep the A5 renderer check on the release path: rendered globals,
-  `readMember`, `arrayNew`, `constrainEq`, and `constrainIn` are parsed back into
-  the typed representation and must round-trip before text is returned.
+- Keep the A5 renderer check on the release path: rendered globals, members,
+  constraint parameters, and every `@constrain` statement are parsed back into
+  the typed representation and must round-trip before text is returned. Keep
+  both backends' separate public-output checks as the visibility control.
 - Keep A7's copy-canonicalisation invariant in the theorem audit; the
   representative map is built by `CopyCanon.run`, whose whole-list invariant is
   proved by `run_preserves` from the single-step theorem.
@@ -125,13 +130,13 @@ needs the range contract D033 exposed.
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, green on `b16bb83e` |
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
-| CI supply-chain policy | complete locally | commit `9b809e32`; immutable action SHAs, fixed Ubuntu/Rust/Nix-cache inputs, 53 G11 controls; organization CI still required on the frozen SHA |
+| CI supply-chain policy | complete locally | commit `9b809e32` plus the public-scope discriminator; immutable action SHAs, fixed Ubuntu/Rust/Nix-cache inputs, 54 G11 controls; organization CI still required on the frozen SHA |
 | Upstream Clean alignment | complete locally | S25; G0-G12 on `6ccca6f8`, `evidence/S25/`; `0e53b9f2` / Lean 4.32.2, D026 recorded |
 | LLZK pin review | complete locally | D032; `25fb3740` accepted after both exact outputs passed, then G0-G12 passed on committed pin `5fe8f465`; `evidence/L0/` |
 | Structural bitwise witness IR | complete locally | S26/D033; G0-G12 green on `8951f016`, `evidence/S26/` |
 | Multi-column tables | complete and adversarially reviewed locally | S28/D034; full 65536×3 certificate, row-preserving G9, six-vector `And8`, and both review repairs passed G0-G12 on `129fbe6e`; `evidence/S28/adversarial-review.md` |
 | Headline bitwise examples end to end | not started | tables plus a proved range contract, then promote |
-| Renderer round-trip assurance | complete locally | A5; G0-G12 green on `28132f64` |
+| Renderer round-trip assurance | strengthened locally | A5 plus the 2026-08-22 audit: complete constraint/member/parameter readback, public-output checks, and mutation regressions; final G0-G12 result recorded in the audit report |
 | Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |
 | Final frozen-tree review | not started | R8 |
 | Organization access | available | active `project-llzk` admin verified 2026-08-21 |

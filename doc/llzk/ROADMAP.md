@@ -265,9 +265,9 @@ Status against that definition:
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
 | unsupported cases fail with structured diagnostics | done — 35 negative fixtures pin exact messages, including S25's five new constructor paths and the pre-S28 wide-field `.val` control. This is still not claimed to be one per rejection path |
-| `llzk-opt` accepts and round-trips | done — 12 modules and 2 renderer fixtures, G3 and G4 |
+| `llzk-opt` accepts and round-trips | done — 15 modules and 2 renderer fixtures, G3 and G4 |
 | every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 14 |
-| both witgen backends agree | done — 33 input vectors, G5 and G6 |
+| both witgen backends agree | done — 51 input vectors in full-witness and public scopes, G5 and G6 |
 | witnesses match Clean on a corpus | done — G7, via `--check-output` against `FlatOperation.witgen` |
 | the emitted constraints are Clean's | done — G9, and since S17 a precondition of emission, so for every circuit |
 | the emitted witnesses are Clean's | done — G9's witness half, S19/D020, likewise a precondition of emission |
@@ -286,8 +286,9 @@ file.
   D020). A lowering bug surfaces as a refusal to compile rather than as a
   compile-time impossibility. D021 records what actually blocks the stronger
   statement — the emitter's privacy boundary, not the state monad — and the three
-  ways out; `FieldExpr.lower_spec` is the fragment that exists, and GAPS.md item 5
-  says how much smaller it is than its name.
+  ways out. The former `FieldExpr.lower_spec` fragment was retired on 2026-08-22
+  because it was unused and did not compose; GAPS.md item 5 states the replacement
+  criterion.
 - **The reading of LLZK is an assumption** (D017): that `felt.add` is `+`,
   `constrain.eq` is equality, `constrain.in` is membership, and
   `!felt.type<"babybear">` is `ZMod 2013265921`. Nothing in Lean can settle it
@@ -300,9 +301,10 @@ file.
 - **The protected renderer surface now reads back (A5).** R6 and R7 showed why
   this mattered: the toolchain gates certify nothing about `@constrain` content.
   `RenderCheck.parse` is now the second line of defense, and
-  `Module.render_constraintSurface` ties every successfully returned text to the
-  typed module's globals, `readMember`, `arrayNew`, `constrainEq`, and
-  `constrainIn` sequence. This
+  `Module.render_semanticSurface` ties every successfully returned text to the
+  typed module's globals, members, constraint parameters, and complete
+  `@constrain` statement sequence. Both witness backends also compare public
+  outputs for every vector. This
   closes GAPS item 2 without closing D017's assumption about LLZK semantics.
 - **Copy canonicalisation is proved stepwise (A7).**
   `CopyCanon.step_preserves`, composed with `WExpr.eval_rename` and

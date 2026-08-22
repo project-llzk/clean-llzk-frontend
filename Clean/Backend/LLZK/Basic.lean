@@ -30,8 +30,9 @@ against it by `llzk-opt`, and one that disagrees is rejected. Emitting
 prime is exactly `prime`, which is why the name and the prime travel together and
 `Analyze` compares them rather than trusting the caller's spelling.
 
-Transcribed from `lib/Util/Field.cpp`, `Field::initKnownFields`, at the pinned
-LLZK revision `5db6f8f9baaa40787a1a40625796497445f2da36`. -/
+Transcribed from `lib/Util/Field.cpp`, `Field::initKnownFields`, and rechecked at
+the accepted LLZK revision `25fb3740ea3465c9129a06289297bb4f0554b7a5` and
+upstream main `b5c110d1088e93d6786f66ec1e155be87bae755f` on 2026-08-22. -/
 structure FieldSpec where
   name : String
   prime : Nat

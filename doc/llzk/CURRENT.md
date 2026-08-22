@@ -11,6 +11,20 @@ three times, and reproduced by R7; all gates were green against the pinned tools
 and in CI, and the pipeline milestone (a Clean circuit compiled, validated, and
 its emitted constraints proved to imply the gadget's `Spec`) stands.
 
+Latest complete frontend audit: **2026-08-22**. The review found a real A5
+false-green: constraint arithmetic and member visibility were outside the
+rendered-text readback, and full-witness JSON could not detect the visibility
+change. The repair protects all globals, members, constraint parameters, and
+`@constrain` statements; both witness backends now also check public-output JSON
+on every vector; both typed readers require the exact member layout. Unused and
+misleading `lower_spec` proof vocabulary and obsolete wrappers were removed.
+The post-repair G0-G12 matrix passed on the accepted LLZK pin and on LLZK main
+`b5c110d1`: 15 modules, 51 vectors, two scopes in both backends, 17/17 product
+admissions, and 10 SMT lowerings / 7 declared skips. See
+`review/FRONTEND-AUDIT-2026-08-22.md` and
+`evidence/AUDIT-2026-08-22/`. This is not R8: the XOR range contract and
+headline-example promotion still precede candidate freeze.
+
 Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
 Compatibility commit `6ccca6f8` preserves the accepted frontend subset, makes
@@ -51,7 +65,7 @@ commit SHA; hosted jobs name Ubuntu 24.04; Plonky3 names Rust 1.98.0; and the
 main token defaults to contents read-only. The LLZK job uses the accepted public
 substituter/key with source builds disabled. All hosted and self-hosted benchmark
 entry points are inert unless `CLEAN_BENCH_ENABLED == 'true'`, which publication
-keeps unset pending a runner threat review. G11 now exercises 53 error paths,
+keeps unset pending a runner threat review. G11 now exercises 54 error paths,
 including ten controls for these policies. Full G0-G12 passed on clean commit
 `9b809e32`; evidence is in `evidence/P0/ci-hardening.txt`. The workflows have
 not run remotely at this commit, and no external state changed.
@@ -436,8 +450,10 @@ closed): lookup table rows are asserted by the caller and not checked (D012 —
 and the `ConstraintSet.globals` conjunct that claimed to close this is a
 tautology; S24 closed the *erasure* half, so the certificate reaches the
 compiler, and R7 tied it to the table's *name*, but not to the circuit's own
-table); and `FieldExpr.lower_spec` is satisfied by five grossly wrong lowerings
-and does not compose. (§4 was on this list until A1 closed it; §3 until A2 —
+table); and there is no whole-translator preservation theorem. The unused
+`FieldExpr.lower_spec` fragment was retired on 2026-08-22 after R5 showed that
+five grossly wrong lowerings satisfied it and that it did not compose. (§4 was
+on this list until A1 closed it; §3 until A2 —
 `spec_of_compile`, whose lookup hypothesis now ranges over the module reader's
 ordered `C.lookups` after the S28 review closed R7-12's remaining bridge;
 §6 until A4; §2 until A5's checked textual constraint-surface round trip; and
@@ -464,19 +480,21 @@ VeIR's project (D003). The `@compute` half of the same reading *does* have
 evidence: 51 vectors across two independent LLZK backends (45 with a Clean
 circuit behind them), plus S26's direct bitwise/shift probes.
 
-**S20 — the preservation theorem — exists, and is much smaller than this section
-used to claim.** Every module `compile` returns has been compared against its
+**S20's partial preservation theorem was retired.** Every module `compile`
+returns has been compared against its
 circuit on both sides, so a lowering bug yields a *refusal*, never a wrong
 module; that part holds.
 
 Two corrections R5 forced. The refusal is no longer "merely never-observed" — R5c
 observed one, on a proved `FormalCircuit` whose emitted module was correct, and
-the reader was at fault. And `FieldExpr.lower_spec`, the theorem S20 produced,
-turns out to be satisfied by a lowering that throws on every expression, one that
+the reader was at fault. The `FieldExpr.lower_spec` theorem S20 produced turned
+out to be satisfied by a lowering that throws on every expression, one that
 emits everything in the wrong field, and one that appends a bogus
 `constrain.eq %v, 0` to every subexpression. Lifting it through the assembly
 loops — the plan for S21 — would have been lifting almost nothing; R5a-4 gives
-three obstructions. `GAPS.md` item 5.
+three obstructions. Since nothing consumed it, the 2026-08-22 audit removed the
+proof and its private reader vocabulary instead of presenting it as active
+assurance. `GAPS.md` item 5 records what a replacement must establish.
 
 It was attempted, and the attempt found that the obstacle is not the one D018
 implied. It is not the state monad: it is that `Value.mk`, `Builder.fresh`,
@@ -590,15 +608,17 @@ order they are written in there.
    going red. It shook out one real defect in the tests: a `#guard` checked every
    corpus module against a hard-coded babybear, which is wrong for five of the six
    `Square_*` entries — `Corpus.Entry` now carries its `FieldSpec`.
-5. **§2 — done (A5).** The supported renderer parses `readMember`,
-   `constrainEq` and `constrainIn` back from the concrete `@constrain` function,
-   compares them with the typed module, and refuses mismatches before text is
-   returned. The theorem and five red controls are in `Print.lean` and
-   `Test/Print.lean`. D017 remains separate.
+5. **§2 — done (A5).** The supported renderer parses all globals, members,
+   constraint parameters, and `@constrain` statements back from the concrete
+   text, compares them with the typed module, and refuses mismatches before text
+   is returned. Both witness backends also compare public-output JSON. The
+   theorem and red controls are in `Print.lean` and `Test/Print.lean`. D017
+   remains separate.
 6. **§5 / D021 — the preservation theorem.** Turning D018's translation
    validation into a verified translator. R5a-4's three obstructions say the
-   *reader* has to be restated before `lower_spec` can be lifted through the
-   assembly loops. Largest item in this track and the one with the least leverage
+   *reader* has to model the whole emitted function and connect to the active G9
+   readers; the old `lower_spec` fragment was retired rather than lifted.
+   Largest item in this track and the one with the least leverage
    per hour, because `agree` already refuses a wrong module.
 7. **§8 — done (A7).** `CopyCanon.step_preserves` proves that one
    canonicalisation step preserves the semantic representative invariant, and

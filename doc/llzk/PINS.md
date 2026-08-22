@@ -23,6 +23,13 @@ builds identify themselves as LLZK 3.0.0; the immutable SHA and L0 evidence,
 not the tag or version string, are the compatibility authority. Evidence is in
 `evidence/L0/` and the decision is D032.
 
+Compatibility note (checked 2026-08-22): LLZK main moved one commit to
+`b5c110d1088e93d6786f66ec1e155be87bae755f`. The delta is a walk-helper
+refactor, and the complete post-audit G0-G12 matrix passed unchanged against its
+exact Nix output, including both public and full-witness scopes. The accepted
+pin remains `25fb3740`; a compatibility pass is evidence, not an implicit pin
+update. See `review/FRONTEND-AUDIT-2026-08-22.md`.
+
 ## CI execution environment
 
 Workflow dependencies are repository inputs too. `scripts/llzk/check-actions-pinned.sh`

@@ -38,7 +38,7 @@ register. S25 advanced Clean to
 | Project | Ref reviewed | Toolchain / relevant state |
 |---|---|---|
 | Clean | `1e563b9c27991b3795eb440c1ee0757edb4ce8b1` | Lean `v4.30.0`; witness IR and JSON export present |
-| LLZK | `5db6f8f9baaa40787a1a40625796497445f2da36` | LLZK 3.0; `llzk-witgen` present with interpreter and execution-engine backends |
+| LLZK | `25fb3740ea3465c9129a06289297bb4f0554b7a5` | Accepted LLZK 3.0 pin; `llzk-witgen` has interpreter and execution-engine backends; current-main compatibility is recorded in the 2026-08-22 audit |
 | project-llzk VeIR | `eae1c27e7842c0503233ec99155c39791bd5f502` | Lean `v4.31.0-rc2`; Felt/Bool/Constrain.eq subset, no Struct/Array runtime |
 | opencompl VeIR | `a4e6194d5810a02d74f0094ff6014cda6db6d617` | Lean `v4.32.2`; verifier is actively moving to dialect-local `OpInfo` |
 | llzk-lean accepted VeIR pin | `d899d95004d4bd988c8456d686c33b11a7a5eb4a` | Clean dependency pin; workspace VeIR is only descendant context |
@@ -172,8 +172,9 @@ member names. The MVP should use stable generated names:
 - compute arguments: `arg0`, `arg1`, ... with matching
   `function.arg_name`;
 - witness members: `w0`, `w1`, ...;
-- public outputs: `out0`, `out1`, ... when output variables point at those
-  witness cells.
+- public outputs: `out0`, `out1`, ... as dedicated `{llzk.pub}` members. Each is
+  written by `@compute` and constrained equal to the corresponding Clean output
+  expression, so constants, inputs, and compound expressions work uniformly.
 
 A later derivable `LLZKLayout`/schema typeclass can preserve source names.
 

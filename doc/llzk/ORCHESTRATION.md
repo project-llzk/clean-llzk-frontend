@@ -1,5 +1,10 @@
 # Clean → LLZK: cross-session orchestration plan
 
+> **Historical bootstrap protocol.** S00 enacted this plan and repository-owned
+> `CURRENT.md`, `PINS.md`, `GATES.md`, and `PUBLIC-READINESS.md` are now the
+> control plane. Paths, branches, and starting pins below are preserved as
+> provenance, not current instructions.
+
 **Date:** 2026-07-31  
 **Status:** proposed execution protocol  
 **Architecture baseline:** `clean-to-llzk-plan-2026-07-31.md`

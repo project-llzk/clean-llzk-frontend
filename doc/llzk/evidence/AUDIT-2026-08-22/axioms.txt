@@ -1,0 +1,23 @@
+'LLZK.CanonicalRepr.val_natCast' depends on axioms: [propext, Quot.sound]
+'LLZK.WExpr.eval_lt_upperBound' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.WExpr.eval_bitsOf' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.WExpr.eval_ofWitgen' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.ofStatic_certifies' depends on axioms: [propext, Quot.sound]
+'LLZK.byteXorTable_certifies' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.ConstraintSet.eqs_iff_of_agree' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.ConstraintSet.lookupRows_of_agree' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.spec_of_compile' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.Module.render_semanticSurface' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.WitnessSet.CopyCanon.step_preserves' depends on axioms: [propext, Quot.sound]
+'LLZK.WitnessSet.CopyCanon.run_preserves' depends on axioms: [propext, Quot.sound]
+'LLZK.Test.Soundness.add8_spec_of_compile' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1]
+'LLZK.Test.Soundness.and8_spec_of_compile' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1,
+ Gadgets.And.And8.and_times_two_add_xor._native.bv_decide.ax_1_5]

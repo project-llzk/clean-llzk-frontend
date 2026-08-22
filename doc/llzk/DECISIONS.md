@@ -418,10 +418,11 @@ computed value. Clean names the discipline that rules this out
 of circuit on which the two definitions disagree is now rejected rather than
 mis-emitted. See R2-03.
 
-The comparison itself is `llzk-witgen --output-scope=full-witness
---check-output`, so a disagreement is a non-zero exit rather than two JSON dumps
-for a reader to diff. G7 is carried inside G5 and G6 rather than being a separate
-run.
+The comparison uses `llzk-witgen --check-output` in both `full-witness` and
+`public` scopes, so a disagreement is a non-zero exit rather than two JSON dumps
+for a reader to diff. The public check was added on 2026-08-22 because
+full-witness JSON does not distinguish signal from public members. G7 is carried
+inside G5 and G6 rather than being a separate run.
 
 The JSON keys come from `Circuit.lean`'s layout functions, shared with the
 emitter. That is deliberate — it makes drift between the expected keys and the
@@ -576,9 +577,12 @@ the table registry, and says in its own docstring that it is not the fail-closed
 entry point for circuits. The accurate claim is the one the theorem supports:
 **no module obtained through `compile` or `emit` has gone unchecked.**
 
-`agree_of_compileSource'` is the theorem; `eqs_iff_of_compileSource'` and
-`lookups_perm_of_compileSource'` give it meaning by composing it with
-`ofSource_eqs_iff`.
+`agree_of_compileSource'` is the theorem. The original convenience wrappers
+`eqs_iff_of_compileSource'` and `lookups_perm_of_compileSource'` were retired in
+the 2026-08-22 cleanup because the active soundness chain consumes the more
+general `eqs_iff_of_agree` and `lookups_perm_of_agree` directly. Those compose
+the same data-level agreement with `ofSource_eqs_iff` and the lookup certificate
+bridge without coupling it to one compiler entry point.
 
 Alternative considered and not done: a preservation theorem about `lower` itself.
 It is the better artifact — it would say *why* the lowering is right, and make a
@@ -690,11 +694,20 @@ Two things this does not do:
   is a separate traversal whose correctness is proved, which is the property
   `ofFExpr` has only by inspection.
 
-## D021 — S20 is blocked on where the private boundary goes, not on effort
+## D021 — Proof placement for S20 (historical; partial proof retired)
 
-**Status:** accepted — option (1), enacted, and the theorem **proved**
+**Status:** superseded on 2026-08-22 — option (1) remains enacted; the partial theorem was retired
 **Date:** 2026-08-01
 **Enacted by:** the S20 attempt
+
+**Maintenance note.** The design conclusion remains useful: any proof that
+needs to expose private builder state belongs beside that state in `IR.lean`.
+The particular `FieldExpr.lower_spec` subsequently proved there was not a
+translator-preservation theorem. R5 showed that five grossly wrong lowerings
+satisfied it, it did not compose with function assembly, and no code or proof
+consumed it. The 2026-08-22 audit removed the theorem and its private
+`ExprAlgebra`/assignment reader (about 390 lines). The chronology below explains
+why it was attempted; it does not describe a current assurance artifact.
 
 D018 and D020 record that G9 *validates each translation* rather than verifying
 the translator, and name the preservation theorem about `lower` as the thing that
@@ -761,8 +774,8 @@ expected: `BuilderState`'s constructor is private too, so the theorem's
 …)` is expressible, but the frame lemma every sequencing case needs must mention
 `{ nextIndex := …, stmts := … }`, and cannot.
 
-So the work happens inside `IR.lean`, and it is **done**:
-`FieldExpr.lower_spec` proves that running the lowering from a fresh index and
+So the work happened inside `IR.lean`. At the time, `FieldExpr.lower_spec`
+proved that running the lowering from a fresh index and
 reading the emitted statements back recovers the expression's denotation at the
 value returned, together with the bookkeeping — the index only advances, every
 statement defines an index in the range consumed, and the returned value is in

@@ -1,5 +1,11 @@
 # Claim inventory for the Stage-1 adversarial review
 
+> **Historical review input.** This inventory captures the R2-era frontend
+> (14 backend modules and 16 vectors) and deliberately preserves the claims the
+> early reviews tried to falsify. It is not the current release claim set. Use
+> `../GAPS.md`, `../GATES.md`, and `FRONTEND-AUDIT-2026-08-22.md` for the current
+> boundaries and reproduced evidence.
+
 Every load-bearing claim the project currently makes, in one place, so a review
 can try to falsify them one at a time instead of reading code hoping to notice
 something.
