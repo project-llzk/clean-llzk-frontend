@@ -1,0 +1,259 @@
+S29 Phase HC — BLAKE3.G external-promotion gates
+=================================================
+
+Date: 2026-08-23
+
+Exact clean implementation commit tested:
+  a3299ca06576b81586ddbe56a9de711e12f1a8cd
+
+Sole parent (BLAKE3.G proof/shape commit HP):
+  f3951231928568bf97a17176a84691fd3752ef59
+
+Reference-contract commit HR:
+  ec1b7e18925128dc12dae2d8cb6a8935b3c6c828
+
+Accepted LLZK source and immutable output:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+Checked-main compatibility source and immutable output:
+  b5c110d1088e93d6786f66ec1e155be87bae755f
+  /nix/store/hvvbkw0afshj37zpiilw0jwxjxfad4p4-llzk-release-3.0.0
+
+The accepted LLZK pin remains 25fb3740. The b5c110d1 run is compatibility
+evidence, not a pin update.
+
+Scope
+-----
+
+HC changed exactly twelve paths:
+
+  Clean/Backend/LLZK/Corpus.lean
+  Clean/Backend/LLZK/EmitMain.lean
+  Clean/Backend/LLZK/Showcase.lean
+  Clean/Backend/LLZK/Test/Constraints.lean
+  Clean/Backend/LLZK/Test/Corpus.lean
+  Clean/Backend/LLZK/Test/Coverage.lean
+  Clean/Backend/LLZK/Test/Showcase.lean
+  doc/llzk/EXAMPLES.md
+  doc/llzk/GATES.md
+  scripts/llzk/e2e.sh
+  scripts/llzk/lib.sh
+  scripts/llzk/test-scripts.sh
+
+The committed diff is 508 insertions and 77 deletions. No Clean-core,
+lowering, witness-bound, proof/HP, oracle/HR, Keccak, or unrelated corpus path
+changed. HC is the sole direct child of HP. The worktree was clean before both
+complete exact-commit matrices and remained unchanged between them.
+
+Focused exact-commit checks
+---------------------------
+
+Commands:
+
+  bash scripts/llzk/check-pins.sh
+  bash scripts/llzk/test-scripts.sh
+  lake env lean doc/llzk/evidence/S29/blake3g-probe.lean
+  python3 doc/llzk/evidence/S29/blake3g_oracle.py
+  python3 -O doc/llzk/evidence/S29/blake3g_oracle.py
+
+Results:
+
+  pin check: PASS at exact HEAD a3299ca0 (inside both matrices)
+  verbatim harness banner (the 177 control cases include positive baselines):
+    PASS: 177 error paths exercised
+  theorem probe exit status: 0
+  Python: 3.12.3
+  normal and optimized oracle stdout: 51 lines, identical SHA-256:
+    e0cb9ec3ec465e4ae65bd03b857a5c216a99bb3dc42da0390a54fa03d0df3364
+
+Frozen file hashes:
+
+  blake3g_oracle.py:
+    788b8a8a6af8cfcfd1b2e8a4e567bee374ff5b0b14c116e0ecefddc5746eea75
+  blake3g-probe.lean:
+    294b4953795e66440562b6721ac3e2ffc0d735620baee3247ab1d45b36931930
+  e2e.sh (whole file, pinned by G11):
+    bf0e65b8b2007087040267c9ccf91c5fe7fa619d40434833059c7e2a08420383
+  lib.sh:
+    d0cca2d1e1d89f4b387995a5f1ab487de05af2c70d42912f1abc2ae870675ae4
+  test-scripts.sh:
+    644a7910dfd77e1688a68a0eb557461313bad80dfa108d281e523580317fa54f
+
+The oracle source is byte-identical from HR through HC. The theorem probe is
+byte-identical from HP through HC.
+
+The committed probe names these six declarations:
+
+  LLZK.Test.Soundness.blake3g_spec_of_compile
+  LLZK.Test.Soundness.blake3g_spec_of_compile'
+  LLZK.Test.Soundness.blake3g_no_interactions
+  LLZK.Test.Lookups.blake3g_lookups_are_bytes_or_byteXor
+  LLZK.Test.Lookups.blake3g_resolve
+  LLZK.Test.Lookups.blake3g_lookup_iff
+
+Each printed exactly this axiom closure:
+
+  [propext,
+   Classical.choice,
+   Quot.sound,
+   instFactGtNatPBabybearHAddHPowOfNat_1._native.native_decide.ax_1,
+   instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+   primeBabybear._native.native_decide.ax_1,
+   Gadgets.ByteDecomposition.Theorems.soundness._native.bv_decide.ax_1_6]
+
+There was no sorryAx. These are three standard Lean axioms and four inherited
+native-computation axioms; HC adds no proof source and no axiom, sorry, unsafe
+declaration, native_decide, or bv_decide use.
+
+Complete accepted-tool matrix on exact HC
+------------------------------------------
+
+Command:
+
+  LLZK_SESSION=s29-blake3g-promotion \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result:
+
+  e2e.sh exit status: 0
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  17 corpus modules, 67 input vectors
+  all 11 source-backed corpus modules checked by both halves of G9
+  6 registry modules correctly reported as not applicable to G9
+  both LLZK witness backends, full-witness and public output scopes
+  2 renderer fixtures
+  19/19 modules admitted by --llzk-product-program
+  10 modules lowered to SMT, 9 declared skips
+  177 G11 control cases
+  widest interface: BLAKE3G
+
+Lean built 1,876 Clean jobs and 1,811 CleanTests jobs. The only warnings were
+the ten inherited Clean test-helper sorry declarations already recorded by the
+frontend audit. llzk-opt reported LLZK version 3.0.0. llzk-witgen is the sibling
+binary in the same immutable output; its own version surface does not identify
+LLZK, so provenance is carried by llzk-opt and the shared output path.
+
+Checked-main compatibility matrix on exact HC
+----------------------------------------------
+
+Command:
+
+  LLZK_SESSION=s29-blake3g-promotion \
+  LLZK_OPT=/nix/store/hvvbkw0afshj37zpiilw0jwxjxfad4p4-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/hvvbkw0afshj37zpiilw0jwxjxfad4p4-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result:
+
+  e2e.sh exit status: 0
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  17 corpus modules, 67 input vectors
+  all 11 source-backed corpus modules checked; 6 registry modules N/A
+  both LLZK witness backends and both scopes
+  2 renderer fixtures
+  19/19 product-program admissions
+  10 SMT lowerings / 9 declared skips
+  177 G11 control cases
+  widest interface: BLAKE3G
+
+llzk-opt reported LLZK version 3.0.0. llzk-witgen is the sibling binary in the
+same immutable checked-main output, with provenance carried by llzk-opt and the
+shared output path. This is exact-revision compatibility evidence only. It does
+not advance the accepted LLZK pin or imply compatibility with future main
+revisions.
+
+BLAKE3.G external discriminator
+-------------------------------
+
+All six BLAKE3.G indices 0 through 5 ran through both LLZK witness backends in
+both full-witness and public scopes. The dedicated lane-marker index 5 has an
+exact carrier of 72 ordered inputs, 96 w{k} cells, and 64 out{j} values.
+
+For each backend, the real accepted tool first accepted one full and one public
+baseline, then rejected:
+
+  96 isolated canonical one-cell witness mutations in full scope;
+  64 isolated canonical one-member output mutations in full scope; and
+  64 isolated canonical one-member output mutations in public scope.
+
+That is four green baselines plus 448 isolated real-tool red mutations across
+both backends. They are one marker row's one-field mutations, not 448 vectors,
+input mutations, arbitrary corruptions, or constraint executions. Inputs are
+checked for exact arg0..arg71 layout, canonicality, and full-input association,
+but are not individually perturbed. Witness cells do not exist in public scope.
+
+G11 separately uses an all-ones synthetic carrier, 1-to-0 mutations, a
+content-aware checker, and an exact 452-call log: four baselines plus the same
+448 backend/scope/key targets. It demonstrates that
+a checker ignoring w42 is caught, that every positive count drives validation,
+that exact arity includes the empty-tenth/nonempty-eleventh bypass, and that
+canonicality controls reach their intended branches. It also digest-pins the
+whole e2e driver. One reachability mutation inserts an early continue that makes
+the six vector preflights unreachable; the other wraps the entire BLAKE
+discriminator block in an outside false conditional. The whole-file digest gate
+rejects both. This synthetic log is a harness falsification proof; it is not the
+real-tool mutation evidence above.
+
+BLAKE3G is admitted to the product-program pipeline. Its SMT lowering is a
+declared skip because felt.uintdiv/felt.umod are illegal for the current pass;
+that is a measured tool limitation, not a semantic conclusion.
+
+Harness falsification and independent review
+---------------------------------------------
+
+Three continuously assigned read-only lanes covered semantic soundness,
+process/attribution, and red-control quality. They repeatedly returned NO-GO
+while HC was live. Confirmed findings included:
+
+  exact resolution of all 72 lookups needed attacks against all same-shaped
+    fake table choices;
+  broad first/middle/last mutation sampling was insufficient for 96 cells;
+  exhaustive-interface arity could be bypassed with an empty tenth and a
+    nonempty eleventh argument;
+  named input/public canonicality controls initially failed for earlier reasons;
+  valid positive but wrong input/witness/output counts were not independently
+    shown to drive validation;
+  a whole-driver digest and reachability attacks were needed to keep the BLAKE
+    calls live; and
+  documentation conflated fixed outputs, Clean-derived cells, public scope,
+    control-case totals, and measured runtime.
+
+Each finding was repaired and re-audited before HC was staged. On the exact
+12-path candidate all three reviewers independently returned GO. After HC was
+committed, the same lanes separately audited the immutable theorem/oracle,
+control/evidence, and process/status boundaries before this documentary closure.
+
+Boundary and attribution
+------------------------
+
+The six rows are normalized spec-domain rows with fixed public references; the
+96 internal cells remain Clean-derived. blake3g_spec_of_compile is conditional
+on compilation/readback/recognition, equality and lookup satisfaction, exact
+input evaluation, and normalized assumptions. The external witness runs do not
+establish those constraint premises: witgen ignores constrain(), and G10 runs
+no solver. D017/formal LLZK semantics, a verified translator, arbitrary-input
+correctness, backend implementation independence, and the generic caller-table
+identity gap remain open. Keccak, R8 freeze, publication, and organization
+changes are outside HC.
+
+HD changes exactly these eleven documentation/evidence paths:
+
+  README.md
+  doc/llzk/README.md
+  doc/llzk/CURRENT.md
+  doc/llzk/GAPS.md
+  doc/llzk/PINS.md
+  doc/llzk/PUBLIC-READINESS.md
+  doc/llzk/ROADMAP.md
+  doc/llzk/GATES.md
+  doc/llzk/sessions/S29-xor-range-contract.md
+  doc/llzk/evidence/S29/blake3g.md
+  doc/llzk/evidence/S29/blake3g-gates.txt
+
+The complete matrices belong only to exact clean HC a3299ca0; HD does not
+inherit those runs. The worktree was clean after the checked-main comparison
+and before these eleven documentation/evidence changes began. No branch was
+pushed and no external state changed.

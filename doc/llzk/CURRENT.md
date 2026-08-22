@@ -1,6 +1,6 @@
 # Clean → LLZK current state
 
-Updated: 2026-08-22
+Updated: 2026-08-23
 
 Active milestone: **public-ready Clean to LLZK release candidate** — make the
 repository suitable for an organization-owned home under `project-llzk`, with a
@@ -24,10 +24,11 @@ admissions, and 10 SMT lowerings / 7 declared skips. The reviewed repair is
 frozen through clean audit commit `7c567f54`. See
 `review/FRONTEND-AUDIT-2026-08-22.md` and
 `evidence/AUDIT-2026-08-22/`. This is not R8: S29 has since completed the XOR
-range contract, while headline-example promotion still precedes candidate
-freeze.
+range contract and Xor32/BLAKE3.G promotions; a separate R8 review of a frozen
+candidate still precedes publication.
 
-Active capability session: **S29 — source-visible XOR byte range**. Its first
+Latest completed capability session: **S29 — source-visible XOR byte range and
+headline promotion**. Its first
 commit is decision and process only: D035 selects executable `% 256` narrowing,
 exact modulo bounds, and power-of-two XOR/OR envelopes without importing hidden
 circuit assumptions. Clean-only overlay `3d086f32`, built from exact upstream
@@ -42,21 +43,28 @@ the same complete matrix. Cross-cutting Phase-X gate commit `8f0fab79` then
 expanded G11 to 88 harness control cases, pins exact corpus and SMT counts, and
 probes first/middle/last witness cells and output members in full-witness scope
 plus public outputs in public scope; its complete accepted-tool matrix passed,
-with `Bits8` derived as the widest current interface. Fixed-reference carrier
+with `Bits8` derived as the widest interface at that boundary. Fixed-reference carrier
 commit `046ec949` and proof/shape commit `8045dbb7` now give Xor32 its checked
 reference infrastructure, exact source/module/readback shapes, certified
 lookup resolution, red mutations, and concrete spec-of-compile theorem. Xor32
 external-promotion commit `06b80f2f` adds the fixed seven-spec/three-compute
 vector set, independent oracle, exhaustive output and old-raw discriminators,
 and a clean accepted-tool G0-G12 run: 16 modules, 61 vectors, both scopes in
-both backends, 18/18 admissions, 10/8 SMT, and 143 G11 control cases. BLAKE3.G remains
-capability-only until its Phase-H reference, proof, and promotion obligations
-are complete.
+both backends, 18/18 admissions, 10/8 SMT, and 143 G11 control cases. Phase H
+then froze its BLAKE3.G reference contract on HR `ec1b7e18`, proof and exact
+shape on HP `f3951231`, and external promotion on HC `a3299ca0`. Exact
+`G 0 1 2 3` carries six normalized `.spec` rows, each row's 64 fixed
+official-reference-derived outputs, 96 Clean-derived internal cells, and an
+exact 72-input/96-witness/64-output discriminator. Both the accepted LLZK pin
+and checked LLZK main passed G0–G12 on clean HC: 17 modules, 67 vectors, G9 on
+all 11 source-backed corpus modules (the other six of 17 are registry modules
+and G9 is N/A), 19/19 admissions, measured SMT 10/9, and 177 G11 control cases.
 Independent adversarial review is required at every phase boundary. See
 `sessions/S29-xor-range-contract.md`, `evidence/S29/bounds.md`,
 `evidence/S29/bounds-gates.txt`, `evidence/S29/harness-gates.txt`, and
-`evidence/S29/xor32-proof-gates.txt`, `evidence/S29/xor32.md`, and
-`evidence/S29/xor32-gates.txt`.
+`evidence/S29/xor32-proof-gates.txt`, `evidence/S29/xor32.md`,
+`evidence/S29/xor32-gates.txt`, `evidence/S29/blake3g.md`, and
+`evidence/S29/blake3g-gates.txt`.
 
 Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
@@ -144,7 +152,7 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s29-xor-range-contract` (Xor32 external promotion sealed on `06b80f2f`; BLAKE3.G Phase H next)
+Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase H implementation sealed on `a3299ca0`; this documentation-only closure completes S29; candidate selection and R8 next)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
@@ -237,10 +245,10 @@ commands with `LLZK_SESSION=<label>`** — each command there is its own POSIX
 session, so the default identity does not survive from the claim to the run.
 `doc/llzk/CONCURRENCY.md` has the why.
 
-Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 16 circuits, 61
+Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 17 circuits, 67
 input vectors, both witgen backends, and 2 renderer fixtures. G10a must admit all
-18 modules; G10b's exact accepted/refused split is recorded by the latest gate
-evidence rather than inferred from the corpus count.
+19 modules; the measured G10b split is exactly 10 lowered / 9 declared skips and
+is pinned by the gate rather than inferred from the corpus count.
 
 CI is *configured* to run G0, G11 and G12 on every pull request, and G1–G10 in
 the `llzk-e2e` job, which builds the pinned LLZK from the same flake reference
@@ -359,13 +367,13 @@ an explicit decision, which was given.
     generated no equation lemmas, and a `for` loop that hid the field check
     inside `forIn`. No new axioms.
   - **A2**, closing `GAPS.md` §3 — the statement R5e said a user most likely
-    assumes the project has. `Soundness.spec_of_compile`: if the emitted module's
-    `@constrain` is satisfied at an assignment and the gadget's `Assumptions`
-    hold there, the gadget's own `Spec` holds. Three of its four links are
-    Clean's own; the one that did not exist was A1's lookup theorem, and
-    `Operations.FullGuarantees` turned out to be *free* because it quantifies
-    over channel interactions, which `Analyze` refuses by name. Instantiated at
-    `Addition8FullCarry`, with everything about the circuit discharged by proof.
+    assumes the project has. `Soundness.spec_of_compile` is a conditional
+    soundness implication: for an assignment satisfying every reader-extracted
+    equality and ordered lookup row, under exact input evaluation and the gadget
+    assumptions, the gadget `Spec` holds. Concrete resolution/no-interaction
+    obligations are proved for `Addition8FullCarry`, `And8`, Xor32, and exact
+    BLAKE3.G `G 0 1 2 3`; compilation, readback, recognition, equality/lookup
+    satisfaction, input evaluation, and assumptions remain explicit premises.
     G12 also became a code-reading check rather than a grep over comments, after
     three files in one session had been added to its allowlist for prose alone —
     the allowlist shrank instead.
@@ -434,44 +442,48 @@ an explicit decision, which was given.
   independent oracle, exhaustive four-output attacks on the wide rows, the
   exact old-raw row-9 discriminator, and whole-driver reachability controls.
   G0-G12 passed with 16 modules, 61 vectors, 18 admissions, 10/8 SMT, both
-  scopes/backends, and 143 G11 control cases. BLAKE3.G Phase H is next.
+  scopes/backends, and 143 G11 control cases.
+- Completed locally: **S29 BLAKE3.G Phase H**. HR `ec1b7e18` freezes the
+  reference contract, HP `f3951231` the proof/shape boundary, and HC
+  `a3299ca0` the exact `G 0 1 2 3` external promotion. Both full toolchain
+  matrices passed with 17 modules, 67 vectors, 19 admissions, 10/9 SMT, both
+  scopes/backends, and 177 G11 control cases. This documentary closure is HD;
+  R8 has not started.
 - Blocked: none.
 
 ## Last green gates
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete accepted-tool run: S29 Xor32 external-promotion commit
-`06b80f2f48b3c6c7c850062e596dde92ab11d82e`; see
-`evidence/S29/xor32.md` and `evidence/S29/xor32-gates.txt`. All G0-G12 passed
-with 16 modules, 61 vectors, G9 on 10/16 source modules, 18 admissions, the
-measured aggregate 10/8 SMT split, 143 G11 cases, and `Bits8` as the widest
-general probe. The latest two-toolchain
-run remains frontend audit commit `7c567f5451c2e40b7be88e96d8a519a7bf82495e`;
-see `evidence/AUDIT-2026-08-22/`. That audit's axiom probe covers its frozen
-frontend theorem closure, including concrete Add8 and And8 spec chains, with no
-`sorryAx`. Phase B's modulo/XOR/OR probe and XP's Xor32 theorem probe are
-recorded in `evidence/S29/bounds-gates.txt` and
-`evidence/S29/xor32-proof-gates.txt`; neither contains `sorryAx`.
+Latest complete two-toolchain run: clean S29 BLAKE3.G implementation commit
+`a3299ca06576b81586ddbe56a9de711e12f1a8cd`; see
+`evidence/S29/blake3g.md` and `evidence/S29/blake3g-gates.txt`. All G0–G12
+passed against accepted LLZK `25fb3740` and checked LLZK main `b5c110d1`: 17
+modules, 67 vectors, G9 on all 11 source-backed corpus modules (the other six of
+17 are registry modules and G9 is N/A), 19 admissions, measured aggregate SMT
+10/9, and 177 G11 control cases.
+BLAKE3G is the widest interface. Its committed probe has no `sorryAx` and names
+all seven axioms in its inherited closure; the theorem remains conditional and
+D017 remains open.
 
 | Gate | Result |
 |---|---|
 | G0 state and pins | PASS — and since R6 it also fails on any change to Clean's core outside `Clean/Backend/LLZK/`, `Clean.lean` and `Clean/Test.lean` |
 | G1 lint + `lake build --wfail Clean` + `lake build CleanTests` | PASS |
-| G2 renderer: goldens plus checked semantic-surface round trip | PASS — 2 renderer fixtures, 16 corpus modules, including arithmetic, visibility, parameter, member, and nested-table red mutations |
-| G3 `llzk-opt` parse and verify | PASS — 16 modules + 2 fixtures |
-| G4 `llzk-opt --verify-roundtrip` | PASS — 16 modules + 2 fixtures |
-| G5 `llzk-witgen` interpreter | PASS — 61 vectors in full-witness and public scopes |
-| G6 `llzk-witgen` execution engine | PASS — 61 vectors in full-witness and public scopes |
-| G7 both backends vs Clean's own interpreter | PASS — carried by `--check-output` |
+| G2 renderer: goldens plus checked semantic-surface round trip | PASS — 2 renderer fixtures, 17 corpus modules, including arithmetic, visibility, parameter, member, and nested-table red mutations |
+| G3 `llzk-opt` parse and verify | PASS — 17 modules + 2 fixtures |
+| G4 `llzk-opt --verify-roundtrip` | PASS — 17 modules + 2 fixtures |
+| G5 `llzk-witgen` interpreter | PASS — 67 vectors in full-witness and public scopes |
+| G6 `llzk-witgen` execution engine | PASS — 67 vectors in full-witness and public scopes |
+| G7 both backends vs checked expectations | PASS — `--check-output` uses Clean-derived cells plus fixed Xor32/BLAKE3.G outputs checked equal to Clean before expected-JSON emission |
 | G8 fail closed | PASS — exact negative fixtures include the new bound, shift-count, dynamic-operand, index, and oversized-`bitsOf` refusals, plus tool-version rejection |
-| G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
-| G10a LLZK analysis pipeline admits the module | PASS — all 18 |
-| G11 the harness's own control cases | PASS — 143 exercised, including lock/core/policy controls, partial and path-specializing full/public checker attacks, exhaustive Xor32 output/raw attacks, whole-e2e reachability mutations, independent strict-width branches, numeric ordering, widest-selector failures, and exact-count failures |
+| G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission for all 11 source-backed corpus modules; the other six of 17 are registry modules and G9 is N/A (D018, D020) |
+| G10a LLZK analysis pipeline admits the module | PASS — all 19 |
+| G11 the harness's own control cases | PASS — 177, including positive baselines, lock/core/policy controls, Xor32 raw/output attacks, whole-e2e reachability mutations, and BLAKE3.G exact-layout/content-aware controls |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |
-| G10b SMT lowering | PASS — 10 lowered, 8 out of scope for a declared reason |
+| G10b SMT lowering | PASS — 10 lowered, 9 out of scope for a declared reason |
 
 Every gate is checked to be falsifiable, and the checks are part of the gate
 rather than notes about it:
@@ -481,6 +493,11 @@ rather than notes about it:
   mutations in the available witness-cell, full-output, and public-output
   groups; the separately derived widest interface requires all three positions
   in every group to be distinct (R2-06, S29);
+- BLAKE3.G's lane-marker discriminator additionally requires the exact
+  72-input/96-witness/64-output carriers, then makes both backends reject every
+  one-cell `w0`–`w95` mutation in full scope and every one-member
+  `out0`–`out63` mutation in both scopes; inputs are layout, canonicality, and
+  association checked, not individually mutated;
 - G3, G4 and G10, by `require_llzk_opt_discriminates`, which requires `llzk-opt`
   to reject a non-MLIR file *and* a well-formed MLIR module that is invalid LLZK
   — a shim answering only `--version` used to make all three vacuous while the
@@ -512,11 +529,14 @@ read, and the docstrings it points at now agree with it.
 
 The largest still open, in order (R7-14 — an earlier version of this paragraph
 kept listing §3 and §6 after other sections of this same file recorded them
-closed): lookup table rows are asserted by the caller and not checked (D012 —
+closed): the generic compiler API cannot tie a caller-certified `RawTable` to
+an arbitrary circuit's erased `RawTable` (D012 —
 and the `ConstraintSet.globals` conjunct that claimed to close this is a
 tautology; S24 closed the *erasure* half, so the certificate reaches the
 compiler, and R7 tied it to the table's *name*, but not to the circuit's own
-table); and there is no whole-translator preservation theorem. The unused
+table). Current lookup-bearing headlines discharge `resolve` through
+circuit-specific proofs, but that does not close the generic caller-selected
+identity gap. There is also no whole-translator preservation theorem. The unused
 `FieldExpr.lower_spec` fragment was retired on 2026-08-22 after R5 showed that
 five grossly wrong lowerings satisfied it and that it did not compose. (§4 was
 on this list until A1 closed it; §3 until A2 —
@@ -532,19 +552,23 @@ compiler's own registry check", and R5a-7 corrected that to "nothing instantiate
 the theorem, so nothing discharges its hypothesis". Since A1 the original
 sentence is true and is a theorem: `canonical_of_recognize` derives the bound
 from `registryOk_of_recognize` and `size_eq_of_recognize`, and
-`Test/Lookups.lean` instantiates both it and `byteTable_lookup_iff` at
-`Addition8FullCarry`. One hypothesis is left and is named — that the compiler
-accepted the circuit, which is a `#guard` rather than a `rfl`.
+`Test/Lookups.lean` instantiates it for Add8, And8, Xor32, and heterogeneous
+BLAKE3.G; the exact resolution proofs tie their operations to Bytes and/or
+ByteXor. Successful recognition remains a named checked premise rather than a
+kernel-reduced fact.
 
 **D017 — the reading of LLZK — cannot be closed from this repository.**
 `llzk-witgen`'s help text says it outright: *"llzk-witgen v1 ignores constrain()
 and traps on bool.assert."* There is no executor for `@constrain` in the pinned
 toolchain, and no formal LLZK semantics in Lean, so the assumption that
-`constrain.eq` is equality and `constrain.in` is membership has no empirical
-check and cannot acquire one here. Closing it means formalising LLZK, which is
+`constrain.eq` is equality and `constrain.in` is membership has no independent
+runtime-executor check and cannot acquire one here. Lean readback and conditional
+theorem evidence do not execute constraints. Closing D017 means formalising LLZK, which is
 VeIR's project (D003). The `@compute` half of the same reading *does* have
-evidence: 61 vectors across two independent LLZK backends (55 with a Clean
-circuit behind them), plus S26's direct bitwise/shift probes.
+evidence: 67 vectors across both LLZK witness backends (61 with a Clean circuit
+behind them). The six BLAKE rows add fixed independent public outputs, while
+their 96 internal cells remain Clean-derived; S26's direct bitwise/shift probes
+remain separate evidence.
 
 **S20's partial preservation theorem was retired.** Every module `compile`
 returns has been compared against its
@@ -625,8 +649,9 @@ where capability grows; S28 is where the *library* does.
 
 Stage 1 is finished, reproduced, and reviewed three times by sessions that did
 not write it. What remains sorts into five tracks. S28 and its post-completion
-review are accepted; S29 Phase B and Xor32 Phase X are complete; BLAKE3.G
-Phase H is the active dependent follow-up.
+review are accepted; S29 Phase B, Xor32 Phase X, and BLAKE3.G Phase H are
+complete. This documentation-only closure completes S29; next select and freeze
+one candidate, then begin R8.
 
 **The two milestones, stated in the grant's terms.** Milestone 1 — one Clean
 circuit compiled through the whole LLZK pipeline, validated end to end — is
@@ -663,13 +688,15 @@ order they are written in there.
    interactions, which `Analyze` refuses — so the chain is A1's lookup theorem
    plus three of Clean's own steps. Soundness direction only; A5 now bridges the
    protected surface to text, while D017's semantics assumption remains.
-3. **§1's second half — tie a certificate to the circuit's own table.** The
-   largest open *soundness* gap: the caller picks both sides of `Certifies`, so
-   it can certify a table the circuit does not look into. Closing it needs the
-   `Table` to survive into `Lookup` instead of being erased to a `RawTable`. That
-   is a change to Clean's core, which since R6 is a **gate** — so it is a
-   Clean-side session with its own review, reserved by ORCHESTRATION §11, not an
-   increment here.
+3. **§1's second half — generic caller-selected identity.** The largest open
+   generic-API soundness gap is that an arbitrary caller picks both sides of
+   `Certifies`, so it can certify a table the circuit does not look into. The
+   current Add8, And8, Xor32, and exact BLAKE3.G headline instantiations are
+   separately protected by circuit-specific exact-resolution proofs. Closing
+   the API for all callers needs the `Table` to survive into `Lookup` instead of
+   being erased to a `RawTable`. That is a change to Clean's core, which since
+   R6 is a **gate** — so it is a Clean-side session with its own review,
+   reserved by ORCHESTRATION §11, not an increment here.
 4. **§6 — done (A4).** Both readers take the expected `Ty` and check it at every
    operand, parameter, member and global; array types are checked exactly against
    the global being read. `Test/Constraints.lean` pins R5e's own counterexample
@@ -725,8 +752,8 @@ one negative fixture):
   locally**. Executable source narrowing plus proved generic modulo/XOR/OR
   bounds now compile narrowed Xor32 and the checked BLAKE3.G instantiation
   without using `FormalCircuit.Assumptions`. Raw-XOR Keccak remains refused,
-  Xor32 now has external-corpus promotion evidence on `06b80f2f`, and BLAKE3.G
-  still requires it.
+  Xor32 has external-corpus promotion evidence on `06b80f2f`, and exact
+  BLAKE3.G `G 0 1 2 3` on `a3299ca0`.
 - **The rest of the witness IR**: `let`-steps and `mapRange` → `scf.for` (this
   is SHA256's real blocker, R7-07, and the zkGolf Add32 ports' too, R7-09),
   `inv` → `felt.inv` (with `ite`, the `IsZero`/comparator family), `listGet` →
@@ -768,8 +795,10 @@ and new tools passed the unchanged same-tree matrix. **S26 is implemented
 locally**: D033, structural lowering, direct `bitsOf`, proofs, corpus, and
 remeasured coverage are in place. **S28 is green on its clean implementation
 commit**, and **S29 Phase B has completed the witness-visible Xor32/BLAKE3.G
-range contract on `7a0f209c`**. **Xor32 promotion is complete on `06b80f2f`;**
-BLAKE3.G promotion comes next; the witness-IR loop increment remains later. S27
+range contract on `7a0f209c`**. **Xor32 promotion is complete on `06b80f2f`,
+and exact BLAKE3.G promotion on `a3299ca0`;** this documentation-only closure
+completes S29. Candidate selection and frozen R8 come next, while the witness-IR
+loop increment remains later. S27
 remains returned for re-scoping (R7-09).
 
 The assurance track's A5 renderer and A7 copy-canonicalisation items are now

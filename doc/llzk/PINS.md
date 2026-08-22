@@ -21,7 +21,7 @@ record the decision, builds, and independent reviews. No upstream branch, issue,
 or PR changed when K was adopted.
 
 Public-readiness note (checked 2026-08-21): L0 advanced the accepted pin from
-`5db6f8f9baaa40787a1a40625796497445f2da36` to current
+`5db6f8f9baaa40787a1a40625796497445f2da36` to the then-current
 `project-llzk/llzk-lib` `main`,
 `25fb3740ea3465c9129a06289297bb4f0554b7a5`, after running both exact Nix
 outputs against one frozen frontend tree. Both passed the unchanged G0-G12
@@ -38,6 +38,22 @@ refactor, and the complete post-audit G0-G12 matrix passed unchanged against its
 exact Nix output, including both public and full-witness scopes. The accepted
 pin remains `25fb3740`; a compatibility pass is evidence, not an implicit pin
 update. See `review/FRONTEND-AUDIT-2026-08-22.md`.
+
+Phase-H compatibility recheck (checked 2026-08-23): exact LLZK source
+`b5c110d1088e93d6786f66ec1e155be87bae755f`, materialized as
+`/nix/store/hvvbkw0afshj37zpiilw0jwxjxfad4p4-llzk-release-3.0.0`, passed
+G0–G12 on exact clean frontend implementation commit
+`a3299ca06576b81586ddbe56a9de711e12f1a8cd`: 17 corpus modules / 67 vectors,
+G9 on all 11 source-backed modules with six registry entries N/A, both LLZK witness
+backends in full-witness and public scopes, two renderer fixtures, 19/19
+product-program admissions, measured aggregate SMT split 10 lowered / 9
+declared skips, and 177 G11 control cases. The BLAKE3.G row-5 discriminator
+separately produced four green baselines and rejected 448 isolated one-field
+mutations. The accepted LLZK pin remains `25fb3740`; this exact-revision
+compatibility pass is evidence, not a pin update. This run covers witness
+computation, parsing, round-trip, and pipeline admission; witgen still ignores
+`@constrain`, G10 runs no solver, and D017/formal LLZK semantics remain open.
+See `evidence/S29/blake3g-gates.txt`.
 
 ## CI execution environment
 

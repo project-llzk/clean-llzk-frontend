@@ -31,8 +31,9 @@ public documentation and hygiene
   → S26: bounded structural U64 and `bitsOf` (done locally)
   → S28: multi-column lookup tables and certificates (complete locally)
   → S29: source-visible XOR range contract and generic bounds (complete locally)
-  → end-to-end Xor32 (complete on `06b80f2f`) plus BLAKE3.G Phase H
-  → frozen-candidate adversarial review
+  → end-to-end Xor32 (`06b80f2f`) and BLAKE3.G (`a3299ca0`) (complete locally)
+  → S29 documentation and evidence closure (complete in this commit)
+  → candidate selection and frozen-candidate adversarial review
 ```
 
 This order joins the three goals that matter for publication. S25 removed the
@@ -45,10 +46,11 @@ artifact
 boundary every pinned LLZK binary accepts without checking semantic content;
 A7 removed the remaining inspection-only premise from copy canonicalisation.
 S26, S28, and S29 Phase B turn measured refusals into compile-capable examples.
-Xor32 is now promoted through the external-tool corpus on `06b80f2f`;
-BLAKE3.G remains the composed headline obligation. The release candidate is
-reached only when both examples carry that evidence, not when `LLZK.compile`
-merely succeeds.
+Xor32 is promoted through the external-tool corpus on `06b80f2f`; exact
+BLAKE3.G `G 0 1 2 3` follows on `a3299ca0`. A candidate is selected only after
+this documentary closure; release readiness is reached only after that frozen
+candidate passes R8, not merely because `LLZK.compile` succeeds or both examples
+carry pre-R8 evidence.
 
 The initial implementation lives under:
 
@@ -67,7 +69,7 @@ Clean/Backend/LLZK/
   Examples.lean    worked example circuits
   RendererFixture.lean  modules exercising every IR constructor, for G2 and G3
   Differential.lean  Clean's own witness, in llzk-witgen's --check-output shape
-  Corpus.lean      the conformance corpus: circuits plus input vectors
+  Corpus.lean      circuits, inputs, Clean-derived cells, and fixed headline outputs
   EmitMain.lean    `lean --run` entry point that materializes the corpus
   Test/            goldens, rejection fixtures, and the G9 checks
 ```
@@ -80,9 +82,13 @@ so a macro would only have been sugar over one of them.
 
 Implemented, golden-tested, and validated against the pinned LLZK 3.0 tools:
 `llzk-opt` parses, verifies, round-trips and product-forms every emitted module;
-both `llzk-witgen` backends agree with Clean's own witness interpreter across the
-recorded input corpus; and no module leaves the backend without its `@constrain`
-having been compared against the circuit's own constraint system (G9, D018).
+both `llzk-witgen` backends agree with checked expectations across the recorded
+input corpus—Clean-derived cells plus independently fixed headline outputs
+prechecked equal to Clean—and no circuit-derived module returned by
+`compile`/`emit` leaves the backend without its `@constrain` having been compared
+against the circuit's own constraint system (G9, D018). The six hand-built
+registry modules have no Clean circuit, so G9 is explicitly N/A and their entry
+path remains confined by G12.
 
 Accept:
 
@@ -166,8 +172,9 @@ then added executable source narrowing plus generic structural bounds:
 S29 Phase B retires the compile-time Xor32/BLAKE3.G range refusal, but compile
 success alone is not external promotion. Xor32 separately completed its fixed
 references, exact shape and lookup proofs, theorem instance, and full
-two-backend/two-scope corpus matrix on `06b80f2f`. BLAKE3.G still needs those
-Phase-H obligations. Keccak remains outside S29's promotion scope. Treating
+two-backend/two-scope corpus matrix on `06b80f2f`. Exact BLAKE3.G `G 0 1 2 3`
+completed the corresponding heterogeneous Bytes/ByteXor obligations and full
+matrix on `a3299ca0`. Keccak remains outside S29's promotion scope. Treating
 assumptions as if the witness recognizer could see them would still make G9's
 semantic theorem false.
 
@@ -205,7 +212,7 @@ controls. The current u64-related boundaries are:
 
 | boundary | local authority | owner / issue state |
 |---|---|---|
-| source-visible XOR byte bounds for Xor32/BLAKE3.G | D035, S29 coverage, exact raw-XOR and hidden-intermediate fixtures | Resolved locally by the reviewed Clean overlay and generic Phase-B bounds at `7a0f209c`; Xor32 external promotion is complete on `06b80f2f`, while BLAKE3.G remains Phase H. Keccak's raw XOR witnesses remain refused and no upstream issue was opened. |
+| source-visible XOR byte bounds for Xor32/BLAKE3.G | D035, S29 coverage, exact raw-XOR and hidden-intermediate fixtures | Resolved locally by the reviewed Clean overlay and generic Phase-B bounds at `7a0f209c`; Xor32 external promotion is complete on `06b80f2f`, and exact BLAKE3.G `G 0 1 2 3` on `a3299ca0`. Keccak's raw XOR witnesses remain refused and no upstream issue was opened. |
 | shift counts at least 64 or dynamically unproved | D033 and exact shift-count fixtures | Intentional adapter refusal: Clean masks modulo 64 while LLZK consumes the felt count. Not an upstream bug; schedule a local masked-lowering increment only if needed. |
 | multi-column static lookup rows | D013 superseded by D034; row-shape, renderer, and G9 red controls | Resolved by S28 from S26 evidence tip `91d43ffd`; dynamic tables remain out of scope. |
 | wide-field `.val` | D033, GAPS §8, exact `wideFieldValWitness`, and S29's bn254-width `% 3` / `% 256` refusals | Resolved for the current contract by refusal. Generic wide-field narrowing or a limb representation is separately unscheduled and outside S29; it has no current implementation owner. |
@@ -261,9 +268,9 @@ the textual contract or add a direct dependency to Clean.
 
 Stage 1 is complete when one documented Lean command emits
 `Addition8FullCarry.llzk`, the pinned `llzk-opt` accepts and round-trips it, both
-witgen backends match each other, their witnesses match Clean across the recorded
-corpus, and the emitted constraints are Clean's. Unsupported cases must fail with
-structured diagnostics.
+witgen backends match each other, their witnesses match checked expectations
+across the recorded corpus, and the emitted constraints are Clean's. Unsupported
+cases must fail with structured diagnostics.
 
 The last of those was added to the definition by S14. R2 showed why: every other
 criterion was met by a module whose `@constrain` was empty.
@@ -274,10 +281,10 @@ Status against that definition:
 |---|---|
 | one command emits `Addition8FullCarry.llzk` | done — `lake env lean --run Clean/Backend/LLZK/EmitMain.lean <dir>` |
 | unsupported cases fail with structured diagnostics | done — exact negative-message fixtures cover the accepted boundary, including S29's raw-XOR, hidden-intermediate, modulo, and wide-field controls; this is not claimed to be one fixture per rejection path |
-| `llzk-opt` accepts and round-trips | done — 16 modules and 2 renderer fixtures, G3 and G4 |
-| every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 18 emitted modules (16 corpus plus 2 renderer fixtures) |
-| both witgen backends agree | done — 61 input vectors in full-witness and public scopes, G5 and G6 |
-| witnesses match Clean on a corpus | done — G7, via `--check-output` against `FlatOperation.witgen` |
+| `llzk-opt` accepts and round-trips | done — 17 modules and 2 renderer fixtures, G3 and G4 |
+| every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 19 emitted modules (17 corpus plus 2 renderer fixtures) |
+| both witgen backends agree | done — 67 input vectors in full-witness and public scopes, G5 and G6 |
+| witnesses match checked corpus expectations | done — G7, via `--check-output` against Clean-derived cells plus fixed headline outputs prechecked equal to `FlatOperation.witgen` |
 | the emitted constraints are Clean's | done — G9, and since S17 a precondition of emission, so for every circuit |
 | the emitted witnesses are Clean's | done — G9's witness half, S19/D020, likewise a precondition of emission |
 
@@ -302,11 +309,13 @@ file.
   `constrain.eq` is equality, `constrain.in` is membership, and
   `!felt.type<"babybear">` is `ZMod 2013265921`. Nothing in Lean can settle it
   without a formal model of LLZK. Every emitted operation rests on it.
-- **Nothing ties a table certificate to the circuit's own table.** The compiler
-  does now *demand* one — the public entry points take a `CertifiedConfig` (S24,
-  D022) — but the caller picks both sides of `Certifies`, because `Table.toRaw`
-  erased which `Table` a `RawTable` came from. GAPS.md item 1's second half; the
-  fix is upstream in Clean's core.
+- **The generic API does not tie a caller-selected table certificate to an
+  arbitrary circuit's own erased table.** The compiler does now *demand* a
+  certificate — the public entry points take a `CertifiedConfig` (S24, D022) —
+  but the caller picks both sides of `Certifies`, because `Table.toRaw` erased
+  which `Table` a `RawTable` came from. Current lookup-bearing headline
+  instantiations separately prove exact circuit-specific resolution; the open
+  generic gap and upstream repair are in GAPS.md item 1.
 - **The protected renderer surface now reads back (A5).** R6 and R7 showed why
   this mattered: the toolchain gates certify nothing about `@constrain` content.
   `RenderCheck.parse` is now the second line of defense, and

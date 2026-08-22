@@ -19,10 +19,13 @@ has five assurance layers:
    `@constrain` body are parsed back and compared with the typed module before
    artifact text is returned.
 4. `llzk-opt` parses, verifies, round-trips, and analyzes each emitted artifact.
-5. Both `llzk-witgen` backends are checked against Clean's witness interpreter
-   in full-witness and public-output scopes over a boundary-oriented input corpus.
+5. Both `llzk-witgen` backends are checked against exact expectations in
+   full-witness and public-output scopes over a boundary-oriented input corpus:
+   internal cells are Clean-derived, while promoted Xor32/BLAKE3.G outputs are
+   fixed independent references first checked equal to Clean.
 
-Stage 1 demonstrates that chain on `Addition8FullCarry`. `EXAMPLES.md` derives
+Stage 1 demonstrates that chain on `Addition8FullCarry`; Xor32 and exact
+`BLAKE3.G 0 1 2 3` are the promoted bitwise headlines. `EXAMPLES.md` derives
 the exact conformance-corpus counts from Lean. This is a strong vertical slice,
 not broad library coverage: the checked 12-gadget sweep currently has exactly
 10 compile-capable rows among approximately 128 top-level circuits, and only
@@ -69,7 +72,15 @@ bash scripts/llzk/worktree-lock.sh claim "reproduce Clean to LLZK"
 bash scripts/llzk/e2e.sh
 ```
 
-The recorded S29 Phase-X result on clean implementation commit `06b80f2f` is:
+The recorded S29 Phase-H result on clean implementation commit `a3299ca0` is:
+
+```text
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+17 circuit(s), 67 input vector(s), both witgen backends,
+full-witness and public output scopes
+```
+
+For historical comparison, the Phase-X result on `06b80f2f` was:
 
 ```text
 PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12

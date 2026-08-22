@@ -217,7 +217,7 @@ is `+`, `constrain.eq` is equality, `constrain.in` is membership, and natural,
 bitwise, and shift operations read their operands as canonical representatives.
 Nothing in Lean settles that without a formal model of LLZK; G5–G7 are the
 empirical evidence for the `@compute` half of it, on 67 vectors (61 from Clean
-sources) and two independent LLZK backends; S26 also probes every new operation spelling
+sources) and both LLZK witness backends; S26 also probes every new operation spelling
 directly. The lookup *rows* used to be listed here; since S16
 they are proved — see D012 and `Clean/Backend/LLZK/TableCert.lean`.
 

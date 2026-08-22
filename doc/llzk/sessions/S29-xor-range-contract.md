@@ -1,6 +1,7 @@
 # S29 — Source-visible XOR byte range and headline promotion
 
-Status: Xor32 external promotion sealed on `06b80f2f`; BLAKE3.G Phase H next
+Status: Phase H implementation sealed on `a3299ca0`; this HD closure completes
+S29; candidate selection and R8 next
 Depends on: audited frontend baseline `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Base integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Frontend branch: `clean-to-llzk/s29-xor-range-contract`
@@ -229,7 +230,7 @@ and 143 G11 control cases. G11 pins the whole e2e driver and makes both an early
 has no `sorryAx`; the independent oracle is stable under normal and optimized
 Python. Three continuously assigned read-only reviewers returned final GO on
 the immutable commit. Evidence is in `evidence/S29/xor32.md` and
-`evidence/S29/xor32-gates.txt`. Phase H is now the active S29 increment.
+`evidence/S29/xor32-gates.txt`. Phase H followed from this frozen boundary.
 
 ## Phase H — promote BLAKE3.G
 
@@ -256,10 +257,35 @@ S29. Acceptance is clean G0-G12, theorem/axiom probe, fixed reference-vector
 red discrimination, exact updated counts/showcase/SMT split, and independent
 review.
 
+Phase H was executed as three immutable boundaries. HR
+`ec1b7e18925128dc12dae2d8cb6a8935b3c6c828` freezes the standalone
+official-reference-derived oracle and six normalized `.spec` rows. HP
+`f3951231928568bf97a17176a84691fd3752ef59` freezes the exact source,
+recognized, typed-module, reader, 72-lookup (56 Bytes plus 16 ByteXor), and
+conditional spec-of-compile proof boundary. HC
+`a3299ca06576b81586ddbe56a9de711e12f1a8cd` promotes the exact `G 0 1 2 3`
+entry through the external corpus.
+
+On clean HC, both the accepted LLZK pin and checked LLZK main passed G0–G12:
+17 modules and 67 vectors; all 11 source-backed corpus entries passed G9, while
+the six registry entries were N/A; 19/19
+corpus-plus-fixture product admissions, measured SMT 10/9, and 177 G11 control
+cases. All six rows ran through both LLZK witness backends and both scopes. The
+lane-marker row additionally pinned the exact 72-input/96-witness/64-output
+carrier, with four green baselines and 448 isolated witness/full-output and
+public-output red mutations. Each row's 64 fixed outputs are
+official-reference-derived and checked equal to Clean before expected-JSON
+emission; the 96 internal cells remain Clean-derived. The theorem stays
+conditional, and witgen does not execute
+`@constrain`, and D017 remains open. Three continuously assigned adversarial
+review lanes returned GO after their findings were repaired. Evidence is in
+`evidence/S29/blake3g.md` and `evidence/S29/blake3g-gates.txt`.
+
 ## Phase C and R8
 
-Choose one clean immutable candidate after H. No feature changes occur during
-R8. Reviewers work from a detached clean worktree and do not edit the candidate.
+With HD closed as a separate documentation-only child of HC, choose one clean
+immutable candidate. No feature changes occur during R8. Reviewers work from a
+detached clean worktree and do not edit the candidate.
 Re-run both LLZK toolchains, theorem probes, renderer mutations, public-output
 discriminators, lookup-row attacks, source-table identity premises, and the new
 range controls. Any confirmed repair creates a new candidate, reruns affected

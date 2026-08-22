@@ -68,11 +68,21 @@ closed the first:
    The caller still picks both sides; what it can no longer do is have them
    speak about different globals.
 
-S24 executed S23, which closed (1) and left (2) exactly where it is. The
-remaining gap is the one that matters most for soundness: a caller can still
-certify a table the circuit does not look into, and `Gadgets.ByteTable`'s
-certificate is the reason to believe the corpus is not doing that, not a proof
-that no caller could.
+S24 executed S23, which closed certificate erasure and transport but left the
+generic caller-selected identity gap: a certificate alone cannot protect an
+arbitrary caller that certifies a table the circuit does not look into. Current
+lookup-bearing corpus entries add the circuit-specific proofs below; those
+proofs protect the headline instantiations without proving that no future caller
+can select the wrong erased table.
+
+The generic API gap is not the same as an unresolved premise in every current
+headline. `Test/Lookups.lean` proves from the concrete operation list of each
+lookup-bearing headline — `Addition8FullCarry`, `And8`, `Xor32`, and exact
+`BLAKE3.G 0 1 2 3` — that every source lookup resolves to the certified Bytes
+or ByteXor `RawTable`. Those circuit-specific theorems discharge `resolve` in
+their `spec_of_compile` instantiations. They do not prove that an arbitrary
+future caller cannot certify the wrong erased table, so the generic gap remains
+open.
 
 ## 2. Nothing said the renderer was faithful — **closed by A5**
 
@@ -80,9 +90,11 @@ Before A5, `emit = renderResult (compile …)`: every semantic theorem stopped a
 the `Module`, and `Module.render` was outside all of them.
 
 For `@compute` this was covered empirically: G5–G7 execute the rendered text
-through two independent LLZK backends and compare against Clean, so a renderer
-bug there shows up as a differential failure. **For `@constrain` nothing
-covered it.**
+through both LLZK witness backends and compare against checked expectations, so
+a renderer bug there shows up as a differential failure. Most internal cells
+and outputs are Clean-derived; promoted Xor32 and BLAKE3.G public outputs are
+fixed independent references first checked equal to Clean. **For `@constrain`
+nothing covered it.**
 
 **R5e's counterexample for this was wrong, and R6 ran it.** It said a
 `Stmt.render` that swapped `constrain.in`'s operands would pass G3 and G4. It
@@ -149,8 +161,11 @@ same-typed member substitution, dropped equality/lookup/row construction,
 changed global shape or row ordering, malformed row construction, changed
 constraint arithmetic/constant/table read/parameter, changed member visibility,
 renamed `@constrain` function, and changed field type. Both witness backends now
-also compare `--output-scope=public` against Clean for every corpus vector, so
-the visibility contract is executed independently of A5. The full corpus passes
+also compare `--output-scope=public` against checked expectations for every
+corpus vector; most are Clean-derived, while fixed Xor32 and BLAKE3.G outputs
+are independently derived and checked equal to Clean before those fixed values
+are emitted to expected JSON. Thus the visibility contract is executed
+independently of A5. The full corpus passes
 through the checked renderer before G3-G10 see it.
 
 What this does **not** close is D017: the parser establishes what concrete text
@@ -191,7 +206,10 @@ reader's rows directly. It still carries the caller-supplied `resolve`
 hypothesis — that every source lookup is into one of the configuration's
 certified tables — which is item 1's second half surfacing in the statement,
 proved at the instantiations by `add8_lookups_are_byteTable` and
-`and8_lookups_are_byteXor`.
+`and8_lookups_are_byteXor`, and by the concrete Xor32 and heterogeneous
+BLAKE3.G resolution theorems. `Test/Soundness.lean` instantiates the chain as
+`add8_spec_of_compile`, `and8_spec_of_compile`, `xor32_spec_of_compile`, and
+`blake3g_spec_of_compile`; the last classifies 56 Bytes and 16 ByteXor rows.
 
 Four links, three of them Clean's own: the two conjuncts of
 `constraintsHoldFlat_iff_forall_mem` (item 4, closed by A1 — this chain could not
@@ -212,6 +230,10 @@ checked rather than proved, because `recognize` on a real gadget does not reduce
 in the kernel: two are `#guard`ed (`compile … isSome`, `recognize … isOk`) and
 the third (`ofModule … = some C`) is entailed by the first — an earlier version
 here counted "three `#guard`s", which is not what the file contains (R7-15).
+The committed BLAKE3.G probe likewise retains explicit compilation, module
+readback, recognition, equality satisfaction, lookup satisfaction, exact input
+evaluation, and normalized-assumption hypotheses; it is not a closed per-vector
+proof that the tool run establishes them.
 
 ## 4. The lookup half of `ConstraintsHoldFlat` — **closed by A1**
 
@@ -237,15 +259,21 @@ is the shape the rest of this file's items need.
   `canonical_of_recognize` composes them into exactly the hypothesis
   `certified_membership` needs.
 - **Both are instantiated**, at `Gadgets.Addition8FullCarry` under `withBytes`
-  and at three-column `And8` under `withBytesAndXor`, in `Test/Lookups.lean`.
-  The concrete resolution theorems prove from each gadget's own operations that
-  every lookup uses the certified table claimed for it.
+  and at three-column `And8`, Xor32, and exact heterogeneous BLAKE3.G under
+  `withBytesAndXor`, in `Test/Lookups.lean`. The concrete resolution theorems
+  prove from each gadget's own operations that every lookup uses the certified
+  table claimed for it. The existing `byteTable_lookup_iff` discharge remains
+  instantiated through the Add8-specific `byteTable_lookup_iff_of_recognize`;
+  `ofSource_lookups_iff` and circuit-specific resolution proofs cover the other
+  families.
 
-What is *left* of this entry is one hypothesis and it is named: `recognize
-withBytes.toConfig addSrc = .ok r`, "the compiler accepted this circuit".
-`recognize` on a real gadget does not reduce in the kernel, so it is a `#guard`
-rather than a `rfl`, and adding `native_decide` to close it would trade a
-checked fact for a trusted one — see item 8.
+What is *left* of this entry is a named recognition premise for each concrete
+source and configuration, such as `recognize withBytes.toConfig addSrc = .ok
+r`: "the compiler accepted this circuit". The corresponding successful
+recognition is `#guard`ed for every current lookup theorem, but `recognize` on a
+real gadget does not reduce in the kernel, so the premise is not closed by
+`rfl`; adding `native_decide` would trade a checked fact for a trusted one — see
+item 8.
 
 Two small refactors were needed to make any of this provable, and they are worth
 knowing about because they are the kind of thing that silently blocks a proof:
@@ -327,14 +355,19 @@ bitwise/shift operations, `constrain.eq`, and `constrain.in` *mean* is a reading
 of LLZK's documentation and its tools' behaviour, not a theorem. There is no
 formal semantics of LLZK in Lean; producing one is VeIR's project (D003).
 
-The `@compute` half has real evidence: 61 vectors across two independent LLZK
-backends (55 with a Clean circuit behind them, including three Xor32 wide rows
-which are compute-only rather than gadget-theorem evidence, and 6 on the
-`Square_*` registry entries whose expected values are computed in Lean), plus S26's direct probes
-of every exact bitwise/shift spelling and R5c's all-field confirmation of the
-`umod`/`uintdiv` reading. **The `@constrain` half has none**, and cannot acquire
+The `@compute` half has real evidence: 67 vectors across both LLZK witness
+backends. Of those, 61 have a Clean circuit behind them, including three Xor32
+wide rows which are compute-only rather than gadget-theorem evidence and six
+normalized BLAKE3.G rows with fixed independent public outputs. The other six
+are `Square_*` registry entries whose expected values are computed in Lean.
+S26's direct probes of every exact bitwise/shift spelling and R5c's all-field
+confirmation of the `umod`/`uintdiv` reading are additional evidence.
+BLAKE3.G's 96 internal cells remain Clean-derived.
+**The `@constrain` half has no runtime executor evidence**, and cannot acquire
 any from this repository: `llzk-witgen`'s own help text says it ignores
-`constrain()`, so there is no executor for it in the pinned toolchain.
+`constrain()`, so there is no executor for it in the pinned toolchain. Lean
+readback and conditional soundness theorems are evidence of a different kind;
+they do not execute those constraints.
 
 ## 8. Small, named, and real
 
@@ -361,6 +394,10 @@ any from this repository: `llzk-witgen`'s own help text says it ignores
   strengthened by S29): `check-pins.sh` verifies the exact upstream-to-overlay
   Xor32 delta, then fails if later history touches anything under `Clean/` other
   than `Clean/Backend/LLZK/`, `Clean.lean`, and `Clean/Test.lean`.
+  The BLAKE3.G probe has no `sorryAx`; its exact closure adds three inherited
+  Babybear `native_decide` facts and the inherited `ByteDecomposition`
+  `bv_decide` fact to `propext`, `Classical.choice`, and `Quot.sound`. The
+  evidence names all seven axioms rather than reusing Xor32's smaller closure.
 - **Goldens detect drift, not error.** G2's expected text is the emitter's own
   output, regenerated by a script when it changes. It pins that a diff is
   reviewed; it cannot tell that the text was right to begin with. G3, G4 and

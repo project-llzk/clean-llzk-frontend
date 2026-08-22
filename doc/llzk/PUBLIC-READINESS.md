@@ -1,6 +1,6 @@
 # Public-readiness milestone
 
-Updated: 2026-08-22
+Updated: 2026-08-23
 
 Status: active
 
@@ -8,8 +8,9 @@ Target: a frozen release-candidate commit suitable for an organization-owned
 repository under `project-llzk`
 
 Latest audit: `review/FRONTEND-AUDIT-2026-08-22.md`. Its repairs pass the full
-matrix on both the accepted LLZK pin and current LLZK main. It is a pre-freeze
-audit, not the required R8 review.
+matrix on both the accepted LLZK pin and exact checked LLZK main `b5c110d1`.
+The later Phase-H implementation `a3299ca0` also passes both exact toolchains.
+These are pre-freeze reviews and matrices, not the required R8 review.
 
 ## Outcome
 
@@ -56,7 +57,7 @@ authorized.
 - **Done locally:** align to current upstream Clean before adding capability
   (S25, exact fetched head `0e53b9f2`, Lean 4.32.2).
 - **Done locally:** review the LLZK toolchain pin after S25 and before
-  capability work. L0 ran the previous `5db6f8f9` input and exact current-main
+  capability work. L0 ran the previous `5db6f8f9` input and exact then-current-main
   `25fb3740` candidate against one frozen frontend tree. Both passed the
   unchanged complete matrix; D032 advances the accepted pin because the
   candidate's witness, memory, lowering, and build fixes justify the move. The
@@ -72,7 +73,9 @@ authorized.
   differential, and the source-to-module checks; a compile-only `#guard` is not
   release evidence. **Xor32 is done locally on `06b80f2f`** with independent
   fixed references, a concrete theorem instance, and the full accepted-tool
-  matrix; the composed-gadget half remains open as BLAKE3.G Phase H.
+  matrix. **BLAKE3.G is done locally on `a3299ca0`** for exact `G 0 1 2 3`,
+  with six official-reference-derived rows, a conditional theorem instance,
+  and the complete matrix on both accepted LLZK and checked LLZK main.
 - **Done locally:** publish a small checked example table generated from, or
   pinned by, repository tests. `EXAMPLES.md` is generated from
   `LLZK.Corpus.corpus`; G1 requires byte equality and `Test/Showcase.lean` pins
@@ -98,8 +101,9 @@ authorized.
 - Freeze the candidate and run a new adversarial review against code, rendered
   artifacts, documentation, gates, and theorem statements. Findings are fixed
   or explicitly accepted in the gap register before publication.
-- Keep the remaining upstream table-identity gap and the absence of a formal
-  LLZK semantics prominent. Public readiness does not redefine those as solved.
+- Keep the remaining generic caller-selected table-identity gap and the absence
+  of a formal LLZK semantics prominent. Public readiness does not redefine those
+  as solved; current lookup-bearing headlines have circuit-specific resolutions.
 
 ## Critical path
 
@@ -111,8 +115,9 @@ P0 public documentation and repository hygiene
   -> S26 bounded structural U64 and bitwise lowering (implemented locally)
   -> S28 multi-column lookup tables (done locally)
   -> S29 proved witness-visible range contract for XOR (done locally)
-  -> P1 Xor32 promotion (done locally) then BLAKE3.G Phase H
-  -> R8 frozen-candidate adversarial review
+  -> P1 Xor32 and BLAKE3.G promotions (done locally)
+  -> S29 documentation and evidence closure (complete in this commit)
+  -> candidate selection and R8 frozen-candidate adversarial review
   -> explicit publication decision
 ```
 
@@ -124,8 +129,10 @@ strengthened the one assurance boundary R7 showed every LLZK binary gate can
 miss, and A7 removed the witness reader's remaining inspection-only semantic
 premise. S26 and S28 unlock `And8`; S29 Phase B supplies the range contract
 D033 exposed. Xor32's external corpus, independent references, concrete theorem
-instance, and adversarial gates are complete on `06b80f2f`; the remaining
-headline work is the composed BLAKE3.G Phase H increment.
+instance, and adversarial gates are complete on `06b80f2f`; exact BLAKE3.G
+`G 0 1 2 3` is complete on `a3299ca0`. This documentary closure completes S29;
+selection and freezing of a candidate, followed by its separate R8 review,
+remain before any publication decision.
 
 ## Current scorecard
 
@@ -133,14 +140,14 @@ headline work is the composed BLAKE3.G Phase H increment.
 |---|---|---|
 | Stage-1 vertical slice | complete locally | G0-G12 plus the checked showcase on `b16bb83e`; fork CI is behind this branch |
 | Public landing page and document map | complete locally | commit `109083ab`; final review still required |
-| Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, and updated with promoted Xor32 on `06b80f2f` |
+| Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, and updated with promoted Xor32 and BLAKE3.G on `a3299ca0` |
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
 | CI supply-chain policy | complete locally | commit `9b809e32` had 53 controls; the audit baseline added the public-scope discriminator as control 54; immutable action SHAs and fixed Ubuntu/Rust/Nix-cache inputs; organization CI still required on the frozen SHA |
 | Upstream Clean alignment | complete locally | S25; G0-G12 on `6ccca6f8`, `evidence/S25/`; `0e53b9f2` / Lean 4.32.2, D026 recorded |
 | LLZK pin review | complete locally | D032; `25fb3740` accepted after both exact outputs passed, then G0-G12 passed on committed pin `5fe8f465`; `evidence/L0/` |
 | Structural bitwise witness IR | complete locally | S26/D033; G0-G12 green on `8951f016`, `evidence/S26/` |
 | Multi-column tables | complete and adversarially reviewed locally | S28/D034; full 65536×3 certificate, row-preserving G9, six-vector `And8`, and both review repairs passed G0-G12 on `129fbe6e`; `evidence/S28/adversarial-review.md` |
-| Headline bitwise examples end to end | in progress | Xor32 is promoted on `06b80f2f` with independent references, theorem instance, and full matrix; BLAKE3.G Phase H remains |
+| Headline bitwise examples end to end | complete locally | Xor32 is promoted on `06b80f2f`; exact BLAKE3.G `G 0 1 2 3` is promoted on `a3299ca0`; both have fixed independent outputs, concrete conditional theorem instances, and full external matrices |
 | Renderer round-trip assurance | strengthened locally | A5 plus the 2026-08-22 audit: complete constraint/member/parameter readback, public-output checks, and mutation regressions; final G0-G12 result recorded in the audit report |
 | Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |
 | Final frozen-tree review | not started | R8 |

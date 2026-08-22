@@ -16,11 +16,13 @@ checks the result with the pinned LLZK toolchain.
 
 Stage 1 is complete. Its reference example, Clean's formally proved
 `Addition8FullCarry` gadget, is compiled to LLZK, parsed, verified,
-round-tripped, and run through both LLZK witness generators. The emitted
-constraints and witness program are also compared in Lean with the circuit they
-came from. The [generated example showcase](doc/llzk/EXAMPLES.md) derives the
-current module and vector counts from the tested corpus and explains exactly
-what each example establishes.
+round-tripped, and run through both LLZK witness generators. The composed
+`BLAKE3.G 0 1 2 3` and `Xor32` headlines now follow the same external path with
+fixed independently derived public outputs. The emitted constraints and witness
+program are also compared in Lean with the circuit they came from. The
+[generated example showcase](doc/llzk/EXAMPLES.md) derives the current module
+and vector counts from the tested corpus and explains exactly what each example
+establishes.
 
 The project is deliberately explicit about its boundary: this is a
 translation-validating source-to-typed-module pipeline with proved component
@@ -63,10 +65,10 @@ bash scripts/llzk/worktree-lock.sh claim "full LLZK conformance run"
 bash scripts/llzk/e2e.sh
 ```
 
-The latest recorded run passed 15 corpus modules and 51 vectors through both
+The latest recorded run passed 17 corpus modules and 67 vectors through both
 LLZK witness backends in both full-witness and public-output scopes, with all
-17 emitted modules admitted to the product-program pipeline. Exact commit,
-tool, proof, and gate evidence is linked from
+19 emitted corpus-plus-fixture modules admitted to the product-program
+pipeline. Exact commit, tool, proof, and gate evidence is linked from
 [`doc/llzk/CURRENT.md`](doc/llzk/CURRENT.md).
 
 ## About Clean
