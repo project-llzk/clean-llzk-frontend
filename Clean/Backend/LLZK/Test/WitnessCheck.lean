@@ -2,6 +2,7 @@ import Clean.Backend.LLZK.WitnessCheck
 import Clean.Backend.LLZK.Corpus
 import Clean.Backend.LLZK.Examples
 import Clean.Gadgets.Xor.Xor32
+import Clean.Gadgets.BLAKE3.BLAKE3G
 
 /-!
 # Gate G9, witness side: the emitted `@compute` against Clean's witness programs
@@ -157,6 +158,8 @@ private def addSrc : Source Bab :=
   Compilable.source (Gadgets.Addition8FullCarry.circuit (p := pBabybear))
 private def xorSrc : Source Bab :=
   Compilable.source (Gadgets.Xor32.circuit (p := pBabybear))
+private def blake3gSrc : Source Bab :=
+  Compilable.source (Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear))
 
 #guard cross babybear mulSrc mulSrc
 #guard cross babybear decSrc decSrc
@@ -166,6 +169,7 @@ private def xorSrc : Source Bab :=
 #guard cross babybear (Compilable.source constOut) (Compilable.source constOut)
 #guard cross withBytes addSrc addSrc
 #guard cross withBytesAndXor xorSrc xorSrc
+#guard cross withBytesAndXor blake3gSrc blake3gSrc
 
 -- The shapes, pinned so that a change in how many cells or outputs a circuit has
 -- is a reviewed diff. `Addition8FullCarry` witnesses the low byte and the carry,
@@ -179,6 +183,7 @@ private def shape (src : Source Bab) : Option (Nat × Nat) :=
 #guard shape bits8Src == some (8, 8)
 #guard shape addSrc == some (2, 2)
 #guard shape xorSrc == some (4, 4)
+#guard shape blake3gSrc == some (96, 64)
 #guard shape (Compilable.source passthrough) == some (0, 1)
 #guard shape (Compilable.source constOut) == some (0, 1)
 
@@ -292,6 +297,166 @@ private def permutedXorOutputs : Source Bab :=
 #guard !cross withBytesAndXor xorSrc wrongOperatorXor
 #guard !cross withBytesAndXor xorSrc wrongOperandXor
 #guard !cross withBytesAndXor xorSrc permutedXorOutputs
+
+/-! ### BLAKE3.G 0/1/2/3 exact source, recognized, module, and reader shapes -/
+
+private def blake3gOutputs : Array (Expression Bab) :=
+  #[ .var ⟨128⟩, .var ⟨130⟩, .var ⟨132⟩, .var ⟨134⟩
+   , .var ⟨161⟩ + .var ⟨162⟩ * 2, .var ⟨163⟩ + .var ⟨164⟩ * 2
+   , .var ⟨165⟩ + .var ⟨166⟩ * 2, .var ⟨167⟩ + .var ⟨160⟩ * 2
+   , .var ⟨148⟩, .var ⟨150⟩, .var ⟨152⟩, .var ⟨154⟩
+   , .var ⟨141⟩ + .var ⟨142⟩ * 256, .var ⟨143⟩ + .var ⟨144⟩ * 256
+   , .var ⟨145⟩ + .var ⟨146⟩ * 256, .var ⟨147⟩ + .var ⟨140⟩ * 256 ] ++
+    (Array.range 48).map fun i ↦ .var ⟨16 + i⟩
+
+private def blake3gWitnessOutputs : List WExpr :=
+  [ .cell 128, .cell 130, .cell 132, .cell 134
+  , .add (.cell 161) (.mul (.cell 162) (.const 2))
+  , .add (.cell 163) (.mul (.cell 164) (.const 2))
+  , .add (.cell 165) (.mul (.cell 166) (.const 2))
+  , .add (.cell 167) (.mul (.cell 160) (.const 2))
+  , .cell 148, .cell 150, .cell 152, .cell 154
+  , .add (.cell 141) (.mul (.cell 142) (.const 256))
+  , .add (.cell 143) (.mul (.cell 144) (.const 256))
+  , .add (.cell 145) (.mul (.cell 146) (.const 256))
+  , .add (.cell 147) (.mul (.cell 140) (.const 256)) ] ++
+    (List.range 48).map fun i ↦ .cell (16 + i)
+
+private def blake3gLookupNames : Array String :=
+  Array.replicate 8 "Bytes" ++ Array.replicate 4 "ByteXor" ++
+  Array.replicate 12 "Bytes" ++ Array.replicate 4 "ByteXor" ++
+  Array.replicate 16 "Bytes" ++ Array.replicate 4 "ByteXor" ++
+  Array.replicate 12 "Bytes" ++ Array.replicate 4 "ByteXor" ++
+  Array.replicate 8 "Bytes"
+
+private def blake3gTopOperations : Operations Bab :=
+  ((Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear)).main
+    (varFromOffset Gadgets.BLAKE3.G.Inputs 0)).operations 72
+
+private def blake3gChildWitnessLengths : List Nat :=
+  blake3gTopOperations.filterMap fun
+    | .subcircuit subcircuit => some subcircuit.localLength
+    | _ => none
+
+#guard blake3gTopOperations.length == 14
+#guard blake3gChildWitnessLengths == [8, 8, 4, 8, 8, 4, 8, 8, 8, 4, 8, 8, 4, 8]
+
+private def blake3gSourceExact : Bool :=
+  let witnessOps := blake3gSrc.operations.filterMap fun
+    | .witness m _ => some m
+    | _ => none
+  blake3gSrc.inputSize == 72 && blake3gSrc.operations.length == 220 &&
+    witnessOps.length == 84 && witnessOps.foldl (init := 0) (fun n m ↦ n + m) == 96 &&
+    (blake3gSrc.operations.filter fun | .assert _ => true | _ => false).length == 64 &&
+    (blake3gSrc.operations.filter fun | .lookup _ => true | _ => false).length == 72 &&
+    (blake3gSrc.operations.filter fun | .interact _ => true | _ => false).isEmpty &&
+    blake3gSrc.outputs.map WExpr.ofExpression == blake3gWitnessOutputs.toArray
+
+#guard blake3gSourceExact
+
+private def blake3gWitnessReaderExact : Bool :=
+  match WitnessSet.ofSource blake3gSrc with
+  | none => false
+  | some witnessSet =>
+      witnessSet.inputs == 72 && witnessSet.cells.length == 96 &&
+        witnessSet.outputs == blake3gWitnessOutputs
+
+#guard blake3gWitnessReaderExact
+
+private def blake3gRecognizedExact : Bool :=
+  match recognize withBytesAndXor.toConfig blake3gSrc with
+  | .error _ => false
+  | .ok recognized =>
+      recognized.inputSize == 72 && recognized.witnesses.size == 96 &&
+        recognized.asserts.size == 64 && recognized.lookups.size == 72 &&
+        recognized.lookups.map (fun lookup ↦ lookup.tableName) == blake3gLookupNames &&
+        recognized.lookups.all fun lookup ↦
+          if lookup.tableName == "Bytes" then
+            lookup.tableRows == 256 && lookup.tableArity == 1 && lookup.entry.size == 1
+          else
+            lookup.tableName == "ByteXor" && lookup.tableRows == 65536 &&
+              lookup.tableArity == 3 && lookup.entry.size == 3 &&
+        recognized.tables.map (fun table ↦ (table.name, table.arity, table.rows)) ==
+          #[("Bytes", 1, byteRows), ("ByteXor", 3, byteXorRows)] &&
+        recognized.outputs == blake3gOutputs.map FieldExpr.ofExpression
+
+#guard blake3gRecognizedExact
+
+private def blake3gModuleExact : Bool :=
+  match compile withBytesAndXor
+    (Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear)) with
+  | .error _ => false
+  | .ok m =>
+      let felt := Ty.felt "babybear"
+      let inputParams := (Array.range 72).map fun i ↦ (felt, some s!"arg{i}")
+      let expectedMembers :=
+        (Array.range 96).map (fun i ↦ (s!"w{i}", felt, Visibility.signal)) ++
+        (Array.range 64).map (fun i ↦ (s!"out{i}", felt, Visibility.pub))
+      m.globals.map (fun table ↦ (table.name, table.elemTy, table.arity, table.rows)) ==
+          #[("Bytes", felt, 1, byteRows), ("ByteXor", felt, 3, byteXorRows)] &&
+        m.root.compute.name == "compute" && m.root.compute.body.size == 629 &&
+        m.root.compute.params.map (fun param ↦ (param.ty, param.argName)) == inputParams &&
+        m.root.constrain.name == "constrain" && m.root.constrain.body.size == 1027 &&
+        m.root.constrain.params.map (fun param ↦ (param.ty, param.argName)) ==
+          #[(rootTy, none)] ++ inputParams &&
+        m.root.members.map (fun member ↦ (member.name, member.ty, member.visibility)) ==
+          expectedMembers &&
+        WitnessSet.ofModule felt m == WitnessSet.ofSource blake3gSrc
+
+#guard blake3gModuleExact
+
+private def blake3gWrongIndices : Source Bab :=
+  Compilable.source (Gadgets.BLAKE3.G.circuit 0 1 2 4 (p := pBabybear))
+
+private def blake3gPermutedOutputs : Source Bab :=
+  match blake3gSrc.outputs[0]?, blake3gSrc.outputs[4]? with
+  | some output0, some output4 =>
+      { blake3gSrc with outputs :=
+          (blake3gSrc.outputs.set! 0 output4).set! 4 output0 }
+  | _, _ => blake3gSrc
+
+private def replaceWitnessWithZeroAt : Nat → List (FlatOperation Bab) →
+    List (FlatOperation Bab)
+  | _, [] => []
+  | 0, .witness 1 _ :: operations =>
+      .witness 1 (.ir [] (.lit #v[.const 0])) :: operations
+  | n + 1, .witness m program :: operations =>
+      .witness m program :: replaceWitnessWithZeroAt n operations
+  | n, operation :: operations => operation :: replaceWitnessWithZeroAt n operations
+
+private def blake3gWrongWitness : Source Bab :=
+  { blake3gSrc with operations := replaceWitnessWithZeroAt 0 blake3gSrc.operations }
+private def blake3gWrongMiddleWitness : Source Bab :=
+  { blake3gSrc with operations := replaceWitnessWithZeroAt 42 blake3gSrc.operations }
+private def blake3gWrongLastWitness : Source Bab :=
+  { blake3gSrc with operations := replaceWitnessWithZeroAt 83 blake3gSrc.operations }
+private def blake3gWrongRotation16 : Source Bab :=
+  { blake3gSrc with operations := replaceWitnessWithZeroAt 17 blake3gSrc.operations }
+private def blake3gWrongRotation12 : Source Bab :=
+  { blake3gSrc with operations := replaceWitnessWithZeroAt 34 blake3gSrc.operations }
+private def blake3gWrongRotation8 : Source Bab :=
+  { blake3gSrc with operations := replaceWitnessWithZeroAt 59 blake3gSrc.operations }
+private def blake3gWrongRotation7 : Source Bab :=
+  { blake3gSrc with operations := replaceWitnessWithZeroAt 76 blake3gSrc.operations }
+
+#guard cross withBytesAndXor blake3gWrongIndices blake3gWrongIndices
+#guard cross withBytesAndXor blake3gPermutedOutputs blake3gPermutedOutputs
+#guard cross withBytesAndXor blake3gWrongWitness blake3gWrongWitness
+#guard cross withBytesAndXor blake3gWrongMiddleWitness blake3gWrongMiddleWitness
+#guard cross withBytesAndXor blake3gWrongLastWitness blake3gWrongLastWitness
+#guard cross withBytesAndXor blake3gWrongRotation16 blake3gWrongRotation16
+#guard cross withBytesAndXor blake3gWrongRotation12 blake3gWrongRotation12
+#guard cross withBytesAndXor blake3gWrongRotation8 blake3gWrongRotation8
+#guard cross withBytesAndXor blake3gWrongRotation7 blake3gWrongRotation7
+#guard !cross withBytesAndXor blake3gSrc blake3gWrongIndices
+#guard !cross withBytesAndXor blake3gSrc blake3gPermutedOutputs
+#guard !cross withBytesAndXor blake3gSrc blake3gWrongWitness
+#guard !cross withBytesAndXor blake3gSrc blake3gWrongMiddleWitness
+#guard !cross withBytesAndXor blake3gSrc blake3gWrongLastWitness
+#guard !cross withBytesAndXor blake3gSrc blake3gWrongRotation16
+#guard !cross withBytesAndXor blake3gSrc blake3gWrongRotation12
+#guard !cross withBytesAndXor blake3gSrc blake3gWrongRotation8
+#guard !cross withBytesAndXor blake3gSrc blake3gWrongRotation7
 
 /-! ## The gate can go red -/
 

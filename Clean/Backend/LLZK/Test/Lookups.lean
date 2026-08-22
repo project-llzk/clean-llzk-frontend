@@ -1,5 +1,6 @@
 import Clean.Backend.LLZK.Lookups
 import Clean.Backend.LLZK.Examples
+import Clean.Gadgets.BLAKE3.BLAKE3G
 import Clean.Gadgets.Xor.Xor32
 
 /-!
@@ -46,6 +47,8 @@ private def andSrc : Source Bab :=
   Compilable.source (Gadgets.And.And8.circuit (p := pBabybear))
 private def xorSrc : Source Bab :=
   Compilable.source (Gadgets.Xor32.circuit (p := pBabybear))
+private def blake3gSrc : Source Bab :=
+  Compilable.source (Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear))
 
 -- The compiler accepts this circuit, which is the one hypothesis below that is
 -- checked rather than proved. Same check as G1 and the corpus.
@@ -56,6 +59,9 @@ private def bytesCert : CertifiedTable Bab :=
 
 private theorem bytesCert_mem : bytesCert ∈ withBytes.tables := by
   simp [withBytes, bytesCert]
+
+private theorem bytesCert_mem_mixed : bytesCert ∈ withBytesAndXor.tables := by
+  simp [withBytesAndXor, bytesCert]
 
 /-- **Every lookup `Addition8FullCarry` performs is into `Gadgets.ByteTable`.**
 
@@ -199,5 +205,156 @@ theorem xor32_lookup_iff {r : Recognized}
             ∃ values ∈ ct.exported.rows,
               values.map FiniteField.fromNat = (entry.map env).toArray) :=
   ofSource_lookups_iff hrec env xor32_resolve
+
+/-! ## BLAKE3.G 0/1/2/3: heterogeneous concrete lookup resolution -/
+
+private def blake3gLookups : List (Lookup Bab) :=
+  FlatOperation.lookups blake3gSrc.operations
+
+#guard blake3gLookups.length == 72
+#guard (blake3gLookups.filter fun lookup =>
+  lookup.table.arity == 1).length == 56
+#guard (blake3gLookups.filter fun lookup =>
+  lookup.table.arity == 3).length == 16
+#guard blake3gLookups.map (fun lookup ↦ lookup.table.arity) ==
+  List.replicate 8 1 ++ List.replicate 4 3 ++
+  List.replicate 12 1 ++ List.replicate 4 3 ++
+  List.replicate 16 1 ++ List.replicate 4 3 ++
+  List.replicate 12 1 ++ List.replicate 4 3 ++
+  List.replicate 8 1
+#guard (recognize withBytesAndXor.toConfig blake3gSrc).isOk
+
+private theorem addition32_subcircuit_lookups_are_bytes (n : Nat)
+    (input : Var Gadgets.Addition32.Inputs Bab) :
+    ∀ l ∈ FlatOperation.lookups
+      ((Gadgets.Addition32.circuit (p := pBabybear)).toSubcircuit n input).ops.toFlat,
+      l.table = (Gadgets.ByteTable (p := pBabybear)).toRaw := by
+  rcases input with ⟨x, y⟩
+  simp [circuit_norm, FormalCircuit.toSubcircuit, Gadgets.Addition32.circuit,
+    Gadgets.Addition32.main, Gadgets.Addition32Full.circuit,
+    Gadgets.Addition32Full.main, Gadgets.Addition8FullCarry.main,
+    FormalAssertion.toSubcircuit, FlatOperation.lookups]
+
+private theorem xor32_subcircuit_lookups_are_byteXor (n : Nat)
+    (input : Var Gadgets.Xor32.Inputs Bab) :
+    ∀ l ∈ FlatOperation.lookups
+      ((Gadgets.Xor32.circuit (p := pBabybear)).toSubcircuit n input).ops.toFlat,
+      l.table = (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw := by
+  rcases input with ⟨x, y⟩
+  simp [circuit_norm, FormalCircuit.toSubcircuit, Gadgets.Xor32.circuit,
+    Gadgets.Xor32.main, FlatOperation.lookups]
+
+private theorem operations_lookups_flatten (opss : List (Operations Bab)) :
+    Operations.lookups opss.flatten = (opss.map Operations.lookups).flatten := by
+  induction opss with
+  | nil => rfl
+  | cons ops opss ih => simp [Operations.lookups_append, ih]
+
+private theorem forEach_assertZero_no_lookups {m : Nat}
+    (inputs : Vector (Expression Bab) m) (n : Nat)
+    {constant : Circuit.ConstantLength (fun input : Expression Bab ↦ assertZero input)} :
+    Operations.lookups ((Circuit.forEach inputs assertZero constant).operations n) = [] := by
+  rw [Circuit.forEach.operations_eq]
+  rw [operations_lookups_flatten]
+  simp [circuit_norm, Operations.lookups]
+
+private theorem byteDecomposition_subcircuit_lookups_are_bytes (offset : Fin 8)
+    (n : Nat) (input : Expression Bab) :
+    ∀ l ∈ FlatOperation.lookups
+      ((Gadgets.ByteDecomposition.circuit offset (p := pBabybear)).toSubcircuit
+        n input).ops.toFlat,
+      l.table = (Gadgets.ByteTable (p := pBabybear)).toRaw := by
+  simp [circuit_norm, FormalCircuit.toSubcircuit, Gadgets.ByteDecomposition.circuit,
+    Gadgets.ByteDecomposition.main, Gadgets.Equality.circuit, Gadgets.Equality.main,
+    forEach_assertZero_no_lookups, FormalAssertion.toSubcircuit,
+    FlatOperation.lookups]
+
+private theorem byteDecomposition_map_lookups_are_bytes {m : Nat} (offset : Fin 8)
+    (inputs : Vector (Expression Bab) m) (n : Nat) :
+    ∀ l ∈ FlatOperation.lookups
+      ((Circuit.map inputs (Gadgets.ByteDecomposition.circuit offset (p := pBabybear))).operations
+        n).toFlat,
+      l.table = (Gadgets.ByteTable (p := pBabybear)).toRaw := by
+  rw [Operations.lookups_toFlat, Circuit.map.operations_eq]
+  rw [operations_lookups_flatten]
+  intro l hl
+  simp only [List.mem_flatten, List.mem_map] at hl
+  obtain ⟨lookups, ⟨ops, hops, rfl⟩, hl⟩ := hl
+  rw [List.mem_ofFn] at hops
+  obtain ⟨i, rfl⟩ := hops
+  unfold subcircuit at hl
+  apply byteDecomposition_subcircuit_lookups_are_bytes offset _ _ l
+  simp [Operations.lookups] at hl
+  exact hl
+
+private theorem rotation32_subcircuit_lookups_are_bytes (offset : Fin 32) (n : Nat)
+    (input : Var U32 Bab) :
+    ∀ l ∈ FlatOperation.lookups
+      ((Gadgets.Rotation32.circuit offset (p := pBabybear)).toSubcircuit n input).ops.toFlat,
+      l.table = (Gadgets.ByteTable (p := pBabybear)).toRaw := by
+  rcases input with ⟨x0, x1, x2, x3⟩
+  fin_cases offset
+  all_goals
+    simp [circuit_norm, FormalCircuit.toSubcircuit, Gadgets.Rotation32.circuit,
+      Gadgets.Rotation32.main, Gadgets.Rotation32Bytes.circuit,
+      Gadgets.Rotation32Bytes.main, Gadgets.Rotation32Bits.circuit,
+      Gadgets.Rotation32Bits.main]
+  all_goals
+    rw [← Operations.lookups_toFlat]
+    exact byteDecomposition_map_lookups_are_bytes _ _ _
+
+/-- Every flattened lookup in exact `G 0 1 2 3` has one of the two concrete
+Clean table identities certified by `withBytesAndXor`. The count and ordered-
+shape guards above prevent both a vacuous proof and silently dropping either
+table class. -/
+theorem blake3g_lookups_are_bytes_or_byteXor :
+    ∀ l ∈ FlatOperation.lookups blake3gSrc.operations,
+      l.table = (Gadgets.ByteTable (p := pBabybear)).toRaw ∨
+      l.table = (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw := by
+  intro l hl
+  simp only [circuit_norm, blake3gSrc, Compilable.source, Source.ofFormalCircuit,
+    Gadgets.BLAKE3.G.circuit, Gadgets.BLAKE3.G.main] at hl
+  rcases hl with h | h | h | h | h | h | h | h | h | h | h | h | h | h
+  · exact Or.inl (addition32_subcircuit_lookups_are_bytes _ _ _ h)
+  · exact Or.inl (addition32_subcircuit_lookups_are_bytes _ _ _ h)
+  · exact Or.inr (xor32_subcircuit_lookups_are_byteXor _ _ _ h)
+  · exact Or.inl (rotation32_subcircuit_lookups_are_bytes _ _ _ _ h)
+  · exact Or.inl (addition32_subcircuit_lookups_are_bytes _ _ _ h)
+  · exact Or.inr (xor32_subcircuit_lookups_are_byteXor _ _ _ h)
+  · exact Or.inl (rotation32_subcircuit_lookups_are_bytes _ _ _ _ h)
+  · exact Or.inl (addition32_subcircuit_lookups_are_bytes _ _ _ h)
+  · exact Or.inl (addition32_subcircuit_lookups_are_bytes _ _ _ h)
+  · exact Or.inr (xor32_subcircuit_lookups_are_byteXor _ _ _ h)
+  · exact Or.inl (rotation32_subcircuit_lookups_are_bytes _ _ _ _ h)
+  · exact Or.inl (addition32_subcircuit_lookups_are_bytes _ _ _ h)
+  · exact Or.inr (xor32_subcircuit_lookups_are_byteXor _ _ _ h)
+  · exact Or.inl (rotation32_subcircuit_lookups_are_bytes _ _ _ _ h)
+
+/-- Resolve all 72 heterogeneous source lookups through the exact certified
+registry carriers, choosing `Bytes` or `ByteXor` from the proved source table
+identity rather than from an emitted name. -/
+theorem blake3g_resolve : ∀ l ∈ FlatOperation.lookups blake3gSrc.operations,
+    ∃ ct ∈ withBytesAndXor.tables, ∃ entry : Vector (Expression Bab) ct.table.arity,
+      l = ⟨ct.table, entry⟩ := by
+  intro l hl
+  obtain ⟨tbl, entry⟩ := l
+  rcases blake3g_lookups_are_bytes_or_byteXor ⟨tbl, entry⟩ hl with hbytes | hxor
+  · subst hbytes
+    exact ⟨bytesCert, bytesCert_mem_mixed, entry, rfl⟩
+  · subst hxor
+    exact ⟨byteXorCert, byteXorCert_mem, entry, rfl⟩
+
+/-- BLAKE3.G's source lookup constraints are exactly membership in the two
+concrete certified global arrays emitted by `withBytesAndXor`. -/
+theorem blake3g_lookup_iff {r : Recognized}
+    (hrec : recognize withBytesAndXor.toConfig blake3gSrc = .ok r)
+    (env : Environment Bab) :
+    (∀ l ∈ FlatOperation.lookups blake3gSrc.operations, l.Contains env)
+      ↔ (∀ l ∈ FlatOperation.lookups blake3gSrc.operations,
+          ∀ ct ∈ withBytesAndXor.tables,
+          ∀ entry : Vector (Expression Bab) ct.table.arity, l = ⟨ct.table, entry⟩ →
+            ∃ values ∈ ct.exported.rows,
+              values.map FiniteField.fromNat = (entry.map env).toArray) :=
+  ofSource_lookups_iff hrec env blake3g_resolve
 
 end LLZK.Test.Lookups

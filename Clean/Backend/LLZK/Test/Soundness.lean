@@ -218,4 +218,104 @@ theorem xor32_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recogni
   spec_of_compile_sourceRows hcompile hm hrec xor32_resolve xor32_no_interactions env outs heqs
     ((xor32_lookup_iff hrec env).mp hlookups) input hinput hassm
 
+/-! ## S29 HP: the composed BLAKE3.G 0/1/2/3 instantiation -/
+
+private abbrev blake3g : FormalCircuit Bab Gadgets.BLAKE3.G.Inputs
+    Gadgets.BLAKE3.BLAKE3State :=
+  Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear)
+
+#guard (compile withBytesAndXor blake3g).toOption.isSome
+#guard (recognize withBytesAndXor.toConfig (Compilable.source blake3g)).isOk
+
+private theorem addition32_subcircuit_no_interactions (n : Nat)
+    (input : Var Gadgets.Addition32.Inputs Bab) :
+    FlatOperation.interactions
+      ((Gadgets.Addition32.circuit (p := pBabybear)).toSubcircuit n input).ops.toFlat = [] := by
+  rcases input with ⟨x, y⟩
+  simp [circuit_norm, FormalCircuit.toSubcircuit, Gadgets.Addition32.circuit,
+    Gadgets.Addition32.main, Gadgets.Addition32Full.circuit,
+    Gadgets.Addition32Full.main, Gadgets.Addition8FullCarry.main,
+    FormalAssertion.toSubcircuit, FlatOperation.interactions]
+
+private theorem xor32_subcircuit_no_interactions (n : Nat)
+    (input : Var Gadgets.Xor32.Inputs Bab) :
+    FlatOperation.interactions
+      ((Gadgets.Xor32.circuit (p := pBabybear)).toSubcircuit n input).ops.toFlat = [] := by
+  rcases input with ⟨x, y⟩
+  simp [circuit_norm, FormalCircuit.toSubcircuit, Gadgets.Xor32.circuit,
+    Gadgets.Xor32.main, FlatOperation.interactions]
+
+private theorem byteDecomposition_main_no_interactions (offset : Fin 8)
+    (n : Nat) (input : Expression Bab) :
+    Operations.interactions ((Gadgets.ByteDecomposition.main offset input).operations n) = [] := by
+  simp [circuit_norm, Gadgets.ByteDecomposition.main, Gadgets.Equality.circuit,
+    Gadgets.Equality.main, FormalAssertion.toSubcircuit]
+
+private theorem byteDecomposition_circuit_main_no_interactions (offset : Fin 8)
+    (n : Nat) (input : Expression Bab) :
+    Operations.interactions
+      (((Gadgets.ByteDecomposition.circuit offset (p := pBabybear)).main input).operations n) =
+      [] := by
+  exact byteDecomposition_main_no_interactions offset n input
+
+private theorem rotation32_subcircuit_no_interactions (offset : Fin 32) (n : Nat)
+    (input : Var U32 Bab) :
+    FlatOperation.interactions
+      ((Gadgets.Rotation32.circuit offset (p := pBabybear)).toSubcircuit n input).ops.toFlat =
+      [] := by
+  rcases input with ⟨x0, x1, x2, x3⟩
+  fin_cases offset <;>
+    simp [circuit_norm, FormalCircuit.toSubcircuit, Gadgets.Rotation32.circuit,
+      Gadgets.Rotation32.main, Gadgets.Rotation32Bytes.circuit,
+      Gadgets.Rotation32Bytes.main, Gadgets.Rotation32Bits.circuit,
+      Gadgets.Rotation32Bits.main, byteDecomposition_circuit_main_no_interactions]
+
+/-- The exact composed `G 0 1 2 3` circuit performs no channel interactions. -/
+theorem blake3g_no_interactions :
+    ((blake3g.main (varFromOffset Gadgets.BLAKE3.G.Inputs 0)).operations
+      (size Gadgets.BLAKE3.G.Inputs)).interactions = [] := by
+  simp [circuit_norm, Gadgets.BLAKE3.G.circuit, Gadgets.BLAKE3.G.main,
+    Operations.interactions, addition32_subcircuit_no_interactions,
+    xor32_subcircuit_no_interactions, rotation32_subcircuit_no_interactions]
+
+/-- The emitted equalities and the two concrete certified lookup arrays imply
+the exact `G 0 1 2 3` Clean specification under its explicit normalization
+assumptions. -/
+theorem blake3g_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognized}
+    (hcompile : compile withBytesAndXor blake3g = .ok m)
+    (hm : ConstraintSet.ofModule (F := Bab) (Ty.felt withBytesAndXor.field.name) m = some C)
+    (hrec : recognize withBytesAndXor.toConfig (Compilable.source blake3g) = .ok r)
+    (env : Environment Bab) (outs : Nat → Bab)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+    (hlookups : C.LookupRowsHold env outs)
+    (input : Gadgets.BLAKE3.G.Inputs Bab)
+    (hinput : eval env
+      (varFromOffset Gadgets.BLAKE3.G.Inputs 0 : Var Gadgets.BLAKE3.G.Inputs Bab) = input)
+    (hassm : blake3g.Assumptions input) :
+    blake3g.Spec input
+      (eval env (blake3g.output (varFromOffset Gadgets.BLAKE3.G.Inputs 0)
+        (size Gadgets.BLAKE3.G.Inputs))) :=
+  spec_of_compile hcompile hm hrec blake3g_resolve blake3g_no_interactions env outs heqs
+    hlookups input hinput hassm
+
+/-- The same `G 0 1 2 3` implication with lookup membership stated over the
+Clean source rows; `blake3g_lookup_iff` supplies the heterogeneous conversion. -/
+theorem blake3g_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recognized}
+    (hcompile : compile withBytesAndXor blake3g = .ok m)
+    (hm : ConstraintSet.ofModule (F := Bab) (Ty.felt withBytesAndXor.field.name) m = some C)
+    (hrec : recognize withBytesAndXor.toConfig (Compilable.source blake3g) = .ok r)
+    (env : Environment Bab) (outs : Nat → Bab)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+    (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source blake3g).operations,
+      l.Contains env)
+    (input : Gadgets.BLAKE3.G.Inputs Bab)
+    (hinput : eval env
+      (varFromOffset Gadgets.BLAKE3.G.Inputs 0 : Var Gadgets.BLAKE3.G.Inputs Bab) = input)
+    (hassm : blake3g.Assumptions input) :
+    blake3g.Spec input
+      (eval env (blake3g.output (varFromOffset Gadgets.BLAKE3.G.Inputs 0)
+        (size Gadgets.BLAKE3.G.Inputs))) :=
+  spec_of_compile_sourceRows hcompile hm hrec blake3g_resolve blake3g_no_interactions env outs
+    heqs ((blake3g_lookup_iff hrec env).mp hlookups) input hinput hassm
+
 end LLZK.Test.Soundness

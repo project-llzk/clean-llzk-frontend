@@ -1,5 +1,7 @@
 import Clean.Backend.LLZK.Corpus
+import Clean.Backend.LLZK.Test.Lookups
 import Clean.Gadgets.Xor.Xor32
+import Clean.Gadgets.BLAKE3.BLAKE3G
 
 /-!
 # Gate G9: the emitted constraints, checked against Clean's
@@ -49,6 +51,8 @@ private def andSrc : Source Bab :=
   Compilable.source (Gadgets.And.And8.circuit (p := pBabybear))
 private def xorSrc : Source Bab :=
   Compilable.source (Gadgets.Xor32.circuit (p := pBabybear))
+private def blake3gSrc : Source Bab :=
+  Compilable.source (Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear))
 
 /-! ## The corpus agrees
 
@@ -113,6 +117,7 @@ private def bumped (s : Source Bab) : Source Bab :=
 #guard cross withBytes addSrc addSrc
 #guard cross withBytesAndXor andSrc andSrc
 #guard cross withBytesAndXor xorSrc xorSrc
+#guard cross withBytesAndXor blake3gSrc blake3gSrc
 
 private def dropFirstLookupOps : List (FlatOperation Bab) → List (FlatOperation Bab)
   | [] => []
@@ -394,6 +399,7 @@ private def shape (cfg : CertifiedConfig Bab) (src : Source Bab) : Option (Nat �
 #guard shape babybear (Compilable.source constOut) == some (1, 0)
 #guard shape withBytes addSrc == some (4, 1)
 #guard shape withBytesAndXor xorSrc == some (4, 4)
+#guard shape withBytesAndXor blake3gSrc == some (128, 72)
 
 private def xorEqs : List (Poly Bab) :=
   [ Poly.sub (Poly.var (.output 0)) (Poly.var (.circuit 8))
@@ -419,5 +425,252 @@ private def xorConstraintReaderExact : Bool :=
             constraints.globals == [("ByteXor", byteXorRows)]
 
 #guard xorConstraintReaderExact
+
+/-! ### BLAKE3.G 0/1/2/3 exact constraint-reader shape and ordered controls -/
+
+private def blake3gOutputs : Array (Expression Bab) :=
+  #[ .var ⟨128⟩, .var ⟨130⟩, .var ⟨132⟩, .var ⟨134⟩
+   , .var ⟨161⟩ + .var ⟨162⟩ * 2, .var ⟨163⟩ + .var ⟨164⟩ * 2
+   , .var ⟨165⟩ + .var ⟨166⟩ * 2, .var ⟨167⟩ + .var ⟨160⟩ * 2
+   , .var ⟨148⟩, .var ⟨150⟩, .var ⟨152⟩, .var ⟨154⟩
+   , .var ⟨141⟩ + .var ⟨142⟩ * 256, .var ⟨143⟩ + .var ⟨144⟩ * 256
+   , .var ⟨145⟩ + .var ⟨146⟩ * 256, .var ⟨147⟩ + .var ⟨140⟩ * 256 ] ++
+    (Array.range 48).map fun i ↦ .var ⟨16 + i⟩
+
+private def blake3gOutputEqs : List (Poly Bab) :=
+  blake3gOutputs.toList.zipIdx.map fun (output, j) ↦
+    Poly.sub (Poly.var (.output j)) (Expression.toPoly output)
+
+private def blake3gLookupNames : List String :=
+  List.replicate 8 "Bytes" ++ List.replicate 4 "ByteXor" ++
+  List.replicate 12 "Bytes" ++ List.replicate 4 "ByteXor" ++
+  List.replicate 16 "Bytes" ++ List.replicate 4 "ByteXor" ++
+  List.replicate 12 "Bytes" ++ List.replicate 4 "ByteXor" ++
+  List.replicate 8 "Bytes"
+
+private def blake3gConstraintReaderExact : Bool :=
+  match compile withBytesAndXor
+    (Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear)) with
+  | .error _ => false
+  | .ok m =>
+      match ofModule (F := Bab) (Ty.felt "babybear") m with
+      | none => false
+      | some constraints =>
+          let clean := ofSource withBytesAndXor.toConfig blake3gSrc
+          constraints.inputs == 72 && constraints.eqs.length == 128 &&
+            constraints.eqs.drop 64 == blake3gOutputEqs &&
+            constraints.eqs == clean.eqs && constraints.lookups.length == 72 &&
+            constraints.lookups.map (fun lookup ↦ lookup.1) == blake3gLookupNames &&
+            constraints.lookups == clean.lookups &&
+            constraints.globals == [("Bytes", byteRows), ("ByteXor", byteXorRows)]
+
+#guard blake3gConstraintReaderExact
+
+/-- Exact-order companion to semantic `agree`, whose permutation comparison is
+deliberate because constraints form a conjunction. Used only as a structural
+red discriminator for this headline circuit. -/
+private def orderedCross (cfg : CertifiedConfig Bab) (built reference : Source Bab) : Bool :=
+  match compileSource cfg.toConfig built with
+  | .error _ => false
+  | .ok m =>
+      match ofModule (F := Bab) (Ty.felt cfg.field.name) m with
+      | none => false
+      | some emitted =>
+          let clean := ofSource cfg.toConfig reference
+          emitted.inputs == clean.inputs && emitted.globals == clean.globals &&
+            emitted.eqs == clean.eqs && emitted.lookups == clean.lookups
+
+private def dropLookupAt : Nat → List (FlatOperation Bab) → List (FlatOperation Bab)
+  | _, [] => []
+  | 0, .lookup _ :: operations => operations
+  | n + 1, .lookup lookup :: operations =>
+      .lookup lookup :: dropLookupAt n operations
+  | n, operation :: operations => operation :: dropLookupAt n operations
+
+private def duplicateLookupAt : Nat → List (FlatOperation Bab) → List (FlatOperation Bab)
+  | _, [] => []
+  | 0, operation@(.lookup _) :: operations => operation :: operation :: operations
+  | n + 1, .lookup lookup :: operations =>
+      .lookup lookup :: duplicateLookupAt n operations
+  | n, operation :: operations => operation :: duplicateLookupAt n operations
+
+private def lookupArray (src : Source Bab) : Array (Lookup Bab) :=
+  (FlatOperation.lookups src.operations).toArray
+
+private def replaceLookups : List (FlatOperation Bab) → List (Lookup Bab) →
+    List (FlatOperation Bab)
+  | [], _ => []
+  | operation :: operations, [] => operation :: replaceLookups operations []
+  | .lookup _ :: operations, lookup :: lookups =>
+      .lookup lookup :: replaceLookups operations lookups
+  | operation :: operations, lookups => operation :: replaceLookups operations lookups
+
+private def swapLookupRows (src : Source Bab) (i j : Nat) : Source Bab :=
+  let lookups := lookupArray src
+  match lookups[i]?, lookups[j]? with
+  | some lookupI, some lookupJ =>
+      let swapped := (lookups.set! i lookupJ).set! j lookupI
+      { src with operations := replaceLookups src.operations swapped.toList }
+  | _, _ => src
+
+private def substituteFirstLookupEntry : List (FlatOperation Bab) → List (FlatOperation Bab)
+  | [] => []
+  | .lookup lookup :: operations =>
+      .lookup { lookup with entry := lookup.entry.map fun _ ↦ .const 0 } :: operations
+  | operation :: operations => operation :: substituteFirstLookupEntry operations
+
+private def blake3gDropFirst : Source Bab :=
+  { blake3gSrc with operations := dropLookupAt 0 blake3gSrc.operations }
+private def blake3gDropMiddle : Source Bab :=
+  { blake3gSrc with operations := dropLookupAt 35 blake3gSrc.operations }
+private def blake3gDropLast : Source Bab :=
+  { blake3gSrc with operations := dropLookupAt 71 blake3gSrc.operations }
+private def blake3gDropDuplicate : Source Bab :=
+  { blake3gSrc with operations :=
+      duplicateLookupAt 1 (dropLookupAt 0 blake3gSrc.operations) }
+private def blake3gSwapBytes : Source Bab := swapLookupRows blake3gSrc 0 1
+private def blake3gSwapByteXor : Source Bab := swapLookupRows blake3gSrc 8 9
+private def blake3gSubstitutedEntry : Source Bab :=
+  { blake3gSrc with operations := substituteFirstLookupEntry blake3gSrc.operations }
+
+-- Every mutation remains independently compilable/readable against itself.
+#guard cross withBytesAndXor blake3gDropFirst blake3gDropFirst
+#guard cross withBytesAndXor blake3gDropMiddle blake3gDropMiddle
+#guard cross withBytesAndXor blake3gDropLast blake3gDropLast
+#guard cross withBytesAndXor blake3gDropDuplicate blake3gDropDuplicate
+#guard orderedCross withBytesAndXor blake3gSwapBytes blake3gSwapBytes
+#guard orderedCross withBytesAndXor blake3gSwapByteXor blake3gSwapByteXor
+#guard cross withBytesAndXor blake3gSubstitutedEntry blake3gSubstitutedEntry
+
+-- Missing, count-preserving, reordered, and operand-substituted rows are red.
+#guard !cross withBytesAndXor blake3gDropFirst blake3gSrc
+#guard !cross withBytesAndXor blake3gDropMiddle blake3gSrc
+#guard !cross withBytesAndXor blake3gDropLast blake3gSrc
+#guard !cross withBytesAndXor blake3gDropDuplicate blake3gSrc
+#guard !orderedCross withBytesAndXor blake3gSwapBytes blake3gSrc
+#guard !orderedCross withBytesAndXor blake3gSwapByteXor blake3gSrc
+#guard !cross withBytesAndXor blake3gSubstitutedEntry blake3gSrc
+
+private def blake3gRenamedTable : Source Bab := renameTable blake3gSrc
+private def fakeRawTable (table : RawTable Bab) : RawTable Bab where
+  name := table.name
+  arity := table.arity
+  Contains _ _ := True
+  Soundness _ _ := True
+  Completeness _ _ := True
+  imply_soundness _ _ _ := trivial
+  implied_by_completeness _ _ _ := trivial
+
+private def fakeLookup (lookup : Lookup Bab) : Lookup Bab :=
+  { lookup with table := fakeRawTable lookup.table }
+
+private def fakeLookupOperation : FlatOperation Bab → FlatOperation Bab
+  | .lookup lookup => .lookup (fakeLookup lookup)
+  | operation => operation
+
+private def blake3gFakeSameArity : Source Bab :=
+  { blake3gSrc with operations := blake3gSrc.operations.map fakeLookupOperation }
+
+private theorem fakeLookups_map (operations : List (FlatOperation Bab)) :
+    FlatOperation.lookups (operations.map fakeLookupOperation) =
+      (FlatOperation.lookups operations).map fakeLookup := by
+  induction operations with
+  | nil => rfl
+  | cons operation operations ih =>
+      cases operation <;> simp [fakeLookupOperation, fakeLookup, ih, FlatOperation.lookups]
+
+private theorem fakeByteTable_ne :
+    fakeRawTable (Gadgets.ByteTable (p := pBabybear)).toRaw ≠
+      (Gadgets.ByteTable (p := pBabybear)).toRaw := by
+  intro h
+  have hsound :
+      (Gadgets.ByteTable (p := pBabybear)).toRaw.Soundness #[]
+        (Vector.replicate (Gadgets.ByteTable (p := pBabybear)).toRaw.arity (300 : Bab)) := by
+    rw [← h]
+    trivial
+  change (300 : Bab).val < 256 at hsound
+  rw [ZMod.val_ofNat_of_lt] at hsound
+  · norm_num at hsound
+  · norm_num [pBabybear]
+
+private theorem fakeByteXorTable_ne :
+    fakeRawTable (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw ≠
+      (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw := by
+  intro h
+  have hsound :
+      (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw.Soundness #[]
+        (Vector.replicate
+          (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw.arity (300 : Bab)) := by
+    rw [← h]
+    trivial
+  change (300 : Bab).val < 256 ∧ (300 : Bab).val < 256 ∧ _ at hsound
+  rw [ZMod.val_ofNat_of_lt] at hsound
+  · norm_num at hsound
+  · norm_num [pBabybear]
+
+private theorem fakeByteLookup_not_resolved (entry : Vector (Expression Bab) 1) :
+    ¬ ∃ ct ∈ withBytesAndXor.tables,
+      ∃ resolvedEntry : Vector (Expression Bab) ct.table.arity,
+        (⟨fakeRawTable (Gadgets.ByteTable (p := pBabybear)).toRaw, entry⟩ : Lookup Bab) =
+          ⟨ct.table, resolvedEntry⟩ := by
+  rintro ⟨ct, hct, resolvedEntry, heq⟩
+  have htable := congrArg Lookup.table heq
+  simp [withBytesAndXor] at hct
+  rcases hct with hct | hct
+  · subst ct
+    exact fakeByteTable_ne htable
+  · subst ct
+    have hname := congrArg RawTable.name htable
+    norm_num [fakeRawTable, Gadgets.ByteTable, Gadgets.Xor.ByteXorTable,
+      Table.toRaw, Table.fromStatic, StaticTable.toTable] at hname
+    exact (by decide : ("Bytes" : String) ≠ "ByteXor") hname
+
+private theorem fakeByteXorLookup_not_resolved (entry : Vector (Expression Bab) 3) :
+    ¬ ∃ ct ∈ withBytesAndXor.tables,
+      ∃ resolvedEntry : Vector (Expression Bab) ct.table.arity,
+        (⟨fakeRawTable (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw, entry⟩ : Lookup Bab) =
+          ⟨ct.table, resolvedEntry⟩ := by
+  rintro ⟨ct, hct, resolvedEntry, heq⟩
+  have htable := congrArg Lookup.table heq
+  simp [withBytesAndXor] at hct
+  rcases hct with hct | hct
+  · subst ct
+    have hname := congrArg RawTable.name htable
+    norm_num [fakeRawTable, Gadgets.ByteTable, Gadgets.Xor.ByteXorTable,
+      Table.toRaw, Table.fromStatic, StaticTable.toTable] at hname
+    exact (by decide : ("ByteXor" : String) ≠ "Bytes") hname
+  · subst ct
+    exact fakeByteXorTable_ne htable
+
+/-- The 72 same-name/same-arity fake lookups all fail exact certified-table
+resolution. This is the kernel red boundary that name/arity-only G9 cannot see. -/
+private theorem blake3gFakeSameArity_unresolved :
+    ∀ l ∈ FlatOperation.lookups blake3gFakeSameArity.operations,
+      ¬ ∃ ct ∈ withBytesAndXor.tables,
+        ∃ entry : Vector (Expression Bab) ct.table.arity, l = ⟨ct.table, entry⟩ := by
+  intro l hl
+  rw [blake3gFakeSameArity, fakeLookups_map] at hl
+  obtain ⟨canonical, hcanonical, rfl⟩ := List.mem_map.mp hl
+  obtain ⟨canonicalTable, canonicalEntry⟩ := canonical
+  rcases LLZK.Test.Lookups.blake3g_lookups_are_bytes_or_byteXor
+    (⟨canonicalTable, canonicalEntry⟩ : Lookup Bab) hcanonical with hbytes | hxor
+  · change canonicalTable = (Gadgets.ByteTable (p := pBabybear)).toRaw at hbytes
+    subst canonicalTable
+    exact fakeByteLookup_not_resolved canonicalEntry
+  · change canonicalTable =
+      (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw at hxor
+    subst canonicalTable
+    exact fakeByteXorLookup_not_resolved canonicalEntry
+
+-- A renamed table fails closed in recognition. All 72 same-name/same-arity
+-- fakes are intentionally invisible to name-based G9 and independently
+-- compilable, while the kernel theorem above proves that none can resolve to
+-- either exact certified RawTable identity.
+#guard match compileSource withBytesAndXor.toConfig blake3gRenamedTable with
+  | .error _ => true
+  | .ok _ => false
+#guard (FlatOperation.lookups blake3gFakeSameArity.operations).length == 72
+#guard cross withBytesAndXor blake3gFakeSameArity blake3gFakeSameArity
+#guard cross withBytesAndXor blake3gFakeSameArity blake3gSrc
 
 end LLZK.Test.Constraints
