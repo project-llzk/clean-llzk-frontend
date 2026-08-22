@@ -115,7 +115,11 @@ private def describeU64Expr {F : Type} : Witgen.U64Expr F → String
   | .localVar _ => "`localVar` (a reference to a `let`-step)"
   | .add _ _ => "a u64 addition"
   | .mul _ _ => "a u64 multiplication"
+  | .div a (.const _) =>
+      "a u64 division with a literal divisor whose numerator is " ++ describeU64Expr a
   | .div _ _ => "a u64 division without a literal divisor"
+  | .mod a (.const _) =>
+      "a u64 modulo with a literal divisor whose numerator is " ++ describeU64Expr a
   | .mod _ _ => "a u64 modulo without a literal divisor"
   | .land _ _ => "`land` (bitwise and)"
   | .lor _ _ => "`lor` (bitwise or)"
@@ -170,16 +174,21 @@ def upperBound {F : Type} (prime : Nat) : Witgen.U64Expr F → Option Nat
       let bb ← upperBound prime b
       let bound := ba * bb
       if bound ≤ modulus then some bound else none
-  | .div a (.const d) | .mod a (.const d) =>
+  | .div a (.const d) =>
       if d = 0 then none else upperBound prime a
+  | .mod a (.const d) =>
+      if d = 0 then none else do
+        let ba ← upperBound prime a
+        some (min ba d.toNat)
   | .land a b => do
       let ba ← upperBound prime a
       let _ ← upperBound prime b
       some ba
   | .lor a b | .lxor a b => do
-      let _ ← upperBound prime a
-      let _ ← upperBound prime b
-      some modulus
+      let ba ← upperBound prime a
+      let bb ← upperBound prime b
+      let bound := 2 ^ Nat.clog 2 (max ba bb)
+      if bound ≤ modulus then some bound else none
   | .shiftL a (.const amount) =>
       if amount.toNat < 64 then do
         let ba ← upperBound prime a

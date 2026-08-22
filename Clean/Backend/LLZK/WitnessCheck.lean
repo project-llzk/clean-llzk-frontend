@@ -319,9 +319,20 @@ theorem eval_lt_upperBound (ctx : Witgen.Ctx F) (prime : Nat)
   | case9 a d hd iha =>
     intro bound h
     rw [LLZK.U64Expr.upperBound, if_neg hd] at h
-    have ha := iha bound h
-    simp only [Witgen.U64Expr.eval, UInt64.toNat_mod]
-    exact lt_of_le_of_lt (Nat.mod_le _ _) ha
+    cases hba : LLZK.U64Expr.upperBound prime a with
+    | none => simp [hba] at h
+    | some ba =>
+      simp [hba] at h
+      subst bound
+      have ha := iha ba hba
+      have hdNat : 0 < d.toNat := by
+        apply Nat.pos_of_ne_zero
+        intro hzero
+        apply hd
+        exact UInt64.toNat_inj.mp (by simpa using hzero)
+      simp only [Witgen.U64Expr.eval, UInt64.toNat_mod]
+      rw [Nat.lt_min]
+      exact ⟨lt_of_le_of_lt (Nat.mod_le _ _) ha, Nat.mod_lt _ hdNat⟩
   | case10 a b iha ihb =>
     intro bound h
     cases hba : LLZK.U64Expr.upperBound prime a with
@@ -342,9 +353,18 @@ theorem eval_lt_upperBound (ctx : Witgen.Ctx F) (prime : Nat)
       cases hbb : LLZK.U64Expr.upperBound prime b with
       | none => simp [LLZK.U64Expr.upperBound, hba, hbb] at h
       | some bb =>
-        simp [LLZK.U64Expr.upperBound, hba, hbb] at h
-        subst bound
-        exact UInt64.toNat_lt_size _
+        by_cases hmax : 2 ^ Nat.clog 2 (max ba bb) ≤ LLZK.U64Expr.modulus
+        · simp [LLZK.U64Expr.upperBound, hba, hbb, hmax] at h
+          subst bound
+          have ha := iha ba hba
+          have hb := ihb bb hbb
+          simp only [Witgen.U64Expr.eval, UInt64.toNat_or]
+          apply Nat.or_lt_two_pow
+          · exact lt_of_lt_of_le ha
+              ((Nat.le_max_left _ _).trans (Nat.le_pow_clog (by omega) _))
+          · exact lt_of_lt_of_le hb
+              ((Nat.le_max_right _ _).trans (Nat.le_pow_clog (by omega) _))
+        · simp [LLZK.U64Expr.upperBound, hba, hbb, hmax] at h
   | case12 a b iha ihb =>
     intro bound h
     cases hba : LLZK.U64Expr.upperBound prime a with
@@ -353,9 +373,18 @@ theorem eval_lt_upperBound (ctx : Witgen.Ctx F) (prime : Nat)
       cases hbb : LLZK.U64Expr.upperBound prime b with
       | none => simp [LLZK.U64Expr.upperBound, hba, hbb] at h
       | some bb =>
-        simp [LLZK.U64Expr.upperBound, hba, hbb] at h
-        subst bound
-        exact UInt64.toNat_lt_size _
+        by_cases hmax : 2 ^ Nat.clog 2 (max ba bb) ≤ LLZK.U64Expr.modulus
+        · simp [LLZK.U64Expr.upperBound, hba, hbb, hmax] at h
+          subst bound
+          have ha := iha ba hba
+          have hb := ihb bb hbb
+          simp only [Witgen.U64Expr.eval, UInt64.toNat_xor]
+          apply Nat.xor_lt_two_pow
+          · exact lt_of_lt_of_le ha
+              ((Nat.le_max_left _ _).trans (Nat.le_pow_clog (by omega) _))
+          · exact lt_of_lt_of_le hb
+              ((Nat.le_max_right _ _).trans (Nat.le_pow_clog (by omega) _))
+        · simp [LLZK.U64Expr.upperBound, hba, hbb, hmax] at h
   | case13 a amount hamount iha =>
     intro bound h
     cases hba : LLZK.U64Expr.upperBound prime a with

@@ -79,24 +79,24 @@ private def diags {Input Output : TypeMap} [ProvableType Input] [ProvableType Ou
 #guard (compile withBytes (Gadgets.Rotation64.circuit (p := pBabybear) 1)).toOption.isSome
 #guard (compile withBytes (Gadgets.Not.circuit (p := pBabybear))).toOption.isSome
 
-/-! ## The bitwise rows: one safe narrowing, three explicit bound refusals
+/-! ## The bitwise rows: source-visible narrowing and one retained refusal
 
 Each guard pins the total and its decomposition. S26 removes `And8`'s `land`
 diagnostic because `x &&& y ≤ x` proves the result remains below Babybear.
-It deliberately retains the `lxor` diagnostics. S29's adopted Xor32 source now
-executes `% 256` on every `.val` operand, but before Phase B the bound analysis
-still assigns modulo its numerator bound and assigns `lxor` the full `2^64`
-bound. The witness recognizer must prove those source-visible bounds rather than
-import byte assumptions/constraints. S28 supplies the certified three-column
-table, so no registry refusal remains. -/
+S29's Xor32 source executes `% 256` on every `.val` operand; Phase B proves that
+literal modulo bound recursively and gives XOR/OR their common power-of-two
+ceiling. Xor32 and the composed BLAKE3.G therefore compile from syntax alone,
+without importing assumptions or constraints. Keccak Theta's 50 witness sites
+remain raw `.val` XORs and stay refused. This is capability-sweep evidence only:
+none of these rows joins the external corpus in Phase B. S28 supplies the
+certified three-column table, so no registry refusal remains. -/
 
-private def xor32 := diags withBytesAndXor (Gadgets.Xor32.circuit (p := pBabybear))
-#guard xor32.size = 1 ∧ count "lxor" xor32 = 1 ∧ count registryRefusal xor32 = 0
+#guard (compile withBytesAndXor (Gadgets.Xor32.circuit (p := pBabybear))).toOption.isSome
 
 #guard (compile withBytesAndXor (Gadgets.And.And8.circuit (p := pBabybear))).toOption.isSome
 
-private def blake3g := diags withBytesAndXor (Gadgets.BLAKE3.G.circuit (p := pBabybear) 0 1 2 3)
-#guard blake3g.size = 4 ∧ count "lxor" blake3g = 4 ∧ count registryRefusal blake3g = 0
+#guard (compile withBytesAndXor
+  (Gadgets.BLAKE3.G.circuit (p := pBabybear) 0 1 2 3)).toOption.isSome
 
 private def theta := diags withBytesAndXor (Gadgets.Keccak256.Theta.circuit (p := pBabybear))
 #guard theta.size = 50 ∧ count "lxor" theta = 50 ∧ count registryRefusal theta = 0

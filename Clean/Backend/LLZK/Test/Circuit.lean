@@ -43,15 +43,20 @@ is now pinned below, in this order:
 | configured field is not the circuit's | `mersenne` on `multiply` |
 | natural divisor is `0` | `moduloByZero` |
 | natural divisor is at or above the prime | `divideByPrime` |
+| modulo divisor is the prime or larger | `moduloAtPrimeWitness`, `moduloAbovePrimeWitness` |
 | an unrecognized `FExpr` (`ite`) | `Gadgets.IsZeroField` |
 | new `BExpr.flt` under a rejected `ite` | `fieldLessThanWitness` |
 | new `BExpr.bit` under a rejected `ite` | `bitConditionWitness` |
 | a `.val` bridge on a field wider than `UInt64` | `wideFieldValWitness` |
-| a bitwise result whose bound exceeds the prime | `xorUnboundedWitness` |
+| wide-field narrowing cannot hide `.val` truncation | `wideFieldModWitness 3/256` |
+| raw XOR/OR envelopes exceed the prime | asymmetric/symmetric XOR and `orUnboundedWitness` |
+| narrowing cannot hide an intermediate felt reduction | `feltReducingBeforeModWitness` |
+| narrowing cannot hide an intermediate u64 wrap | `u64WrappingBeforeModWitness` |
 | a shift count at the UInt64 masking boundary | `shift64Witness` |
 | a dynamic shift count | `dynamicShiftWitness` |
-| a dynamic natural divisor | `dynamicDivisorWitness` |
+| a dynamic natural divisor | `dynamicDivisorWitness`, `dynamicModuloWitness` |
 | an unscoped u64 loop index | `idxWitness` |
+| modulo cannot bound an index or local | `idxModuloWitness`, `localModuloWitness` |
 | a `.native` witness closure | `nativeWitness` |
 | witness `let`-steps | `letStepWitness` |
 | a u64 witness `let`-step | `letUStepWitness` |
@@ -589,6 +594,9 @@ proof unrelated to the refusal under test. -/
 private def wideFieldValWitness : Witgen.WitgenIR (F pBabybear) 1 :=
   .ir [] (.lit #v[.ofU64 (.val (.expr (.var ⟨0⟩)))])
 
+private def wideFieldModWitness (d : UInt64) : Witgen.WitgenIR (F pBabybear) 1 :=
+  .ir [] (.lit #v[.ofU64 (.mod (.val (.expr (.var ⟨0⟩))) (.const d))])
+
 private def renderWitnessRecognition
     (result : Except Diagnostic (Array FieldExpr)) : String :=
   match result with
@@ -600,6 +608,36 @@ result remains below the prime. -/
 private def xorUnboundedWitness : Source (F pBabybear) :=
   source 1 [.witness 1 (.ir [] (.lit #v[.ofU64
     (.lxor (.val (.expr (.var ⟨0⟩))) (.const 1))]))]
+
+/-- Both raw XOR operands remain whole-field values. -/
+private def xorUnboundedSymmetricWitness : Source (F pBabybear) :=
+  source 2 [.witness 1 (.ir [] (.lit #v[.ofU64
+    (.lxor (.val (.expr (.var ⟨0⟩))) (.val (.expr (.var ⟨1⟩))))]))]
+
+/-- OR uses the same common power-of-two envelope and the same field guard. -/
+private def orUnboundedWitness : Source (F pBabybear) :=
+  source 2 [.witness 1 (.ir [] (.lit #v[.ofU64
+    (.lor (.val (.expr (.var ⟨0⟩))) (.val (.expr (.var ⟨1⟩))))]))]
+
+/-- The final `% 256` is small, but its numerator can already have reduced in
+LLZK's field: the syntactic child bound is `pBabybear + 2`. -/
+private def feltReducingBeforeModWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 (.mod
+    (.add (.val (.expr (.var ⟨0⟩))) (.const 1)) (.const 256))]))]
+
+/-- The numerator's exclusive bound exceeds `2^64`; a later modulo may not hide
+the wrapping addition. -/
+private def u64WrappingBeforeModWitness : Source (F pBabybear) :=
+  source 0 [.witness 1 (.ir [] (.lit #v[.ofU64 (.mod
+    (.add (.const (2 ^ 64 - 1)) (.const 1)) (.const 256))]))]
+
+private def moduloAtPrimeWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 (.mod
+    (.val (.expr (.var ⟨0⟩))) (.const (UInt64.ofNat pBabybear)))]))]
+
+private def moduloAbovePrimeWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 (.mod
+    (.val (.expr (.var ⟨0⟩))) (.const (UInt64.ofNat (pBabybear + 1))))]))]
 
 /-- Lean masks a shift count of 64 to zero; LLZK does not. -/
 private def shift64Witness : Source (F pBabybear) :=
@@ -617,9 +655,19 @@ private def dynamicDivisorWitness : Source (F pBabybear) :=
   source 1 [.witness 1 (.ir [] (.lit #v[.ofU64
     (.div (.val (.expr (.var ⟨0⟩))) (.val (.expr (.var ⟨0⟩))))]))]
 
+private def dynamicModuloWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64
+    (.mod (.val (.expr (.var ⟨0⟩))) (.val (.expr (.var ⟨0⟩))))]))]
+
 /-- A bare `idx` has no loop context and no syntactic value bound. -/
 private def idxWitness : Source (F pBabybear) :=
   source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 .idx]))]
+
+private def idxModuloWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 (.mod .idx (.const 256))]))]
+
+private def localModuloWitness : Source (F pBabybear) :=
+  source 1 [.witness 1 (.ir [] (.lit #v[.ofU64 (.mod (.localVar 0) (.const 256))]))]
 
 /-- The new field comparison has an explicit condition diagnostic even though
 all conditionals remain outside S25's accepted language. -/
@@ -803,10 +851,89 @@ operation 0 (witness): unsupported witness expression: `ofU64` applied to `val` 
 
 /--
 info: compilation failed:
-operation 0 (witness): unsupported witness expression: `ofU64` applied to `lxor` (bitwise exclusive or); its proved exclusive upper bound 18446744073709551616 exceeds the field prime 2013265921, so LLZK could reduce an intermediate differently
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `lxor` (bitwise exclusive or); its proved exclusive upper bound 2147483648 exceeds the field prime 2013265921, so LLZK could reduce an intermediate differently
 -/
 #guard_msgs in
 #eval IO.print (emitSource babybear xorUnboundedWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `lxor` (bitwise exclusive or); its proved exclusive upper bound 2147483648 exceeds the field prime 2013265921, so LLZK could reduce an intermediate differently
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear xorUnboundedSymmetricWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to `lor` (bitwise or); its proved exclusive upper bound 2147483648 exceeds the field prime 2013265921, so LLZK could reduce an intermediate differently
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear orUnboundedWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to a u64 addition; its proved exclusive upper bound 2013265923 exceeds the field prime 2013265921, so LLZK could reduce an intermediate differently
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear feltReducingBeforeModWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to a u64 modulo with a literal divisor whose numerator is a u64 addition; no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear u64WrappingBeforeModWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): witness modulo has divisor 2013265921, which is not below the field prime 2013265921; `felt.const` would reduce it modulo the prime
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear moduloAtPrimeWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): witness modulo has divisor 2013265922, which is not below the field prime 2013265921; `felt.const` would reduce it modulo the prime
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear moduloAbovePrimeWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to a u64 modulo without a literal divisor; no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear dynamicModuloWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to a u64 modulo with a literal divisor whose numerator is `idx` (a `mapRange` loop index); no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear idxModuloWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to a u64 modulo with a literal divisor whose numerator is `localVar` (a reference to a `let`-step); no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (emitSource babybear localModuloWitness)
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to a u64 modulo with a literal divisor whose numerator is `val` (the truncating field-to-u64 bridge) applied on its own; no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (renderWitnessRecognition
+  (Witness.recognize FieldSpec.bn254.prime "operation 0 (witness)" 1 (wideFieldModWitness 3)))
+
+/--
+info: compilation failed:
+operation 0 (witness): unsupported witness expression: `ofU64` applied to a u64 modulo with a literal divisor whose numerator is `val` (the truncating field-to-u64 bridge) applied on its own; no safe structural u64 bound was proved
+-/
+#guard_msgs in
+#eval IO.print (renderWitnessRecognition
+  (Witness.recognize FieldSpec.bn254.prime "operation 0 (witness)" 1 (wideFieldModWitness 256)))
 
 /--
 info: compilation failed:

@@ -44,6 +44,97 @@ private def syntheticVal : Witgen.U64Expr Nat := .val (.const 0)
 #guard U64Expr.upperBound (2 ^ 64) syntheticVal == some (2 ^ 64)
 #guard (U64Expr.upperBound (2 ^ 64 + 1) syntheticVal).isNone
 
+/-! ## S29's exact modulo and common bitwise ceilings
+
+The inputs below are written as their largest possible value, so their
+exclusive source bound is one larger. Modulo takes the minimum of that bound and
+the literal divisor. XOR and OR take the least power of two at least as large as
+the larger operand bound. The `257` row distinguishes a true ceiling from the
+old blanket `2^64`, and the last two rows pin the u64 boundary itself. -/
+
+private def modBound (n d : UInt64) : Option Nat :=
+  U64Expr.upperBound (2 ^ 64) (.mod (.const n) (.const d) : Witgen.U64Expr Nat)
+
+private def xorBound (a b : UInt64) : Option Nat :=
+  U64Expr.upperBound (2 ^ 64) (.lxor (.const a) (.const b) : Witgen.U64Expr Nat)
+
+private def orBound (a b : UInt64) : Option Nat :=
+  U64Expr.upperBound (2 ^ 64) (.lor (.const a) (.const b) : Witgen.U64Expr Nat)
+
+#guard modBound 0 256 == some 1
+#guard modBound 1 256 == some 2
+#guard modBound 254 256 == some 255
+#guard modBound 255 256 == some 256
+#guard modBound 256 1024 == some 257
+#guard modBound (2 ^ 63 - 1) (2 ^ 64 - 1) == some (2 ^ 63)
+#guard modBound (2 ^ 64 - 1) 1 == some 1
+#guard modBound (2 ^ 64 - 1) 2 == some 2
+#guard modBound (2 ^ 64 - 1) 255 == some 255
+#guard modBound (2 ^ 64 - 1) 256 == some 256
+#guard modBound (2 ^ 64 - 1) 257 == some 257
+#guard modBound (2 ^ 64 - 1) (2 ^ 63) == some (2 ^ 63)
+#guard U64Expr.upperBound (2 ^ 64) (.const (2 ^ 64 - 1) : Witgen.U64Expr Nat)
+  == some (2 ^ 64)
+
+#guard xorBound 0 0 == some 1
+#guard xorBound 1 1 == some 2
+#guard xorBound 254 254 == some 256
+#guard xorBound 255 255 == some 256
+#guard xorBound 256 256 == some 512
+#guard xorBound (2 ^ 63 - 1) (2 ^ 63 - 1) == some (2 ^ 63)
+#guard xorBound (2 ^ 64 - 1) (2 ^ 64 - 1) == some (2 ^ 64)
+#guard xorBound 0 256 == some 512
+#guard xorBound 256 0 == some 512
+
+#guard orBound 0 0 == some 1
+#guard orBound 1 1 == some 2
+#guard orBound 254 254 == some 256
+#guard orBound 255 255 == some 256
+#guard orBound 256 256 == some 512
+#guard orBound (2 ^ 63 - 1) (2 ^ 63 - 1) == some (2 ^ 63)
+#guard orBound (2 ^ 64 - 1) (2 ^ 64 - 1) == some (2 ^ 64)
+#guard orBound 0 256 == some 512
+#guard orBound 256 0 == some 512
+
+-- `upperBound` computes the syntactic ceiling; the recognizer's separate root
+-- field guard rejects this one because 2^31 is above Babybear.
+#guard U64Expr.upperBound pBabybear (.lxor syntheticVal (.const 1)) == some (2 ^ 31)
+#guard U64Expr.upperBound pBabybear (.lor syntheticVal (.const 1)) == some (2 ^ 31)
+
+private def syntaxX : Witgen.FExpr Bab := .expr (.var ⟨0⟩)
+private def feltReducingChild : Witgen.U64Expr Bab := .add (.val syntaxX) (.const 1)
+private def feltReducingMod : Witgen.U64Expr Bab := .mod feltReducingChild (.const 256)
+private def u64WrappingChild : Witgen.U64Expr Bab :=
+  .add (.const (2 ^ 64 - 1)) (.const 1)
+private def u64WrappingMod : Witgen.U64Expr Bab := .mod u64WrappingChild (.const 256)
+private def idxMod : Witgen.U64Expr Bab := .mod .idx (.const 256)
+private def localMod : Witgen.U64Expr Bab := .mod (.localVar 0) (.const 256)
+private def dynamicMod : Witgen.U64Expr Bab := .mod (.val syntaxX) (.val syntaxX)
+private def zeroMod : Witgen.U64Expr Bab := .mod (.val syntaxX) (.const 0)
+private def primeMod : Witgen.U64Expr Bab :=
+  .mod (.val syntaxX) (.const (UInt64.ofNat pBabybear))
+private def narrowSyntax256 : Witgen.U64Expr Bab := .mod (.val syntaxX) (.const 256)
+
+#guard U64Expr.upperBound pBabybear feltReducingChild == some (pBabybear + 2)
+#guard U64Expr.upperBound pBabybear feltReducingMod == some 256
+#guard pBabybear % 256 == 1
+#guard (WExpr.ofWitgen (.ofU64 feltReducingMod)).isNone
+#guard (U64Expr.upperBound pBabybear u64WrappingChild).isNone
+#guard (U64Expr.upperBound pBabybear u64WrappingMod).isNone
+#guard (WExpr.ofWitgen (.ofU64 u64WrappingMod)).isNone
+#guard (U64Expr.upperBound pBabybear idxMod).isNone
+#guard (U64Expr.upperBound pBabybear localMod).isNone
+#guard (U64Expr.upperBound pBabybear dynamicMod).isNone
+#guard (U64Expr.upperBound pBabybear zeroMod).isNone
+#guard U64Expr.upperBound pBabybear primeMod == some pBabybear
+#guard (WExpr.ofWitgen (.ofU64 primeMod)).isNone
+#guard (U64Expr.upperBound FieldSpec.bn254.prime
+  (.mod (.val syntaxX) (.const 3))).isNone
+#guard (U64Expr.upperBound FieldSpec.bn254.prime
+  (.mod (.val syntaxX) (.const 256))).isNone
+#guard U64Expr.upperBound pBabybear (.lxor narrowSyntax256 narrowSyntax256) == some 256
+#guard U64Expr.upperBound pBabybear (.lor narrowSyntax256 narrowSyntax256) == some 256
+
 private def source (inputSize : Nat) (operations : List (FlatOperation Bab))
     (outputs : Array (Expression Bab) := #[]) : Source Bab :=
   { inputSize, operations, outputs }
@@ -92,6 +183,7 @@ private def wit (e : Witgen.FExpr Bab) : FlatOperation Bab :=
   .witness 1 (.ir [] (.lit #v[e]))
 
 private def x : Witgen.FExpr Bab := .expr (.var ⟨0⟩)
+private def y : Witgen.FExpr Bab := .expr (.var ⟨1⟩)
 
 private def sq : Source Bab := source 1 [wit (.mul x x)] #[.var ⟨1⟩]
 private def dbl : Source Bab := source 1 [wit (.add x x)] #[.var ⟨1⟩]
@@ -102,6 +194,16 @@ private def and255 : Source Bab :=
   source 1 [wit (.ofU64 (.land (.val x) (.const 255)))] #[.var ⟨1⟩]
 private def and127 : Source Bab :=
   source 1 [wit (.ofU64 (.land (.val x) (.const 127)))] #[.var ⟨1⟩]
+private def narrowAt (e : Witgen.FExpr Bab) (d : UInt64) : Witgen.U64Expr Bab :=
+  .mod (.val e) (.const d)
+private def xorXY : Source Bab :=
+  source 2 [wit (.ofU64 (.lxor (narrowAt x 256) (narrowAt y 256)))] #[.var ⟨2⟩]
+private def orXY : Source Bab :=
+  source 2 [wit (.ofU64 (.lor (narrowAt x 256) (narrowAt y 256)))] #[.var ⟨2⟩]
+private def xorXX : Source Bab :=
+  source 2 [wit (.ofU64 (.lxor (narrowAt x 256) (narrowAt x 256)))] #[.var ⟨2⟩]
+private def xorOne128 : Source Bab :=
+  source 2 [wit (.ofU64 (.lxor (narrowAt x 256) (narrowAt y 128)))] #[.var ⟨2⟩]
 private def twoCells : Source Bab :=
   source 1 [.witness 2 (.ir [] (.lit #v[.mul x x, .add x x]))] #[.var ⟨1⟩, .var ⟨2⟩]
 private def twoCellsSwapped : Source Bab :=
@@ -110,9 +212,19 @@ private def outConst : Source Bab := source 1 [wit (.mul x x)] #[.const 7]
 
 -- Baselines, so that a red below cannot be explained by everything being red.
 #guard cross babybear sq sq
+#guard cross babybear dbl dbl
 #guard cross babybear mod256 mod256
+#guard cross babybear mod128 mod128
+#guard cross babybear div256 div256
 #guard cross babybear and255 and255
+#guard cross babybear and127 and127
+#guard cross babybear xorXY xorXY
+#guard cross babybear orXY orXY
+#guard cross babybear xorXX xorXX
+#guard cross babybear xorOne128 xorOne128
 #guard cross babybear twoCells twoCells
+#guard cross babybear twoCellsSwapped twoCellsSwapped
+#guard cross babybear outConst outConst
 
 -- A wrong operation.
 #guard !cross babybear sq dbl
@@ -122,6 +234,12 @@ private def outConst : Source Bab := source 1 [wit (.mul x x)] #[.const 7]
 #guard !cross babybear mod256 div256
 -- A wrong bitwise operand.
 #guard !cross babybear and255 and127
+-- XOR and OR are distinct emitted operations.
+#guard !cross babybear xorXY orXY
+-- A wrong XOR operand.
+#guard !cross babybear xorXY xorXX
+-- Narrowing by the wrong byte divisor.
+#guard !cross babybear xorXY xorOne128
 -- Cells in the wrong order.
 #guard !cross babybear twoCells twoCellsSwapped
 -- A wrong output.
