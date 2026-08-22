@@ -19,6 +19,91 @@ namespace LLZK.Corpus
 
 open LLZK.Examples
 
+/-- Whether a fixed public reference lies inside a gadget theorem's assumptions
+or exercises only the executable witness program. This label is evidence
+metadata; it never weakens the reference check. -/
+inductive ReferenceScope where
+  | spec
+  | computeOnly
+deriving Repr, DecidableEq
+
+/-- Where an expected public result comes from.
+
+Most historical corpus entries are differential checks against Clean's witness
+interpreter. Promoted entries carry fixed values produced independently of
+Clean. Keeping this in the same per-vector carrier as the inputs prevents a
+parallel reference array from truncating or drifting by row. -/
+inductive PublicExpectation where
+  | fromWitness
+  | fixed (scope : ReferenceScope) (values : Array Nat)
+deriving Repr, DecidableEq
+
+/-- Whether an entry permits Clean-derived public outputs or requires a fixed
+reference on every vector. -/
+inductive PublicReferencePolicy where
+  | witnessDerived
+  | fixedRequired
+deriving Repr, DecidableEq
+
+/-- One input row, its Clean witness result, and its public-output provenance. -/
+structure VectorCase where
+  name : String
+  inputs : Array Nat
+  cleanWitness : Except Diagnostic Witness
+  publicExpectation : PublicExpectation
+deriving Repr, DecidableEq
+
+/-- A source row and fixed reference supplied together to the referenced-entry
+constructor. There is deliberately no constructor taking parallel arrays. -/
+structure ReferencedVector where
+  name : String
+  inputs : Array Nat
+  scope : ReferenceScope
+  outputs : Array Nat
+deriving Repr, DecidableEq
+
+def PublicExpectation.scope? : PublicExpectation → Option ReferenceScope
+  | .fromWitness => none
+  | .fixed scope _ => some scope
+
+def PublicExpectation.isFixed : PublicExpectation → Bool
+  | .fromWitness => false
+  | .fixed _ _ => true
+
+/-- Validate a vector's independent public reference and return the witness that
+must be serialized. Fixed outputs replace Clean-derived outputs in both JSON
+scopes only after exact width, canonicality, and complete equality checks. -/
+def VectorCase.checkedWitness (vector : VectorCase) (field : FieldSpec)
+    (policy : PublicReferencePolicy) (context : String) : Except Diagnostic Witness := do
+  let witness ← match vector.cleanWitness with
+    | .ok witness => .ok witness
+    | .error diagnostic => .error { context, message := diagnostic.render }
+  if witness.inputs != vector.inputs then
+    throw { context
+            message := "the stored Clean witness belongs to different inputs" }
+  match vector.publicExpectation with
+  | .fromWitness =>
+      if policy = .fixedRequired then
+        throw { context
+                message := "this promoted entry requires a fixed independent public reference" }
+      return witness
+  | .fixed _ values =>
+      if values.size != witness.outputs.size then
+        throw { context
+                message := s!"fixed public reference has {values.size} value(s), but Clean's \
+                  witness has {witness.outputs.size}" }
+      for (value, j) in values.zipIdx do
+        if value ≥ field.prime then
+          throw { context
+                  message := s!"fixed public reference output {j} is {value}, not below the \
+                    field prime {field.prime}" }
+      for ((reference, clean), j) in (values.zip witness.outputs).zipIdx do
+        if reference != clean then
+          throw { context
+                  message := s!"fixed public reference output {j} is {reference}, but Clean's \
+                    witness produced {clean}" }
+      return { witness with outputs := values }
+
 /-! ## Entries
 
 An entry carries an already-compiled module and already-computed expected
@@ -42,10 +127,13 @@ structure Entry where
   hard-codes babybear answers it wrongly for five of them. -/
   field : FieldSpec
   module : Except (Array Diagnostic) Module
-  /-- Each input vector, paired with Clean's own witness for it. Input values are
-  canonical representatives, one per input field element. Chosen to cover
-  boundaries, not just a typical value. -/
-  vectors : Array (Array Nat × Except Diagnostic Witness)
+  /-- Each input vector, paired with Clean's witness and its public-output
+  provenance. Input values are canonical representatives, one per input field
+  element. Chosen to cover boundaries, not just a typical value. -/
+  vectors : Array VectorCase
+  /-- Promoted reference-backed entries fail if any vector is downgraded to a
+  Clean-derived public expectation. -/
+  publicReferencePolicy : PublicReferencePolicy
   /-- Gate G9: whether the emitted `@constrain`, read back as polynomials, is the
   same constraint system as the Clean circuit's. `none` where there is no Clean
   circuit to compare against — see `registryEntry`.
@@ -68,7 +156,12 @@ def Entry.ofSource {F : Type} [FiniteField F] [CanonicalRepr F] [DecidableEq F]
   name := name
   field := cfg.field
   module := compileSourceVerified cfg src
-  vectors := inputs.map fun values => (values, LLZK.witness src values)
+  vectors := inputs.zipIdx.map fun (values, i) =>
+    { name := s!"vector-{i}"
+      inputs := values
+      cleanWitness := LLZK.witness src values
+      publicExpectation := .fromWitness }
+  publicReferencePolicy := .witnessDerived
   -- `.toConfig` twice, because these two report on the halves of G9 *separately*
   -- and neither is the supported entry point; the module above is the one that
   -- goes through both, and it takes the certificates.
@@ -76,6 +169,20 @@ def Entry.ofSource {F : Type} [FiniteField F] [CanonicalRepr F] [DecidableEq F]
   witnessAgree := some (match compileSource cfg.toConfig src with
     | .error _ => false
     | .ok m => WitnessSet.agree (Ty.felt cfg.field.name) src m)
+
+/-- Build a promoted entry whose every vector carries a fixed, independently
+derived public result. -/
+def Entry.ofSourceReferenced {F : Type} [FiniteField F] [CanonicalRepr F] [DecidableEq F]
+    (cfg : CertifiedConfig F) (name : String) (src : Source F)
+    (vectors : Array ReferencedVector) : Entry :=
+  let base := Entry.ofSource cfg name src #[]
+  { base with
+    vectors := vectors.map fun vector =>
+      { name := vector.name
+        inputs := vector.inputs
+        cleanWitness := LLZK.witness src vector.inputs
+        publicExpectation := .fixed vector.scope vector.outputs }
+    publicReferencePolicy := .fixedRequired }
 
 /-! ## Registry conformance
 
@@ -116,7 +223,12 @@ def registryEntry (spec : FieldSpec) : Entry :=
   { name := "Square_" ++ spec.name
     field := spec
     module := lowerRecognized (.forField spec) square
-    vectors := #[(#[x], .ok { inputs := #[x], cells := #[], outputs := #[x * x % spec.prime] })]
+    vectors := #[{ name := "registry-boundary"
+                   inputs := #[x]
+                   cleanWitness := .ok {
+                     inputs := #[x], cells := #[], outputs := #[x * x % spec.prime] }
+                   publicExpectation := .fromWitness }]
+    publicReferencePolicy := .witnessDerived
     -- No Clean circuit behind these, so there is nothing independent to compare
     -- the emitted constraints against; checking them against the `Recognized`
     -- they were built from would be the emitter checking itself.

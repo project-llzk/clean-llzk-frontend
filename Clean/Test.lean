@@ -13,4 +13,5 @@ import Clean.Backend.LLZK.Test.WitnessCheck
 import Clean.Backend.LLZK.Test.Lookups
 import Clean.Backend.LLZK.Test.Soundness
 import Clean.Backend.LLZK.Test.Coverage
+import Clean.Backend.LLZK.Test.Corpus
 import Clean.Backend.LLZK.Test.Showcase

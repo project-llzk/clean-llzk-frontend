@@ -55,14 +55,15 @@ private def emitEntry (directory : System.FilePath) (entry : Corpus.Entry) : IO 
     | .ok text =>
       IO.FS.writeFile path text
       IO.println s!"wrote {path}"
-  for ((inputs, expected), i) in entry.vectors.zipIdx do
-    match expected with
+  for (vector, i) in entry.vectors.zipIdx do
+    match vector.checkedWitness entry.field entry.publicReferencePolicy
+        s!"{entry.name} input vector {i} ({vector.name})" with
     | .error d =>
-      IO.eprintln s!"error: {entry.name} input vector {i}: {d.render}"
+      IO.eprintln s!"error: {d.render}"
       failed := true
     | .ok w =>
       IO.FS.writeFile (directory / s!"{entry.name}.{i}.inputs.json")
-        (inputsJson inputs).compress
+        (inputsJson vector.inputs).compress
       IO.FS.writeFile (directory / s!"{entry.name}.{i}.expected.json")
         (fullWitnessJson w).compress
       IO.FS.writeFile (directory / s!"{entry.name}.{i}.public.json")
