@@ -5,11 +5,20 @@ updates require an explicit session and decision-log entry.
 
 | Component | Revision | Role |
 |---|---|---|
-| Clean | `0e53b9f2d05f06defa2aa0a859f549b611583f10` | Frontend host and source semantics; S25 |
+| Upstream Clean | `0e53b9f2d05f06defa2aa0a859f549b611583f10` | Reviewed upstream provenance and overlay parent; S25/S29 |
+| Accepted Clean overlay | `3d086f32a71d17cbddfb46c0dea63cd36c8aa552` | Frontend host/source semantics with D035's executable Xor32 byte narrowing; S29 |
 | LLZK | `25fb3740ea3465c9129a06289297bb4f0554b7a5` | LLZK 3.0 syntax, verifier, and witgen reference; L0 |
 | project-llzk VeIR | `eae1c27e7842c0503233ec99155c39791bd5f502` | Existing LLZK-aware VeIR fork |
 | upstream VeIR | `a4e6194d5810a02d74f0094ff6014cda6db6d617` | Long-term Lean MLIR framework |
 | llzk-lean VeIR | `d899d95004d4bd988c8456d686c33b11a7a5eb4a` | Previously accepted differential harness pin |
+
+The accepted Clean overlay is a local, frontend-owned direct child of the
+upstream pin; it is not claimed to be published upstream. Its full U..K delta is
+exactly `M Clean/Gadgets/Xor/Xor32.lean`. G0 verifies both immutable commits,
+that direct-parent relationship, the exact name/status delta, and ordinary
+Clean-core byte identity after K. D035 and `evidence/S29/clean-overlay.md`
+record the decision, builds, and independent reviews. No upstream branch, issue,
+or PR changed when K was adopted.
 
 Public-readiness note (checked 2026-08-21): L0 advanced the accepted pin from
 `5db6f8f9baaa40787a1a40625796497445f2da36` to current

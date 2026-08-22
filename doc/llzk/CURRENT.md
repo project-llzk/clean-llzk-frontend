@@ -29,10 +29,11 @@ headline-example promotion still precede candidate freeze.
 Active capability session: **S29 — source-visible XOR byte range**. Its first
 commit is decision and process only: D035 selects executable `% 256` narrowing,
 exact modulo bounds, and power-of-two XOR/OR envelopes without importing hidden
-circuit assumptions. A Clean-only overlay will be built and reviewed from exact
-upstream base `0e53b9f2`, then adopted atomically with a new Clean pin before
-frontend bound proofs or example promotion. Independent adversarial review is
-required at every phase boundary. See `sessions/S29-xor-range-contract.md`.
+circuit assumptions. Clean-only overlay `3d086f32`, built from exact upstream
+base `0e53b9f2`, passed targeted and full builds plus three independent reviews
+and is now the accepted source-semantics pin. Frontend bound proofs and example
+promotion remain pending. Independent adversarial review is required at every
+phase boundary. See `sessions/S29-xor-range-contract.md`.
 
 Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
@@ -119,11 +120,13 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s29-xor-range-contract` (bootstrap recovery; no feature code yet)
+Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase M Clean-overlay adoption; backend bound work not started)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
-Pinned Clean base: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
+Pinned upstream Clean base: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
+
+Accepted Clean overlay: `3d086f32a71d17cbddfb46c0dea63cd36c8aa552`
 
 Local integration state, reconciled 2026-08-22: `clean-to-llzk/integration` was
 fast-forwarded from stale R7 tip `97390fac` to audited baseline `9b46264c`; the
@@ -134,8 +137,10 @@ green there. A public release candidate must put the branch, evidence, and CI
 on the same frozen commit. No push or other external change occurred during
 this reconciliation.
 
-Dependency state, also verified 2026-08-21: Clean upstream remains exactly
-`0e53b9f2`, S25's accepted base. LLZK `main` is `25fb3740`, now the accepted
+Dependency state, updated 2026-08-22: Clean upstream provenance remains exactly
+`0e53b9f2`. S29 adopts reviewed direct-child overlay `3d086f32`, whose only
+change is executable Xor32 byte narrowing; it is not claimed upstream. LLZK
+`main` at `25fb3740` remains the accepted
 source/tool pin after L0's same-tree comparison with the previous `5db6f8f9`
 input. Both exact outputs report 3.0.0 and passed 12 circuits, 33 vectors on both
 witness backends, 2 renderer fixtures, all 14 product-program admissions, and
@@ -150,7 +155,8 @@ authority; the unchanged 3.0.0 version banner is not.
 
 ## Accepted pins
 
-- Clean: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
+- Upstream Clean: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
+- Accepted Clean overlay: `3d086f32a71d17cbddfb46c0dea63cd36c8aa552`
 - LLZK source: `25fb3740ea3465c9129a06289297bb4f0554b7a5`
 - LLZK tools: the Nix output of the pinned LLZK source; reports version 3.0.0
 - project-llzk VeIR: `eae1c27e7842c0503233ec99155c39791bd5f502`
@@ -158,8 +164,10 @@ authority; the unchanged 3.0.0 version banner is not.
 
 See `PINS.md` for how to obtain the tools, including the cache-key requirement.
 
-**The Clean pin is current as fetched on 2026-08-21.** S25 merged the 70-commit
-delta at `0e53b9f2` and moved Lean from 4.30.0 to **4.32.2**. The backend now
+**The upstream Clean pin is current as fetched on 2026-08-21; the accepted
+source-semantics pin is S29 overlay `3d086f32`.** S25 merged the 70-commit delta
+at `0e53b9f2` and moved Lean from 4.30.0 to **4.32.2**. S29 changes only Xor32's
+witness byte narrowing on top. The backend now
 matches `U64Expr`, `ofU64`, `letU`, `BExpr.flt`/`bit`, and
 `VExpr.envRange`/`bitsOf` exhaustively while preserving the old accepted subset.
 The non-obvious cost found by S25 was D026: `U64Expr.val` truncates. S26's D033

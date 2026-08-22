@@ -6,7 +6,8 @@ repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 
 # shellcheck source=scripts/llzk/lib.sh
 source "${script_dir}/lib.sh"
-clean_base="0e53b9f2d05f06defa2aa0a859f549b611583f10"
+clean_upstream_base="0e53b9f2d05f06defa2aa0a859f549b611583f10"
+clean_base="3d086f32a71d17cbddfb46c0dea63cd36c8aa552"
 expected_upstream="git@github.com:Verified-zkEVM/clean.git"
 expected_toolchain="leanprover/lean4:v4.32.2"
 
@@ -23,23 +24,47 @@ if [[ "${actual_upstream}" != "${expected_upstream}" ]]; then
   exit 1
 fi
 
+if ! git cat-file -e "${clean_upstream_base}^{commit}" 2>/dev/null; then
+  echo "error: pinned upstream Clean base is missing: ${clean_upstream_base}" >&2
+  exit 1
+fi
+
 if ! git cat-file -e "${clean_base}^{commit}" 2>/dev/null; then
-  echo "error: pinned Clean base is missing: ${clean_base}" >&2
+  echo "error: pinned Clean overlay is missing: ${clean_base}" >&2
+  exit 1
+fi
+
+if ! git merge-base --is-ancestor "${clean_upstream_base}" "${clean_base}"; then
+  echo "error: pinned Clean overlay ${clean_base} does not descend from" >&2
+  echo "  pinned upstream Clean base ${clean_upstream_base}" >&2
+  exit 1
+fi
+
+overlay_parents="$(git rev-list --parents -1 "${clean_base}")"
+if [[ "${overlay_parents}" != "${clean_base} ${clean_upstream_base}" ]]; then
+  echo "error: pinned Clean overlay ${clean_base} is not a direct single-parent child of" >&2
+  echo "  the pinned upstream Clean base ${clean_upstream_base}" >&2
+  exit 1
+fi
+
+overlay_delta="$(git diff --name-status "${clean_upstream_base}" "${clean_base}")"
+expected_overlay_delta=$'M\tClean/Gadgets/Xor/Xor32.lean'
+if [[ "${overlay_delta}" != "${expected_overlay_delta}" ]]; then
+  echo "error: pinned Clean overlay differs from the reviewed one-path delta:" >&2
+  sed 's/^/  /' <<<"${overlay_delta}" >&2
+  echo "  expected: M  Clean/Gadgets/Xor/Xor32.lean" >&2
   exit 1
 fi
 
 if ! git merge-base --is-ancestor "${clean_base}" HEAD; then
-  echo "error: HEAD does not descend from pinned Clean base ${clean_base}" >&2
+  echo "error: HEAD does not descend from pinned Clean overlay ${clean_base}" >&2
   exit 1
 fi
 
-# This branch changes Clean's core in exactly two places, and several decisions
-# rest on that: D012's follow-up defers naming ByteTable's `StaticTable` because
-# "that belongs to a Clean-side session", and GAPS.md item 8 defers removing
-# `Clean/Utils/Primes.lean`'s `native_decide` uses because "that file is Clean
-# core, which this branch keeps byte-identical to the pinned base". Both are
-# arguments about *where* work belongs, and both stop holding the moment the
-# premise does.
+# D035 adopts one reviewed Clean-side overlay commit for executable Xor32 byte
+# narrowing. The exact U..K delta is checked above. From K onward, this branch
+# changes Clean's core in exactly two registration places, and several decisions
+# still rely on that confinement.
 #
 # R6 found the premise was true and gated nowhere -- an invariant three documents
 # rely on, checkable in one line, checked by nobody. The two exceptions are the
@@ -48,7 +73,7 @@ fi
 core_changes="$(git diff --name-only "${clean_base}" HEAD -- Clean/ \
   ':!Clean/Backend/LLZK' ':!Clean.lean' ':!Clean/Test.lean')"
 if [[ -n "${core_changes}" ]]; then
-  echo "error: Clean's core is no longer byte-identical to the pinned base ${clean_base}:" >&2
+  echo "error: Clean's core is no longer byte-identical to the accepted overlay ${clean_base}:" >&2
   sed 's/^/  /' <<<"${core_changes}" >&2
   echo "  This branch is allowed to add Clean/Backend/LLZK/ and to register it in" >&2
   echo "  Clean.lean and Clean/Test.lean, and nothing else. A change to Clean's core" >&2
@@ -79,8 +104,10 @@ if [[ "${actual_toolchain}" != "${expected_toolchain}" ]]; then
   exit 1
 fi
 
-echo "Clean base: ${clean_base}"
-echo "core:       byte-identical outside Clean/Backend/LLZK (plus the two registration files)"
+echo "Clean upstream: ${clean_upstream_base}"
+echo "Clean overlay:  ${clean_base}"
+echo "overlay:        exact reviewed Xor32 delta"
+echo "core after K:   byte-identical outside Clean/Backend/LLZK (plus the two registration files)"
 echo "HEAD:       $(git rev-parse HEAD)"
 echo "upstream:   ${actual_upstream}"
 echo "toolchain:  ${actual_toolchain}"

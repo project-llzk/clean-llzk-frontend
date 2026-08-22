@@ -82,7 +82,7 @@ git -C "${clone}" remote add upstream https://example.invalid/not-clean.git
 expect "wrong upstream URL" 1 "expected git@github.com:Verified-zkEVM/clean.git" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
-# A repository that does not contain the pinned Clean base at all.
+# A repository that does not contain the pinned upstream Clean base at all.
 orphan="${workdir}/no-base"
 mkdir -p "${orphan}/scripts/llzk"
 cp "${script_dir}"/{check-pins.sh,lib.sh} "${orphan}/scripts/llzk/"
@@ -90,15 +90,49 @@ cp "${repo_root}/lean-toolchain" "${orphan}/"
 git -C "${orphan}" init --quiet .
 git -C "${orphan}" remote add upstream git@github.com:Verified-zkEVM/clean.git
 git -C "${orphan}" -c user.email=t@t -c user.name=t commit --quiet --allow-empty -m base
-expect "pinned base absent" 1 "pinned Clean base is missing" \
+expect "pinned upstream base absent" 1 "pinned upstream Clean base is missing" \
   -- bash "${orphan}/scripts/llzk/check-pins.sh"
 
-# A history that exists but does not descend from the pinned base.
+clone="$(make_clone no-overlay)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+sed -i 's/^clean_base=.*/clean_base="0000000000000000000000000000000000000000"/' \
+  "${clone}/scripts/llzk/check-pins.sh"
+expect "pinned Clean overlay absent" 1 "pinned Clean overlay is missing" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
+clone="$(make_clone unrelated-overlay)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+sed -i 's/^clean_base=.*/clean_base="97390faca9dd0680b7fe3a6db26f4de0c3cf6a06"/' \
+  "${clone}/scripts/llzk/check-pins.sh"
+expect "Clean overlay unrelated to upstream base" 1 "does not descend from" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
+clone="$(make_clone indirect-overlay)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+sed -i 's/^clean_base=.*/clean_base="9b46264c59ed69af24817cb4b2cfdb7ebcfb4629"/' \
+  "${clone}/scripts/llzk/check-pins.sh"
+expect "Clean overlay is not a direct child" 1 "not a direct single-parent child" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
+clone="$(make_clone wrong-overlay-delta)"
+git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
+original_head="$(git -C "${clone}" rev-parse HEAD)"
+git -C "${clone}" checkout --quiet --detach 0e53b9f2d05f06defa2aa0a859f549b611583f10
+echo "-- wrong overlay path" >> "${clone}/Clean/Utils/Primes.lean"
+git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet -am "wrong overlay"
+wrong_overlay="$(git -C "${clone}" rev-parse HEAD)"
+git -C "${clone}" checkout --quiet "${original_head}"
+sed -i "s/^clean_base=.*/clean_base=\"${wrong_overlay}\"/" \
+  "${clone}/scripts/llzk/check-pins.sh"
+expect "unexpected Clean overlay delta" 1 "differs from the reviewed one-path delta" \
+  -- bash "${clone}/scripts/llzk/check-pins.sh"
+
+# A history that exists but does not descend from the pinned overlay.
 clone="$(make_clone orphan-head)"
 git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
 git -C "${clone}" checkout --quiet --orphan detached
 git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet --allow-empty -m unrelated
-expect "HEAD not descended from base" 1 "does not descend from pinned Clean base" \
+expect "HEAD not descended from overlay" 1 "does not descend from pinned Clean overlay" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
 clone="$(make_clone bad-toolchain)"
@@ -114,7 +148,7 @@ clone="$(make_clone core-drift)"
 git -C "${clone}" remote add upstream git@github.com:Verified-zkEVM/clean.git
 echo "-- touched by a backend session" >> "${clone}/Clean/Utils/Primes.lean"
 git -C "${clone}" -c user.email=t@t -c user.name=t commit --quiet -am "touch Clean core"
-expect "a change to Clean's core is caught" 1 "no longer byte-identical to the pinned base" \
+expect "a change to Clean's core is caught" 1 "no longer byte-identical to the accepted overlay" \
   -- bash "${clone}/scripts/llzk/check-pins.sh"
 
 # R7-01. The commit-vs-commit diff above is blind to the working tree, which is

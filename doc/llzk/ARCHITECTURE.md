@@ -31,9 +31,10 @@ the accepted VeIR inputs do not provide the complete Struct, Array,
 ## 2. Exact source state reviewed
 
 The table below is the 2026-07-31 investigation baseline, not the current pin
-register. S25 advanced Clean to
-`0e53b9f2d05f06defa2aa0a859f549b611583f10` / Lean 4.32.2 on 2026-08-21;
-`PINS.md` is authoritative for accepted inputs.
+register. S25 advanced upstream Clean to
+`0e53b9f2d05f06defa2aa0a859f549b611583f10` / Lean 4.32.2 on 2026-08-21; S29
+adopts the separately pinned one-file Clean overlay `3d086f32`. `PINS.md` is
+authoritative for both inputs.
 
 | Project | Ref reviewed | Toolchain / relevant state |
 |---|---|---|

@@ -4,7 +4,8 @@
 
 ## Evidence
 
-- Clean base:
+- Upstream Clean base:
+- Accepted Clean overlay:
 - LLZK source/tool pin:
 - Targeted checks:
 - Full G0–G12 result or named reason it is not required:
@@ -24,7 +25,8 @@
   themselves.
 - [ ] Changes outside `Clean/Backend/LLZK/`, `Clean.lean`, and `Clean/Test.lean`
   are intentional Clean-core work or remain byte-identical to the accepted
-  upstream base.
+  Clean overlay; any overlay change is separately pinned and reviewed against
+  its upstream base.
 
 ## Public impact
 

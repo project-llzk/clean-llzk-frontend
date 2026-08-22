@@ -38,9 +38,9 @@ authorized.
 - Active documentation contains no dependency on one developer's filesystem or
   personal fork. Historical evidence may retain exact paths when provenance
   requires them.
-- The branch is aligned with the accepted upstream Clean revision, has a clean
-  worktree, contains no generated build products, and has no unpublished commits
-  that are part of the release candidate.
+- The branch records the accepted upstream Clean revision and every reviewed
+  local Clean overlay separately, has a clean worktree, contains no generated
+  build products, and publishes every commit selected for the release candidate.
 - Licensing and upstream Clean attribution remain intact. **Prepared locally:**
   `PUBLICATION.md` specifies the repository description, topics, branch
   protection, required checks, and security settings; `CONTRIBUTING.md`, the PR

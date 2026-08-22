@@ -7,6 +7,7 @@
 - K's only parent: U.
 - Branch: `clean-to-llzk/s29-clean-xor-range`.
 - Worktree: `/home/alh/LLZK/clean-xor-range-contract`.
+- Lean toolchain: `leanprover/lean4:v4.32.2`.
 
 `git diff --name-status U..K -- Clean/` returned exactly:
 

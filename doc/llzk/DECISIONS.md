@@ -1439,7 +1439,7 @@ are complete.
 
 ## D035 — Make XOR byte bounds executable in witness semantics
 
-**Status:** accepted design; implementation pending
+**Status:** accepted; Clean source contract enacted, frontend bounds pending
 
 **Date:** 2026-08-22
 

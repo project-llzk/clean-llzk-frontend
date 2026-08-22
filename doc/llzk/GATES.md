@@ -27,6 +27,12 @@ bash scripts/llzk/doctor.sh                  # adds tool discovery
 bash scripts/llzk/doctor.sh --require-llzk   # fails if LLZK tools are missing
 ```
 
+G0 distinguishes upstream Clean provenance U from the accepted local Clean
+overlay K. It requires both immutable commits, K as U's direct single-parent
+child, the exact reviewed `M Clean/Gadgets/Xor/Xor32.lean` U..K delta, K as an
+ancestor of HEAD, and byte identity of all later Clean core outside the backend
+and its two registration files. It separately rejects uncommitted core drift.
+
 ## G1 — Lean
 
 G1 is defined as the checks `.github/workflows/ci.yml` runs, so that a green
@@ -270,8 +276,10 @@ the cases are the negative direction of
 positive direction ran on the real tools every time while the direction that
 matters ran never.
 
-There are now 54 cases. The additional audit control rejects a witgen shim that
-is honest for full-witness output but permissive for public output. Ten enforce
+There are now 58 cases. The audit control rejects a witgen shim that is honest
+for full-witness output but permissive for public output. Four S29 controls
+independently reject a missing overlay, unrelated overlay, indirect overlay, and
+wrong overlay path/status. Ten enforce
 the public CI policy in
 `check-actions-pinned.sh`: mutable action tags, moving hosted-runner or Rust
 inputs, writable default tokens, and implicitly enabled hosted or self-hosted
