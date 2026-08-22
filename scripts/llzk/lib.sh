@@ -53,12 +53,15 @@ both must come from the same LLZK installation"
 }
 
 # require_llzk_witgen_discriminates ARTIFACT INPUTS EXPECTED PUBLIC_EXPECTED WORKDIR
+#   [sampled|strict-sampled|exhaustive-outputs] [EXPECTED_OUTPUTS]
+#   [ALTERNATE_FULL ALTERNATE_PUBLIC]
 #
 # Proves, on a real emitted artifact, that llzk-witgen --check-output can go both
 # green and red. For both output scopes, the expected document must succeed and
-# three independently corrupted documents -- first, middle, and last field --
-# must fail. The three positions matter for wide headline outputs: a checker
-# that validates only `out0` must not make the rest of the matrix look green.
+# independently corrupted documents must fail. Sampled mode checks numeric
+# first, middle, and last positions. Exhaustive-output mode checks every
+# `out{j}` in both scopes and can additionally require a semantically distinct
+# alternate full/public witness pair to go red.
 #
 # Without this, every green below is unfalsifiable: the harness cannot tell a
 # passing check from a binary that exits 0 unconditionally. The expanded probes
@@ -67,23 +70,47 @@ both must come from the same LLZK installation"
 # every run and strengthened for S29's wide outputs.
 require_llzk_witgen_discriminates() {
   local artifact="$1" inputs="$2" expected="$3" public_expected="$4" workdir="$5"
-  local require_distinct="${6:-false}"
-  case "${require_distinct}" in
-    true|false) ;;
-    *) llzk_fail "llzk-witgen self-test: strict-distinct flag must be true or false, got \
-${require_distinct}" ;;
+  local mode="${6:-sampled}" expected_outputs="${7:-}"
+  local alternate_full="${8:-}" alternate_public="${9:-}"
+  case "${mode}" in
+    sampled|strict-sampled)
+      [[ -z "${expected_outputs}${alternate_full}${alternate_public}" ]] \
+        || llzk_fail "llzk-witgen self-test: ${mode} mode takes no output count or alternate"
+      ;;
+    exhaustive-outputs)
+      [[ "${expected_outputs}" =~ ^[1-9][0-9]*$ ]] \
+        || llzk_fail "llzk-witgen self-test: exhaustive-output count must be a positive integer"
+      if [[ -n "${alternate_full}" || -n "${alternate_public}" ]]; then
+        [[ -n "${alternate_full}" && -n "${alternate_public}" ]] \
+          || llzk_fail "llzk-witgen self-test: alternate full and public expectations must be supplied together"
+      fi
+      ;;
+    *) llzk_fail "llzk-witgen self-test: unknown discriminator mode ${mode}" ;;
   esac
   # Not a fixed name. R5d's D-5: two six-line shims that special-cased the
   # scratch paths defeated both self-tests, because those paths were literals a
-  # shim could recognise. The basename and PID make them unguessable from
-  # inside the tool.
+  # shim could recognise. PID-derived scratch names keep the source filenames,
+  # especially their semantic `raw` marker, out of the tool invocation. This is
+  # a regression discriminator, not a secrecy claim.
   local tag; tag="$(basename -- "${artifact}" .llzk).$$"
   local corrupted_prefix="${workdir}/witgen-selftest-${tag}"
   local public_corrupted_prefix="${workdir}/witgen-public-selftest-${tag}"
-  local positions=(first middle last)
+  local alternate_full_probe="${corrupted_prefix}-alternate.json"
+  local alternate_public_probe="${public_corrupted_prefix}-alternate.json"
+  local witness_positions=(first middle last)
+  local output_positions=(first middle last)
+  if [[ "${mode}" == "exhaustive-outputs" ]]; then
+    output_positions=()
+    local output_index
+    for ((output_index = 0; output_index < expected_outputs; output_index++)); do
+      output_positions+=("index-${output_index}")
+    done
+  fi
 
   python3 - "${expected}" "${corrupted_prefix}" \
-      "${public_expected}" "${public_corrupted_prefix}" "${require_distinct}" <<'PYEOF' \
+      "${public_expected}" "${public_corrupted_prefix}" "${mode}" "${expected_outputs}" \
+      "${alternate_full}" "${alternate_public}" \
+      "${alternate_full_probe}" "${alternate_public_probe}" <<'PYEOF' \
     || llzk_fail "llzk-witgen self-test: \
 could not build the corrupted witness"
 import copy, json, sys
@@ -101,6 +128,15 @@ def corrupt_positions(document, keys, prefix, what, group):
         with open(f"{prefix}-{group}-{label}.json", "w") as output:
             json.dump(changed, output)
 
+def corrupt_all(document, keys, prefix, what, group):
+    for index, key in enumerate(keys):
+        changed = copy.deepcopy(document)
+        target = changed["signals"] if what != "public output" else changed
+        value = int(target[key])
+        target[key] = "1" if value == 0 else "0"
+        with open(f"{prefix}-{group}-index-{index}.json", "w") as output:
+            json.dump(changed, output)
+
 with open(sys.argv[1]) as source:
     witness = json.load(source)
 signals = witness.get("signals", {})
@@ -116,13 +152,13 @@ witness_keys = numbered_keys(signals, "w")
 output_keys = numbered_keys(signals, "out")
 if not witness_keys and not output_keys:
     raise SystemExit("expected full witness has no signal or output to perturb")
-if sys.argv[5] == "true":
+mode, expected_count = sys.argv[5:7]
+if mode == "strict-sampled":
     for label, values in (("witness cells", witness_keys),
                           ("full-witness outputs", output_keys)):
         if len(values) < 3:
             raise SystemExit(f"widest artifact has only {len(values)} distinct {label}; need 3")
 corrupt_positions(witness, witness_keys, sys.argv[2], "witness signals", "witness")
-corrupt_positions(witness, output_keys, sys.argv[2], "full-witness outputs", "output")
 
 with open(sys.argv[3]) as source:
     public = json.load(source)
@@ -131,9 +167,46 @@ if not public:
 public_keys = numbered_keys(public, "out")
 if len(public_keys) != len(public):
     raise SystemExit("public expectation contains a key other than out{j}")
-if sys.argv[5] == "true" and len(public_keys) < 3:
+if mode == "strict-sampled" and len(public_keys) < 3:
     raise SystemExit(f"widest artifact has only {len(public_keys)} distinct public outputs; need 3")
-corrupt_positions(public, public_keys, sys.argv[4], "public output", "output")
+if mode == "exhaustive-outputs":
+    count = int(expected_count)
+    exact_keys = [f"out{i}" for i in range(count)]
+    if output_keys != exact_keys:
+        raise SystemExit(f"full witness outputs are {output_keys}, expected exactly {exact_keys}")
+    if public_keys != exact_keys:
+        raise SystemExit(f"public outputs are {public_keys}, expected exactly {exact_keys}")
+    if any(str(signals[key]) != str(public[key]) for key in exact_keys):
+        raise SystemExit("full and public output expectations disagree")
+    corrupt_all(witness, output_keys, sys.argv[2], "full-witness outputs", "output")
+    corrupt_all(public, public_keys, sys.argv[4], "public output", "output")
+else:
+    corrupt_positions(witness, output_keys, sys.argv[2], "full-witness outputs", "output")
+    corrupt_positions(public, public_keys, sys.argv[4], "public output", "output")
+
+alternate_full_path, alternate_public_path, alternate_full_probe, alternate_public_probe = \
+    sys.argv[7:11]
+if alternate_full_path:
+    with open(alternate_full_path) as source:
+        alternate_witness = json.load(source)
+    with open(alternate_public_path) as source:
+        alternate_public = json.load(source)
+    alternate_signals = alternate_witness.get("signals", {})
+    if alternate_witness.get("inputs") != witness.get("inputs"):
+        raise SystemExit("alternate full expectation belongs to different inputs")
+    if set(alternate_signals) != set(signals):
+        raise SystemExit("alternate full expectation has a different signal key set")
+    if set(alternate_public) != set(public):
+        raise SystemExit("alternate public expectation has a different output key set")
+    for key in output_keys:
+        if str(alternate_signals[key]) != str(alternate_public[key]):
+            raise SystemExit(f"alternate full/public output {key} disagrees")
+        if str(alternate_public[key]) == str(public[key]):
+            raise SystemExit(f"alternate output {key} does not differ from the baseline")
+    with open(alternate_full_probe, "w") as output:
+        json.dump(alternate_witness, output)
+    with open(alternate_public_probe, "w") as output:
+        json.dump(alternate_public, output)
 PYEOF
 
   # Both backends, because both are gates. R5d's D-1: the self-test ran only the
@@ -148,19 +221,31 @@ PYEOF
       || llzk_fail "llzk-witgen self-test (${backend}): ${artifact} does not match its own \
 expected witness; every later green would be meaningless"
 
-    local group position corrupted
-    for group in witness output; do
-      for position in "${positions[@]}"; do
-        corrupted="${corrupted_prefix}-${group}-${position}.json"
-        [[ -f "${corrupted}" ]] || continue
-        if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
-             --output-scope=full-witness --check-output "${corrupted}" >/dev/null 2>&1; then
-          llzk_fail "llzk-witgen self-test (${backend}): ${LLZK_WITGEN} accepted a full witness \
-with its ${group} group's ${position} field perturbed, so --check-output is incomplete. Every \
+    local position corrupted
+    for position in "${witness_positions[@]}"; do
+      corrupted="${corrupted_prefix}-witness-${position}.json"
+      [[ -f "${corrupted}" ]] || continue
+      if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+           --output-scope=full-witness --check-output "${corrupted}" >/dev/null 2>&1; then
+        llzk_fail "llzk-witgen self-test (${backend}): ${LLZK_WITGEN} accepted a full witness \
+with its witness group's ${position} field perturbed, so --check-output is incomplete. Every \
 G5/G6/G7 green below would be vacuous."
-        fi
-      done
+      fi
     done
+    for position in "${output_positions[@]}"; do
+      corrupted="${corrupted_prefix}-output-${position}.json"
+      if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+           --output-scope=full-witness --check-output "${corrupted}" >/dev/null 2>&1; then
+        llzk_fail "llzk-witgen self-test (${backend}): ${LLZK_WITGEN} accepted a full witness \
+with its output group's ${position} field perturbed, so --check-output is incomplete. Every \
+G5/G6/G7 green below would be vacuous."
+      fi
+    done
+    if [[ -n "${alternate_full}" ]] && \
+         "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+           --output-scope=full-witness --check-output "${alternate_full_probe}" >/dev/null 2>&1; then
+      llzk_fail "llzk-witgen self-test (${backend}): ${LLZK_WITGEN} accepted the alternate full witness"
+    fi
 
     "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
       --output-scope=public --check-output "${public_expected}" >/dev/null \
@@ -168,7 +253,7 @@ G5/G6/G7 green below would be vacuous."
 its own expected output; every later public-scope green would be meaningless"
 
     local public_corrupted
-    for position in "${positions[@]}"; do
+    for position in "${output_positions[@]}"; do
       public_corrupted="${public_corrupted_prefix}-output-${position}.json"
       if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
            --output-scope=public --check-output "${public_corrupted}" >/dev/null 2>&1; then
@@ -177,23 +262,99 @@ expectation with its ${position} public output perturbed, so the visibility/valu
 incomplete."
       fi
     done
+    if [[ -n "${alternate_public}" ]] && \
+         "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+           --output-scope=public --check-output "${alternate_public_probe}" >/dev/null 2>&1; then
+      llzk_fail "llzk-witgen public-output self-test (${backend}): ${LLZK_WITGEN} accepted the alternate public output"
+    fi
   done
   local position
-  for group in witness output; do
-    for position in "${positions[@]}"; do
-      rm -f -- "${corrupted_prefix}-${group}-${position}.json"
-    done
+  for position in "${witness_positions[@]}"; do
+    rm -f -- "${corrupted_prefix}-witness-${position}.json"
   done
-  for position in "${positions[@]}"; do
+  for position in "${output_positions[@]}"; do
+    rm -f -- "${corrupted_prefix}-output-${position}.json"
     rm -f -- "${public_corrupted_prefix}-output-${position}.json"
   done
-  if [[ "${require_distinct}" == "true" ]]; then
+  rm -f -- "${alternate_full_probe}" "${alternate_public_probe}"
+  if [[ "${mode}" == "strict-sampled" ]]; then
     echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, \
 red on distinct first/middle/last witness-cell, full-output, and public-output perturbations"
+  elif [[ "${mode}" == "exhaustive-outputs" ]]; then
+    echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, \
+red on first/middle/last witness cells and every one of ${expected_outputs} full/public outputs${alternate_full:+ plus alternate expectations}"
   else
     echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, \
 red on every available first/middle/last probe (positions can coincide; empty groups are skipped)"
   fi
+}
+
+# llzk_xor32_raw_expectations INPUTS EXPECTED PUBLIC_EXPECTED RAW_FULL RAW_PUBLIC
+#
+# Build the old pre-D035 Xor32 result directly from the eight canonical input
+# representatives. It is a discriminator, not another source of expected green
+# values: the checked baseline must equal low-byte XOR in every lane, while the
+# old raw XOR after field reduction must differ in all four lanes.
+llzk_xor32_raw_expectations() {
+  local inputs="$1" expected="$2" public_expected="$3" raw_full="$4" raw_public="$5"
+  python3 - "${inputs}" "${expected}" "${public_expected}" "${raw_full}" "${raw_public}" <<'PYEOF' \
+    || llzk_fail "Xor32 raw-reference discriminator could not be built"
+import json, sys
+
+input_path, full_path, public_path, raw_full_path, raw_public_path = sys.argv[1:]
+with open(input_path) as source:
+    inputs = json.load(source)
+with open(full_path) as source:
+    full = json.load(source)
+with open(public_path) as source:
+    public = json.load(source)
+
+input_keys = [f"arg{i}" for i in range(8)]
+signal_keys = [f"w{i}" for i in range(4)] + [f"out{i}" for i in range(4)]
+output_keys = [f"out{i}" for i in range(4)]
+if not isinstance(inputs, dict) or set(inputs) != set(input_keys):
+    raise SystemExit("Xor32 inputs must be exactly canonical arg0 through arg7")
+def decimal_representative(value):
+    if isinstance(value, bool):
+        raise ValueError
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str) and value.isdecimal():
+        parsed = int(value)
+        if value == str(parsed):
+            return parsed
+    raise ValueError
+
+try:
+    values = [decimal_representative(inputs[key]) for key in input_keys]
+except ValueError:
+    raise SystemExit("Xor32 inputs must be integers or canonical decimal strings")
+prime = 2_013_265_921
+if any(value < 0 or value >= prime for value in values):
+    raise SystemExit("Xor32 input is not a canonical Babybear representative")
+
+if full.get("inputs") != inputs or set(full.get("signals", {})) != set(signal_keys):
+    raise SystemExit("Xor32 full expectation has the wrong inputs or signal layout")
+if set(public) != set(output_keys):
+    raise SystemExit("Xor32 public expectation must be exactly out0 through out3")
+
+narrowed = [(values[i] % 256) ^ (values[4 + i] % 256) for i in range(4)]
+raw = [(values[i] ^ values[4 + i]) % prime for i in range(4)]
+signals = full["signals"]
+for i, value in enumerate(narrowed):
+    if str(signals[f"w{i}"]) != str(value) or str(signals[f"out{i}"]) != str(value) \
+            or str(public[f"out{i}"]) != str(value):
+        raise SystemExit(f"Xor32 checked expectation is not narrowed at lane {i}")
+    if raw[i] == value:
+        raise SystemExit(f"Xor32 raw XOR does not differ at lane {i}")
+
+raw_signals = {f"w{i}": str(value) for i, value in enumerate(raw)}
+raw_signals.update({f"out{i}": str(value) for i, value in enumerate(raw)})
+with open(raw_full_path, "w") as output:
+    json.dump({"inputs": inputs, "signals": raw_signals}, output)
+with open(raw_public_path, "w") as output:
+    json.dump({f"out{i}": str(value) for i, value in enumerate(raw)}, output)
+PYEOF
 }
 
 # llzk_widest_public_input OUTPUT_DIRECTORY

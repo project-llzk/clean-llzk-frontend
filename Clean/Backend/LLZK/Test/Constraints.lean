@@ -62,11 +62,11 @@ otherwise drop out of the gate silently. -/
 -- emission (D018) and a corpus entry that dropped one would still compile.
 #guard Corpus.corpus.all fun e => e.constraintsAgree ≠ some false
 #guard Corpus.corpus.all fun e => e.witnessAgree ≠ some false
-#guard (Corpus.corpus.filter (·.witnessAgree = some true)).size == 9
+#guard (Corpus.corpus.filter (·.witnessAgree = some true)).size == 10
 
--- Nine of the fifteen corpus entries have a Clean source. The other six are the
+-- Ten of the sixteen corpus entries have a Clean source. The other six are the
 -- registry conformance squares, built from a `Recognized` — see `registryEntry`.
-#guard (Corpus.corpus.filter (·.constraintsAgree = some true)).size == 9
+#guard (Corpus.corpus.filter (·.constraintsAgree = some true)).size == 10
 #guard (Corpus.corpus.filter (·.constraintsAgree = none)).size == 6
 
 /-! ## The gate can go red -/

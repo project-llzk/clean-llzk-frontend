@@ -87,8 +87,8 @@ S29's Xor32 source executes `% 256` on every `.val` operand; Phase B proves that
 literal modulo bound recursively and gives XOR/OR their common power-of-two
 ceiling. Xor32 and the composed BLAKE3.G therefore compile from syntax alone,
 without importing assumptions or constraints. Keccak Theta's 50 witness sites
-remain raw `.val` XORs and stay refused. This is capability-sweep evidence only:
-none of these rows joins the external corpus in Phase B. S28 supplies the
+remain raw `.val` XORs and stay refused. Xor32 joins the external corpus in
+Phase X; BLAKE3.G remains capability-only until Phase H. S28 supplies the
 certified three-column table, so no registry refusal remains. -/
 
 #guard (compile withBytesAndXor (Gadgets.Xor32.circuit (p := pBabybear))).toOption.isSome

@@ -20,6 +20,7 @@ def purpose : String → Option String
   | "LowByte" => some "Bounded `felt.bit_and` witness lowering"
   | "Bits8" => some "First-class `bitsOf` decomposition with felt shifts"
   | "And8" => some "Three-column certified ByteXor row membership"
+  | "Xor32" => some "Proved four-byte XOR with fixed independent public references"
   | "Addition8FullCarry" => some "Headline proved byte addition with a certified lookup"
   | "Passthrough" => some "Direct public output with no witness cells"
   | "ConstOut" => some "Constant public output with no witness cells"
@@ -40,6 +41,9 @@ def totalVectors : Nat :=
 
 def sourceBacked : Nat :=
   (Corpus.corpus.filter isSourceBacked).size
+
+private def referenceScopeCount (entry : Corpus.Entry) (scope : Corpus.ReferenceScope) : Nat :=
+  (entry.vectors.filter fun vector => vector.publicExpectation.scope? = some scope).size
 
 private def sourceLabel (entry : Corpus.Entry) : Except String String :=
   match entry.constraintsAgree, entry.witnessAgree with
@@ -67,6 +71,7 @@ private def findEntry (name : String) : Except String Corpus.Entry :=
 /-- Render the checked public example page. -/
 def markdown : Except String String := do
   let headline ← findEntry "Addition8FullCarry"
+  let xor32 ← findEntry "Xor32"
   let rows ← Corpus.corpus.toList.mapM row
   let lines :=
     [ "# Verified example showcase"
@@ -97,6 +102,27 @@ def markdown : Except String String := do
     , "- Backend instantiation:"
     , "  [`Clean/Backend/LLZK/Test/Soundness.lean`](../../Clean/Backend/LLZK/Test/Soundness.lean)."
     , ""
+    , "## Promoted bitwise example: `Xor32`"
+    , ""
+    , "`Xor32` performs four ordered byte-XOR lookups. Its exact source, typed"
+    , "module, independent witness/constraint readbacks, and full 65,536-row"
+    , "ByteXor identity are pinned by the backend tests."
+    , "`Test/Soundness.xor32_spec_of_compile` proves the compiled constraint"
+    , "implication while retaining the gadget's normalized-byte assumptions."
+    , ""
+    , s!"The corpus carries {referenceScopeCount xor32 .spec} normalized spec vectors and"
+    , s!"{referenceScopeCount xor32 .computeOnly} compute-only vectors with wide limbs. The latter"
+    , "exercise executable `% 256` narrowing but do not invoke the gadget theorem:"
+    , "`llzk-witgen` executes `@compute` without enforcing `@constrain`. Every"
+    , "public result is a fixed independently derived reference, checked against"
+    , "Clean before both full-witness and public JSON are emitted."
+    , ""
+    , "- Source and proof:"
+    , "  [`Clean/Gadgets/Xor/Xor32.lean`](../../Clean/Gadgets/Xor/Xor32.lean) and"
+    , "  [`Clean/Backend/LLZK/Test/Soundness.lean`](../../Clean/Backend/LLZK/Test/Soundness.lean)."
+    , "- Independent oracle:"
+    , "  [`doc/llzk/evidence/S29/xor32_oracle.py`](evidence/S29/xor32_oracle.py)."
+    , ""
     , "## Checked conformance corpus"
     , ""
     , s!"The current corpus contains {Corpus.corpus.size} emitted modules and {totalVectors} input vectors."
@@ -110,14 +136,16 @@ def markdown : Except String String := do
     [ ""
     , "Every row is parsed, verified, round-tripped, and admitted to LLZK's analysis"
     , "pipeline. Every vector is executed by both `llzk-witgen` backends and compared"
-    , "against Clean's own witness interpreter. For source-backed rows, emission also"
-    , "requires the typed `@constrain` and `@compute` readers to agree with the circuit."
+    , "against a checked expected witness. Xor32's public fields come from fixed"
+    , "independent references which must first equal Clean; historical entries derive"
+    , "them directly from Clean. For source-backed rows, emission also requires the"
+    , "typed `@constrain` and `@compute` readers to agree with the circuit."
     , ""
     , "## Assurance chain"
     , ""
     , "| Layer | Repository evidence |"
     , "|---|---|"
-    , "| Gadget semantics | Clean soundness/completeness proofs; specific compiled implication for `Addition8FullCarry` |"
+    , "| Gadget semantics | Clean soundness/completeness proofs; specific compiled implications for `Addition8FullCarry` and `Xor32` |"
     , "| Lookup values | `byteTable_certified` and `byteXorTable_certified` prove the exported rows |"
     , "| Typed translation | G9 independently reads source and module constraints and witnesses |"
     , "| Concrete constraint text | A5 parses the protected rendered surface back before returning text |"

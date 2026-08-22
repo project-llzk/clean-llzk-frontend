@@ -103,8 +103,11 @@ version appears.
 ## G5–G7 — witness generation, differentially
 
 `LLZK.Corpus.corpus` carries input vectors alongside each circuit. The emitter
-writes, per vector, the `--inputs` object, Clean's full witness, and Clean's
-public outputs. Both LLZK backends compare both
+writes, per vector, the `--inputs` object and a checked expected full/public
+witness. Historical entries derive it from Clean. Promoted reference-backed
+entries carry fixed independent public results which must equal Clean before
+they replace the public fields in both JSON scopes. Both LLZK backends compare
+both
 `--output-scope=full-witness` and `--output-scope=public` with `--check-output`.
 The public check is separate because full-witness JSON groups signal and public
 members together and cannot detect a visibility mistake. Clean's side uses
@@ -128,10 +131,15 @@ a valid check: `e2e.sh` removes and regenerates its output directory every run.
 
 Since S09 the harness does not take that on trust. S29 strengthens the
 discriminator across both scopes: each backend must accept the original
-expectation and reject independent first, middle, and last field mutations in
-the full-witness and public JSON. The probes include both corpus endpoints and
-the artifact selected from emitted JSON as having the widest public interface.
-G11 has separate partial-checker attacks that validate only `w0` or only `out0`.
+expectation and reject independent numeric first, middle, and last field
+mutations in the full-witness and public JSON. The probes include both corpus
+endpoints and the artifact selected from emitted JSON as having the widest
+public interface. Xor32 additionally checks every one of its four outputs in
+both scopes on all three compute-only rows. Its both-wide row must reject the
+exact old raw-XOR full witness and public result, presented under PID-derived
+non-raw scratch names. G11 has separate partial-checker attacks that validate only `w0`
+or `out0`, omit Xor32 `out1`, accept the raw full/public alternate, or
+specialize on predictable paths.
 R2-06 showed why this is necessary: with `llzk-witgen` replaced by a two-line
 `exit 0` script sitting next to a symlinked `llzk-opt`, the harness reported
 PASS and exited 0. Provenance by co-location was necessary and not sufficient;
@@ -205,8 +213,8 @@ remain pinned in `Test/WitnessCheck.lean`.
 is `+`, `constrain.eq` is equality, `constrain.in` is membership, and natural,
 bitwise, and shift operations read their operands as canonical representatives.
 Nothing in Lean settles that without a formal model of LLZK; G5–G7 are the
-empirical evidence for the `@compute` half of it, on 51 vectors and two
-independent LLZK backends; S26 also probes every new operation spelling
+empirical evidence for the `@compute` half of it, on 61 vectors (55 from Clean
+sources) and two independent LLZK backends; S26 also probes every new operation spelling
 directly. The lookup *rows* used to be listed here; since S16
 they are proved — see D012 and `Clean/Backend/LLZK/TableCert.lean`.
 
@@ -282,7 +290,7 @@ the cases are the negative direction of
 positive direction ran on the real tools every time while the direction that
 matters ran never.
 
-There are now 88 cases. The witness controls reject a permissive shim, a stub
+There are now 143 cases. The witness controls reject a permissive shim, a stub
 execution backend, a checker permissive for public output, and three
 content-aware partial checkers: public `out0` only, full-witness `w0` plus all
 outputs, and full-witness all cells plus `out0`. Each partial checker is first
@@ -291,7 +299,14 @@ ignored canonical mutation. The controls independently exercise each strict
 minimum, prove numeric rather than serialized-key ordering with scrambled
 double-digit fields, and pin widest-interface selection, empty/malformed/missing
 selector inputs, deterministic ties, literal count pins, and both directions of
-exact-count enforcement. Seven S29 overlay controls
+exact-count enforcement. Xor32 adds exhaustive four-output full/public attacks,
+exact old-raw full/public alternates, PID-derived non-raw alternate paths, and every
+validation failure of the raw-reference and exhaustive-output helpers. Each
+partial or path-specializing shim has its own green, checked-field red, ignored
+field/alternate false-green, and whole-helper red demonstration. The complete
+e2e driver is digest-pinned, with an inserted early-`continue` and a valid-shell
+outside conditional independently proving unreachable real-tool calls turn G11
+red. Seven S29 overlay controls
 independently reject a missing overlay, unrelated overlay, indirect overlay,
 an extra overlay path, wrong status on the expected path, and committed or
 uncommitted post-overlay Xor32 drift. Ten enforce

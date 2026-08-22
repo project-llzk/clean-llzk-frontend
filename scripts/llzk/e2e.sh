@@ -124,8 +124,42 @@ require_llzk_witgen_discriminates \
   "${widest_selftest_input}" \
   "${out_dir}/${selftest_name}.0.expected.json" \
   "${out_dir}/${selftest_name}.0.public.json" \
-  "${out_dir}" true
+  "${out_dir}" strict-sampled
 require_llzk_opt_discriminates "${out_dir}" "${out_dir}/${selftest_name}.llzk"
+echo
+
+# Xor32 has four outputs, for which first/middle/last means 0/2/3 and silently
+# misses out1. Exercise every output in both scopes and both backends on all
+# three compute-only rows. The final row also supplies the exact pre-D035 raw
+# witness/public result; accepting it would mean executable `% 256` narrowing
+# was not actually observed by the external tool.
+echo "== Xor32 exhaustive output and narrowing self-test =="
+xor_artifact="${out_dir}/Xor32.llzk"
+[[ -f "${xor_artifact}" ]] || fail "Xor32 promotion artifact is missing"
+for xor_index in 7 8 9; do
+  xor_inputs="${out_dir}/Xor32.${xor_index}.inputs.json"
+  xor_expected="${out_dir}/Xor32.${xor_index}.expected.json"
+  xor_public="${out_dir}/Xor32.${xor_index}.public.json"
+  for xor_path in "${xor_inputs}" "${xor_expected}" "${xor_public}"; do
+    [[ -f "${xor_path}" ]] || fail "Xor32 compute-only discriminator input is missing: ${xor_path}"
+  done
+  echo "-- compute-only vector ${xor_index}"
+  if [[ "${xor_index}" == 9 ]]; then
+    xor_raw_full="${out_dir}/.Xor32.${xor_index}.raw.expected.json"
+    xor_raw_public="${out_dir}/.Xor32.${xor_index}.raw.public.json"
+    llzk_xor32_raw_expectations \
+      "${xor_inputs}" "${xor_expected}" "${xor_public}" \
+      "${xor_raw_full}" "${xor_raw_public}"
+    require_llzk_witgen_discriminates \
+      "${xor_artifact}" "${xor_inputs}" "${xor_expected}" "${xor_public}" "${out_dir}" \
+      exhaustive-outputs 4 "${xor_raw_full}" "${xor_raw_public}"
+    rm -f -- "${xor_raw_full}" "${xor_raw_public}"
+  else
+    require_llzk_witgen_discriminates \
+      "${xor_artifact}" "${xor_inputs}" "${xor_expected}" "${xor_public}" "${out_dir}" \
+      exhaustive-outputs 4
+  fi
+done
 echo
 
 # G10 is in two halves.
@@ -150,9 +184,9 @@ echo
 # reviewed from the named logs. These literals are deliberately not environment
 # overrides: changing a count is a source diff (R4b-5, S29).
 readonly LLZK_EXPECTED_SMT_OK=10
-readonly LLZK_EXPECTED_SMT_SKIPPED=7
-readonly LLZK_EXPECTED_ARTIFACTS=15
-readonly LLZK_EXPECTED_VECTORS=51
+readonly LLZK_EXPECTED_SMT_SKIPPED=8
+readonly LLZK_EXPECTED_ARTIFACTS=16
+readonly LLZK_EXPECTED_VECTORS=61
 readonly LLZK_EXPECTED_FIXTURES=2
 smt_ok=0
 smt_skipped=0

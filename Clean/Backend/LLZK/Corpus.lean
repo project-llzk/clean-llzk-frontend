@@ -2,6 +2,7 @@ import Clean.Backend.LLZK.Examples
 import Clean.Backend.LLZK.Differential
 import Clean.Backend.LLZK.RendererFixture
 import Clean.Backend.LLZK.WitnessCheck
+import Clean.Gadgets.Xor.Xor32
 
 /-!
 # The conformance corpus
@@ -184,6 +185,45 @@ def Entry.ofSourceReferenced {F : Type} [FiniteField F] [CanonicalRepr F] [Decid
         publicExpectation := .fixed vector.scope vector.outputs }
     publicReferencePolicy := .fixedRequired }
 
+/-! ## Independently referenced Xor32 vectors
+
+The seven normalized rows lie within Xor32's theorem assumptions and independently
+reference its word-level XOR result. The three wide rows exercise only the
+executable `% 256` witness semantics because LLZK witgen does not enforce
+`@constrain`. Their fixed results are derived by the independent
+word/limb oracle in `doc/llzk/evidence/S29/xor32_oracle.py`, never by Clean or an
+emitted module. `Test/Corpus.lean` pins every name, input, scope, result, and
+raw-XOR discriminator. -/
+
+def xor32SpecVectors : Array ReferencedVector :=
+  #[ ⟨"spec_zero", #[0, 0, 0, 0, 0, 0, 0, 0], .spec, #[0, 0, 0, 0]⟩
+   , ⟨"spec_all_ones", #[255, 255, 255, 255, 0, 0, 0, 0], .spec,
+       #[255, 255, 255, 255]⟩
+   , ⟨"spec_high_bit", #[128, 128, 128, 128, 0, 1, 127, 255], .spec,
+       #[128, 129, 255, 127]⟩
+   , ⟨"spec_alternating", #[170, 85, 170, 85, 85, 170, 85, 170], .spec,
+       #[255, 255, 255, 255]⟩
+   , ⟨"spec_equal", #[0, 1, 128, 255, 0, 1, 128, 255], .spec, #[0, 0, 0, 0]⟩
+   , ⟨"spec_lane_markers", #[1, 2, 4, 8, 16, 32, 64, 128], .spec,
+       #[17, 34, 68, 136]⟩
+   , ⟨"spec_mixed_word", #[18, 52, 86, 120, 135, 101, 67, 33], .spec,
+       #[149, 81, 21, 89]⟩ ]
+
+def xor32ComputeVectors : Array ReferencedVector :=
+  #[ ⟨"compute_x_wide", #[256, 257, 511, 65535, 1, 2, 128, 170], .computeOnly,
+       #[1, 3, 127, 85]⟩
+   , ⟨"compute_y_wide", #[0, 255, 85, 170, 256, 257, 511, 65535], .computeOnly,
+       #[0, 254, 170, 85]⟩
+   , ⟨"compute_both_wide",
+       #[2013265920, 65536, 1000, 65706, 257, 511, 65535, 2013265920], .computeOnly,
+       #[1, 255, 23, 170]⟩ ]
+
+def xor32Vectors : Array ReferencedVector := xor32SpecVectors ++ xor32ComputeVectors
+
+def xor32Entry : Entry :=
+  Entry.ofSourceReferenced withBytesAndXor "Xor32"
+    (Compilable.source (Gadgets.Xor32.circuit (p := pBabybear))) xor32Vectors
+
 /-! ## Registry conformance
 
 `FieldSpec.registry` is transcribed from LLZK's `Field::initKnownFields`, and a
@@ -266,6 +306,7 @@ def corpus : Array Entry :=
        (Compilable.source (Gadgets.And.And8.circuit (p := pBabybear)))
        #[#[0, 0], #[1, 2], #[128, 255], #[255, 255], #[256, 1],
          #[2013265920, 2013265920]],
+     xor32Entry,
      -- No carry, carry out of the low byte, and both extremes of the documented
      -- input range (two bytes plus a boolean carry-in) -- then three vectors
      -- *outside* the gadget's `Assumptions`, which R2's C5 recorded as untested.

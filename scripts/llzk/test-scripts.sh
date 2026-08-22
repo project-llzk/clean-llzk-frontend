@@ -54,6 +54,29 @@ expect() {
   passed=$(( passed + 1 ))
 }
 
+# Pin the complete e2e driver, not only landmarks within the Xor32 block.
+# Substring counts stayed green when an early `continue` made every real-tool
+# call unreachable; a bounded block digest stayed green when an outside
+# conditional enclosed the block. The whole-file digest and mutation controls
+# near G11's tail close both false-greens.
+check_xor_e2e_wiring() {
+  python3 - "$1" <<'PYEOF'
+import hashlib, pathlib, sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+start = 'echo "== Xor32 exhaustive output and narrowing self-test =="'
+end = "# G10 is in two halves."
+if source.count(start) != 1 or source.count(end) != 1:
+    print("Xor32 e2e block markers are not unique")
+    raise SystemExit(1)
+actual = hashlib.sha256(source.encode()).hexdigest()
+expected = "4e8098e681f78665f260fbdb4c3f7444fb0e8c20778d84b1fcb02b5c835b0178"
+if actual != expected:
+    print(f"Xor32 e2e file digest mismatch: {actual}")
+    raise SystemExit(1)
+PYEOF
+}
+
 # A throwaway clone of this repository, so the pinned base commit is present and
 # only the property under test differs. `--shared` keeps it near-instant.
 #
@@ -549,7 +572,7 @@ printf '{"out0":"1","out1":"2","out2":"3"}\n' \
 expect "strict widest self-test independently requires three witness cells" 1 \
   "only 1 distinct witness cells; need 3" \
   -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
-       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" true' \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" strict-sampled' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
        "${workdir}/strict-witness-small.json" "${workdir}/strict-public-wide.json" "${workdir}"
 printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"1"}}\n' \
@@ -557,7 +580,7 @@ printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"1"}
 expect "strict widest self-test independently requires three full outputs" 1 \
   "only 1 distinct full-witness outputs; need 3" \
   -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
-       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" true' \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" strict-sampled' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
        "${workdir}/strict-full-output-small.json" "${workdir}/strict-public-wide.json" "${workdir}"
 printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"1","out1":"2","out2":"3"}}\n' \
@@ -565,11 +588,11 @@ printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"1",
 expect "strict widest self-test independently requires three public outputs" 1 \
   "only 1 distinct public outputs; need 3" \
   -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
-       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" true' \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" strict-sampled' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
        "${workdir}/strict-full-wide.json" "${workdir}/public.json" "${workdir}"
-expect "llzk-witgen self-test rejects an invalid strict-mode flag" 1 \
-  "strict-distinct flag must be true or false" \
+expect "llzk-witgen self-test rejects an unknown discriminator mode" 1 \
+  "unknown discriminator mode maybe" \
   -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
        bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" maybe' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
@@ -660,7 +683,7 @@ for a in "$@"; do
 done
 if [[ "${scope}" == "full-witness" ]]; then
   python3 - "${check}" <<'PYEOF'
-import json, sys
+import json, os, sys
 with open(sys.argv[1]) as source:
     actual = json.load(source)
 expected = {"w0":"1", "w1":"2", "w2":"3", "out0":"1", "out1":"2", "out2":"3"}
@@ -861,9 +884,444 @@ printf '{"out10":"1","out2":"1","out0":"1","out11":"1","out5":"1","out1":"1","ou
 expect "witness discriminator uses numeric first middle and last positions" 0 \
   "red on distinct first/middle/last" \
   -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-numeric-positions" \
-       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" true' \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" strict-sampled' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
        "${workdir}/expected-scrambled-12.json" "${workdir}/public-scrambled-12.json" "${workdir}"
+
+# Xor32 has four outputs, so a first/middle/last probe samples out0/out2/out3
+# and misses out1. These fixtures exercise the exhaustive-output and old-raw
+# alternate branches before the real promotion relies on them.
+printf '{"arg0":"2013265920","arg1":"65536","arg2":"1000","arg3":"65706","arg4":"257","arg5":"511","arg6":"65535","arg7":"2013265920"}\n' \
+  > "${workdir}/xor-inputs.json"
+printf '{"inputs":{"arg0":"2013265920","arg1":"65536","arg2":"1000","arg3":"65706","arg4":"257","arg5":"511","arg6":"65535","arg7":"2013265920"},"signals":{"w0":"1","w1":"255","w2":"23","w3":"170","out0":"1","out1":"255","out2":"23","out3":"170"}}\n' \
+  > "${workdir}/xor-expected.json"
+printf '{"out0":"1","out1":"255","out2":"23","out3":"170"}\n' \
+  > "${workdir}/xor-public.json"
+
+expect "Xor32 raw generator produces the exact old full and public results" 0 "" \
+  -- bash -c '
+       source "$1/lib.sh"
+       llzk_xor32_raw_expectations "$2" "$3" "$4" "$5" "$6"
+       python3 -c '\''import json,sys
+full=json.load(open(sys.argv[1])); public=json.load(open(sys.argv[2]))
+raw=["256","66047","64535","65705"]
+want={f"w{i}":v for i,v in enumerate(raw)}
+want.update({f"out{i}":v for i,v in enumerate(raw)})
+raise SystemExit(0 if full["signals"]==want and public=={f"out{i}":v for i,v in enumerate(raw)} else 1)'\'' "$5" "$6"
+     ' _ "${script_dir}" "${workdir}/xor-inputs.json" "${workdir}/xor-expected.json" \
+       "${workdir}/xor-public.json" "${workdir}/xor-raw-expected.json" \
+       "${workdir}/xor-raw-public.json"
+
+printf '{"arg0":"2013265920","arg1":"65536","arg2":"1000","arg3":"65706","arg4":"257","arg5":"511","arg6":"65535"}\n' \
+  > "${workdir}/xor-short-inputs.json"
+expect "Xor32 raw generator rejects a wrong input layout" 1 "exactly canonical arg0 through arg7" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-short-inputs.json" "${workdir}/xor-expected.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+
+printf '{"out0":"1","out1":"255","out2":"24","out3":"170"}\n' \
+  > "${workdir}/xor-public-not-narrowed.json"
+expect "Xor32 raw generator rejects a baseline that is not narrowed" 1 \
+  "checked expectation is not narrowed at lane 2" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs.json" "${workdir}/xor-expected.json" \
+       "${workdir}/xor-public-not-narrowed.json" \
+       "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+
+printf '{"arg0":"0","arg1":"0","arg2":"0","arg3":"0","arg4":"0","arg5":"0","arg6":"0","arg7":"0"}\n' \
+  > "${workdir}/xor-collision-inputs.json"
+printf '{"inputs":{"arg0":"0","arg1":"0","arg2":"0","arg3":"0","arg4":"0","arg5":"0","arg6":"0","arg7":"0"},"signals":{"w0":"0","w1":"0","w2":"0","w3":"0","out0":"0","out1":"0","out2":"0","out3":"0"}}\n' \
+  > "${workdir}/xor-collision-expected.json"
+printf '{"out0":"0","out1":"0","out2":"0","out3":"0"}\n' \
+  > "${workdir}/xor-collision-public.json"
+expect "Xor32 raw generator rejects a raw/narrowed collision" 1 \
+  "raw XOR does not differ at lane 0" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-collision-inputs.json" "${workdir}/xor-collision-expected.json" \
+       "${workdir}/xor-collision-public.json" \
+       "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+
+python3 - "${workdir}" <<'PYEOF'
+import copy, json, os, sys
+
+directory = sys.argv[1]
+def load(name):
+    with open(os.path.join(directory, name)) as source:
+        return json.load(source)
+def write(name, value):
+    with open(os.path.join(directory, name), "w") as output:
+        json.dump(value, output)
+
+inputs = load("xor-inputs.json")
+full = load("xor-expected.json")
+public = load("xor-public.json")
+raw_full = load("xor-raw-expected.json")
+raw_public = load("xor-raw-public.json")
+
+changed = copy.deepcopy(full); del changed["signals"]["out3"]
+write("xor-full-short.json", changed)
+changed = copy.deepcopy(public); del changed["out3"]
+write("xor-public-short.json", changed)
+changed = copy.deepcopy(full); changed["signals"]["out2"] = "24"
+write("xor-full-public-disagree.json", changed)
+changed = copy.deepcopy(raw_full); changed["inputs"]["arg0"] = "0"
+write("xor-raw-full-wrong-input.json", changed)
+changed = copy.deepcopy(raw_full); del changed["signals"]["w3"]
+write("xor-raw-full-short-signals.json", changed)
+changed = copy.deepcopy(raw_full); changed["signals"]["out2"] = "64536"
+write("xor-raw-full-disagree.json", changed)
+changed = copy.deepcopy(inputs); changed["arg0"] = "not-decimal"
+write("xor-inputs-nondecimal.json", changed)
+changed = copy.deepcopy(inputs); changed["arg0"] = True
+write("xor-inputs-boolean.json", changed)
+changed = copy.deepcopy(inputs); changed["arg0"] = 1.5
+write("xor-inputs-float.json", changed)
+changed = copy.deepcopy(inputs); changed["arg0"] = "2013265921"
+write("xor-inputs-noncanonical.json", changed)
+changed = copy.deepcopy(full); del changed["signals"]["w3"]
+write("xor-expected-short-signals.json", changed)
+changed = copy.deepcopy(full); changed["inputs"]["arg0"] = "0"
+write("xor-expected-wrong-inputs.json", changed)
+changed = copy.deepcopy(full); changed["signals"]["w2"] = "24"
+write("xor-expected-wrong-witness.json", changed)
+changed = copy.deepcopy(full); changed["signals"]["out2"] = "24"
+write("xor-expected-wrong-output.json", changed)
+PYEOF
+
+expect "Xor32 raw generator rejects a nondecimal input" 1 \
+  "inputs must be integers or canonical decimal strings" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs-nondecimal.json" "${workdir}/xor-expected.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+expect "Xor32 raw generator rejects a boolean input" 1 \
+  "inputs must be integers or canonical decimal strings" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs-boolean.json" "${workdir}/xor-expected.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+expect "Xor32 raw generator rejects a lossy float input" 1 \
+  "inputs must be integers or canonical decimal strings" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs-float.json" "${workdir}/xor-expected.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+expect "Xor32 raw generator rejects a noncanonical input" 1 \
+  "input is not a canonical Babybear representative" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs-noncanonical.json" "${workdir}/xor-expected.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+expect "Xor32 raw generator rejects a wrong full layout" 1 \
+  "full expectation has the wrong inputs or signal layout" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs.json" "${workdir}/xor-expected-short-signals.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+expect "Xor32 raw generator rejects full-witness input drift" 1 \
+  "full expectation has the wrong inputs or signal layout" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs.json" "${workdir}/xor-expected-wrong-inputs.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+expect "Xor32 raw generator rejects a non-narrowed witness cell" 1 \
+  "checked expectation is not narrowed at lane 2" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs.json" "${workdir}/xor-expected-wrong-witness.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+expect "Xor32 raw generator rejects a non-narrowed full output" 1 \
+  "checked expectation is not narrowed at lane 2" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs.json" "${workdir}/xor-expected-wrong-output.json" \
+       "${workdir}/xor-public.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+expect "Xor32 raw generator rejects a wrong public layout" 1 \
+  "public expectation must be exactly out0 through out3" \
+  -- run_helper llzk_xor32_raw_expectations \
+       "${workdir}/xor-inputs.json" "${workdir}/xor-expected.json" \
+       "${workdir}/xor-public-short.json" "${workdir}/unused-full.json" "${workdir}/unused-public.json"
+
+expect "exhaustive discriminator requires an output count" 1 \
+  "exhaustive-output count must be a positive integer" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}"
+expect "exhaustive discriminator rejects a zero output count" 1 \
+  "exhaustive-output count must be a positive integer" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 0' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}"
+expect "sampled discriminator rejects exhaustive-only arguments" 1 \
+  "sampled mode takes no output count or alternate" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" sampled 4' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}"
+expect "exhaustive discriminator rejects a one-sided alternate" 1 \
+  "alternate full and public expectations must be supplied together" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-expected.json"
+expect "exhaustive discriminator rejects a public-only alternate" 1 \
+  "alternate full and public expectations must be supplied together" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "" "$7"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-public.json"
+expect "exhaustive discriminator rejects a wrong full-output layout" 1 \
+  "full witness outputs are" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-full-short.json" "${workdir}/xor-public.json" "${workdir}"
+expect "exhaustive discriminator rejects a wrong public-output layout" 1 \
+  "public outputs are" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public-short.json" "${workdir}"
+expect "exhaustive discriminator rejects full/public baseline disagreement" 1 \
+  "full and public output expectations disagree" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-full-public-disagree.json" "${workdir}/xor-public.json" "${workdir}"
+
+printf '{"out0":"256","out1":"66047","out2":"64535"}\n' \
+  > "${workdir}/xor-raw-public-wrong-keys.json"
+expect "exhaustive discriminator rejects alternate key-set drift" 1 \
+  "alternate public expectation has a different output key set" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-expected.json" "${workdir}/xor-raw-public-wrong-keys.json"
+
+printf '{"inputs":{"arg0":"2013265920","arg1":"65536","arg2":"1000","arg3":"65706","arg4":"257","arg5":"511","arg6":"65535","arg7":"2013265920"},"signals":{"w0":"256","w1":"255","w2":"64535","w3":"65705","out0":"256","out1":"255","out2":"64535","out3":"65705"}}\n' \
+  > "${workdir}/xor-raw-full-noop.json"
+printf '{"out0":"256","out1":"255","out2":"64535","out3":"65705"}\n' \
+  > "${workdir}/xor-raw-public-noop.json"
+expect "exhaustive discriminator rejects an alternate with a no-op output" 1 \
+  "alternate output out1 does not differ from the baseline" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-full-noop.json" "${workdir}/xor-raw-public-noop.json"
+expect "exhaustive discriminator rejects alternate input drift" 1 \
+  "alternate full expectation belongs to different inputs" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-full-wrong-input.json" "${workdir}/xor-raw-public.json"
+expect "exhaustive discriminator rejects alternate signal-key drift" 1 \
+  "alternate full expectation has a different signal key set" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-full-short-signals.json" "${workdir}/xor-raw-public.json"
+expect "exhaustive discriminator rejects alternate full/public disagreement" 1 \
+  "alternate full/public output out2 disagrees" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-full-disagree.json" "${workdir}/xor-raw-public.json"
+
+printf '{"inputs":{"arg0":"2013265920","arg1":"65536","arg2":"1000","arg3":"65706","arg4":"257","arg5":"511","arg6":"65535","arg7":"2013265920"},"signals":{"w0":"1","w1":"255","w2":"23","w3":"170","out0":"0","out1":"255","out2":"23","out3":"170"}}\n' \
+  > "${workdir}/xor-full-out0-mutated.json"
+printf '{"inputs":{"arg0":"2013265920","arg1":"65536","arg2":"1000","arg3":"65706","arg4":"257","arg5":"511","arg6":"65535","arg7":"2013265920"},"signals":{"w0":"1","w1":"255","w2":"23","w3":"170","out0":"1","out1":"0","out2":"23","out3":"170"}}\n' \
+  > "${workdir}/xor-full-out1-mutated.json"
+printf '{"out0":"0","out1":"255","out2":"23","out3":"170"}\n' \
+  > "${workdir}/xor-public-out0-mutated.json"
+printf '{"out0":"1","out1":"0","out2":"23","out3":"170"}\n' \
+  > "${workdir}/xor-public-out1-mutated.json"
+
+> "${workdir}/shim/llzk-witgen-xor-controlled" cat <<'SHIM'
+#!/usr/bin/env bash
+scope=full-witness
+check=""
+for a in "$@"; do
+  case "${a}" in
+    --output-scope=*) scope="${a#--output-scope=}" ;;
+    --check-output) check="next" ;;
+    *) [[ "${check}" == "next" ]] && check="${a}" ;;
+  esac
+done
+python3 - "${XOR_SHIM_MODE:?}" "${scope}" "${check}" <<'PYEOF'
+import json, os, sys
+mode, scope, path = sys.argv[1:]
+actual = json.load(open(path))
+inputs = {f"arg{i}": str(v) for i, v in enumerate(
+    [2013265920, 65536, 1000, 65706, 257, 511, 65535, 2013265920])}
+narrow = ["1", "255", "23", "170"]
+raw = ["256", "66047", "64535", "65705"]
+signals = {f"w{i}": v for i, v in enumerate(narrow)}
+signals.update({f"out{i}": v for i, v in enumerate(narrow)})
+raw_signals = {f"w{i}": v for i, v in enumerate(raw)}
+raw_signals.update({f"out{i}": v for i, v in enumerate(raw)})
+baseline_full = {"inputs": inputs, "signals": signals}
+raw_full = {"inputs": inputs, "signals": raw_signals}
+baseline_public = {f"out{i}": v for i, v in enumerate(narrow)}
+raw_public = {f"out{i}": v for i, v in enumerate(raw)}
+
+if scope == "full-witness":
+    if mode == "full-ignore-out1":
+        got = actual.get("signals", {})
+        ok = (actual.get("inputs") == inputs and set(got) == set(signals)
+              and all(got[key] == value for key, value in signals.items() if key != "out1"))
+    elif mode == "full-accept-raw":
+        ok = actual == baseline_full or actual == raw_full
+    elif mode == "full-path-raw-only":
+        ok = (actual == baseline_full or
+              (actual == raw_full and "raw" not in os.path.basename(path)))
+    else:
+        ok = actual == baseline_full
+else:
+    if mode == "public-ignore-out1":
+        ok = (set(actual) == set(baseline_public)
+              and all(actual[key] == value for key, value in baseline_public.items()
+                      if key != "out1"))
+    elif mode == "public-accept-raw":
+        ok = actual == baseline_public or actual == raw_public
+    elif mode == "public-path-raw-only":
+        ok = (actual == baseline_public or
+              (actual == raw_public and "raw" not in os.path.basename(path)))
+    else:
+        ok = actual == baseline_public
+raise SystemExit(0 if ok else 1)
+PYEOF
+SHIM
+chmod +x "${workdir}/shim/llzk-witgen-xor-controlled"
+
+expect "exhaustive Xor discriminator accepts an honest content-aware checker" 0 \
+  "every one of 4 full/public outputs plus alternate expectations" \
+  -- env XOR_SHIM_MODE=exact LLZK_WITGEN="${workdir}/shim/llzk-witgen-xor-controlled" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-expected.json" "${workdir}/xor-raw-public.json"
+
+expect "full out1-omitting checker accepts its baseline" 0 "" \
+  -- env XOR_SHIM_MODE=full-ignore-out1 "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-expected.json"
+expect "full out1-omitting checker rejects out0" 1 "" \
+  -- env XOR_SHIM_MODE=full-ignore-out1 "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-full-out0-mutated.json"
+expect "full out1-omitting checker demonstrably ignores out1" 0 "" \
+  -- env XOR_SHIM_MODE=full-ignore-out1 "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-full-out1-mutated.json"
+expect "exhaustive discriminator catches a full checker that omits out1" 1 \
+  "output group's index-1 field perturbed" \
+  -- env XOR_SHIM_MODE=full-ignore-out1 LLZK_WITGEN="${workdir}/shim/llzk-witgen-xor-controlled" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}"
+
+expect "public out1-omitting checker accepts its baseline" 0 "" \
+  -- env XOR_SHIM_MODE=public-ignore-out1 "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-public.json"
+expect "public out1-omitting checker rejects out0" 1 "" \
+  -- env XOR_SHIM_MODE=public-ignore-out1 "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-public-out0-mutated.json"
+expect "public out1-omitting checker demonstrably ignores out1" 0 "" \
+  -- env XOR_SHIM_MODE=public-ignore-out1 "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-public-out1-mutated.json"
+expect "exhaustive discriminator catches a public checker that omits out1" 1 \
+  "index-1 public output perturbed" \
+  -- env XOR_SHIM_MODE=public-ignore-out1 LLZK_WITGEN="${workdir}/shim/llzk-witgen-xor-controlled" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}"
+
+expect "raw-full-accepting checker accepts its baseline" 0 "" \
+  -- env XOR_SHIM_MODE=full-accept-raw "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-expected.json"
+expect "raw-full-accepting checker rejects an individual output mutation" 1 "" \
+  -- env XOR_SHIM_MODE=full-accept-raw "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-full-out0-mutated.json"
+expect "raw-full-accepting checker demonstrably accepts the raw witness" 0 "" \
+  -- env XOR_SHIM_MODE=full-accept-raw "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-raw-expected.json"
+expect "exhaustive discriminator catches a checker that accepts the raw full witness" 1 \
+  "accepted the alternate full witness" \
+  -- env XOR_SHIM_MODE=full-accept-raw LLZK_WITGEN="${workdir}/shim/llzk-witgen-xor-controlled" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-expected.json" "${workdir}/xor-raw-public.json"
+
+expect "raw-public-accepting checker accepts its baseline" 0 "" \
+  -- env XOR_SHIM_MODE=public-accept-raw "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-public.json"
+expect "raw-public-accepting checker rejects an individual output mutation" 1 "" \
+  -- env XOR_SHIM_MODE=public-accept-raw "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-public-out0-mutated.json"
+expect "raw-public-accepting checker demonstrably accepts the raw output" 0 "" \
+  -- env XOR_SHIM_MODE=public-accept-raw "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-raw-public.json"
+expect "exhaustive discriminator catches a checker that accepts the raw public output" 1 \
+  "accepted the alternate public output" \
+  -- env XOR_SHIM_MODE=public-accept-raw LLZK_WITGEN="${workdir}/shim/llzk-witgen-xor-controlled" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-expected.json" "${workdir}/xor-raw-public.json"
+
+# A path-aware shim can appear honest if the helper passes a predictably named
+# `raw` file directly. The helper must copy alternates to PID-derived names
+# before presenting them to witgen, exactly as it does for scalar mutations.
+expect "full path-specializing checker accepts its baseline" 0 "" \
+  -- env XOR_SHIM_MODE=full-path-raw-only "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-expected.json"
+expect "full path-specializing checker rejects an individual mutation" 1 "" \
+  -- env XOR_SHIM_MODE=full-path-raw-only "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-full-out0-mutated.json"
+expect "full path-specializing checker rejects only the predictable raw path" 1 "" \
+  -- env XOR_SHIM_MODE=full-path-raw-only "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=full-witness \
+       --check-output "${workdir}/xor-raw-expected.json"
+expect "PID-derived non-raw path catches the full path-specializing checker" 1 \
+  "accepted the alternate full witness" \
+  -- env XOR_SHIM_MODE=full-path-raw-only LLZK_WITGEN="${workdir}/shim/llzk-witgen-xor-controlled" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-expected.json" "${workdir}/xor-raw-public.json"
+
+expect "public path-specializing checker accepts its baseline" 0 "" \
+  -- env XOR_SHIM_MODE=public-path-raw-only "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-public.json"
+expect "public path-specializing checker rejects an individual mutation" 1 "" \
+  -- env XOR_SHIM_MODE=public-path-raw-only "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-public-out0-mutated.json"
+expect "public path-specializing checker rejects only the predictable raw path" 1 "" \
+  -- env XOR_SHIM_MODE=public-path-raw-only "${workdir}/shim/llzk-witgen-xor-controlled" \
+       "${workdir}/dummy.llzk" --output-scope=public \
+       --check-output "${workdir}/xor-raw-public.json"
+expect "PID-derived non-raw path catches the public path-specializing checker" 1 \
+  "accepted the alternate public output" \
+  -- env XOR_SHIM_MODE=public-path-raw-only LLZK_WITGEN="${workdir}/shim/llzk-witgen-xor-controlled" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" exhaustive-outputs 4 "$7" "$8"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/xor-inputs.json" \
+       "${workdir}/xor-expected.json" "${workdir}/xor-public.json" "${workdir}" \
+       "${workdir}/xor-raw-expected.json" "${workdir}/xor-raw-public.json"
 
 mkdir -p "${workdir}/public-widths"
 printf '{"out0":"1"}\n' > "${workdir}/public-widths/AThin.0.public.json"
@@ -916,13 +1374,47 @@ expect "exact count rejects a larger value" 1 "got 11, expected exactly 10" \
 expect "exact count rejects a non-natural value" 1 "counts must be natural numbers" \
   -- run_helper llzk_require_exact_count "test split" ten 10
 
+expect "e2e Xor32 exhaustive wiring is source pinned" 0 "" \
+  -- check_xor_e2e_wiring "${script_dir}/e2e.sh"
+
+python3 - "${script_dir}/e2e.sh" "${workdir}/e2e-xor-unreachable.sh" <<'PYEOF'
+import pathlib, sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+needle = "for xor_index in 7 8 9; do\n"
+if source.count(needle) != 1:
+    raise SystemExit("could not construct the Xor32 unreachable-control fixture")
+pathlib.Path(sys.argv[2]).write_text(source.replace(needle, needle + "  continue\n", 1))
+PYEOF
+expect "e2e Xor32 source pin rejects unreachable discriminator calls" 1 \
+  "Xor32 e2e file digest mismatch" \
+  -- check_xor_e2e_wiring "${workdir}/e2e-xor-unreachable.sh"
+
+python3 - "${script_dir}/e2e.sh" "${workdir}/e2e-xor-wrapped.sh" <<'PYEOF'
+import pathlib, sys
+
+source = pathlib.Path(sys.argv[1]).read_text()
+start = 'echo "== Xor32 exhaustive output and narrowing self-test =="\n'
+end = "# G10 is in two halves.\n"
+if source.count(start) != 1 or source.count(end) != 1:
+    raise SystemExit("could not construct the Xor32 outside-wrapper fixture")
+wrapped = source.replace(start, "if false; then\n" + start, 1)
+wrapped = wrapped.replace(end, end + "fi\n", 1)
+pathlib.Path(sys.argv[2]).write_text(wrapped)
+PYEOF
+expect "e2e Xor32 outside-wrapper fixture is valid shell" 0 "" \
+  -- bash -n "${workdir}/e2e-xor-wrapped.sh"
+expect "e2e Xor32 source pin rejects an unreachable wrapped block" 1 \
+  "Xor32 e2e file digest mismatch" \
+  -- check_xor_e2e_wiring "${workdir}/e2e-xor-wrapped.sh"
+
 expect "e2e exact counts are literal source pins" 0 "" \
   -- bash -c '
        for assignment in \
          LLZK_EXPECTED_SMT_OK=10 \
-         LLZK_EXPECTED_SMT_SKIPPED=7 \
-         LLZK_EXPECTED_ARTIFACTS=15 \
-         LLZK_EXPECTED_VECTORS=51 \
+         LLZK_EXPECTED_SMT_SKIPPED=8 \
+         LLZK_EXPECTED_ARTIFACTS=16 \
+         LLZK_EXPECTED_VECTORS=61 \
          LLZK_EXPECTED_FIXTURES=2
        do
          rg --fixed-strings --line-regexp "readonly ${assignment}" "$1/e2e.sh" >/dev/null \
