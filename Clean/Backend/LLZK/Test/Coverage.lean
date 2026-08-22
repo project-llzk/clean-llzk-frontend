@@ -83,11 +83,12 @@ private def diags {Input Output : TypeMap} [ProvableType Input] [ProvableType Ou
 
 Each guard pins the total and its decomposition. S26 removes `And8`'s `land`
 diagnostic because `x &&& y ≤ x` proves the result remains below Babybear.
-It deliberately retains the `lxor` diagnostics: the source IR contains only
-`.val` operands, while the byte bounds live in assumptions/constraints that the
-witness recognizer cannot inspect. Treating those hidden bounds as available
-would violate D033's theorem-or-refusal rule. S28 supplies the certified
-three-column table, so no registry refusal remains. -/
+It deliberately retains the `lxor` diagnostics. S29's adopted Xor32 source now
+executes `% 256` on every `.val` operand, but before Phase B the bound analysis
+still assigns modulo its numerator bound and assigns `lxor` the full `2^64`
+bound. The witness recognizer must prove those source-visible bounds rather than
+import byte assumptions/constraints. S28 supplies the certified three-column
+table, so no registry refusal remains. -/
 
 private def xor32 := diags withBytesAndXor (Gadgets.Xor32.circuit (p := pBabybear))
 #guard xor32.size = 1 ∧ count "lxor" xor32 = 1 ∧ count registryRefusal xor32 = 0

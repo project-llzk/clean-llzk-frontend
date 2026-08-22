@@ -1,0 +1,103 @@
+S29 Phase M — Clean overlay adoption gates
+============================================
+
+Date: 2026-08-22
+
+Accepted Phase-M tip tested:
+  ab0affd3f67fe8c6801d92cdd97bffbe02ff18d7
+
+Atomic adoption merge:
+  0e9f5d034715a6c0d11f1149aa2515078217740b
+  first parent:  fae399f61f15167c35f21bf75766f906185f296f
+  second parent: 3d086f32a71d17cbddfb46c0dea63cd36c8aa552 (K)
+
+Upstream Clean base U:
+  0e53b9f2d05f06defa2aa0a859f549b611583f10
+
+Accepted Clean overlay K:
+  3d086f32a71d17cbddfb46c0dea63cd36c8aa552
+
+The full U..K name-status delta was exactly:
+  M Clean/Gadgets/Xor/Xor32.lean
+
+The Xor32 blob at the merge is byte-identical to K. K is a direct
+single-parent child of U, the merge's second parent is exactly K, and the
+tested tip descends from the merge without any later Clean-core drift.
+
+Rejected Phase-M tip and adversarial repair
+--------------------------------------------
+
+The first full matrix on merge 0e9f5d03 was green, including the then-current
+58 G11 paths, but the independent controls review rejected it before Phase B.
+It was never designated as the future R8 candidate C.
+The generic Primes drift fixtures would not have detected an Xor32-specific
+allowlist, and the overlay fixture did not separately falsify an extra path or
+wrong status on the expected path.
+
+Corrective commit ab0affd3 adds non-vacuous red controls for:
+
+  - a direct-child-U overlay containing exact K Xor32 plus an extra path;
+  - a direct-child-U overlay deleting the expected Xor32 path;
+  - committed post-K Xor32 drift;
+  - uncommitted post-K Xor32 drift.
+
+It also corrects historical 53/54 path attribution and distinguishes the
+upstream U provenance input from the unpublished accepted K overlay. The
+controls and process reviewers independently reproduced all 61 G11 cases and
+gave GO before the corrective commit. The semantic reviewer separately gave GO
+on the adoption merge and found no source/proof overclaim.
+
+Focused gates on exact ab0affd3
+-------------------------------
+
+Commands:
+
+  bash scripts/llzk/check-pins.sh
+  bash scripts/llzk/test-scripts.sh
+
+Results:
+
+  check-pins.sh exit status: 0
+  test-scripts.sh exit status: 0
+  pin check: PASS
+  PASS: 61 error paths exercised
+
+Complete accepted-tool matrix on exact ab0affd3
+------------------------------------------------
+
+The worktree was clean before the run and held under
+LLZK_SESSION=s29-matrix-ab0affd3. Commands:
+
+  LLZK_SESSION=s29-matrix-ab0affd3 \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result:
+
+  e2e.sh exit status: 0
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  15 circuit modules, 51 input vectors
+  both witness backends, full-witness and public output scopes
+  2 renderer fixtures
+  17/17 modules admitted by --llzk-product-program
+  10 modules lowered to SMT, 7 declared skips
+  61 harness error/falsification paths
+
+Tool versions:
+
+  Lean: v4.32.2
+  llzk-opt: LLZK version 3.0.0
+  llzk-witgen: exact sibling binary in the same immutable Nix output; its own
+    version surface is non-identifying, so provenance is carried by llzk-opt and
+    the shared output path, as PINS.md records
+
+Lean built 1876 Clean jobs and 1810 CleanTests jobs. The only warnings were the
+ten inherited Clean test-helper `sorry` declarations already recorded by the
+frontend audit. No Phase-B backend bound support or example promotion was
+present. The adopted Clean Xor32 source narrowing was present, but modulo still
+retained its numerator bound and `lxor` still reported `2^64`; Xor32 therefore
+retained one `lxor` diagnostic and remained outside the emitted corpus.
+
+No branch was pushed, no upstream issue or PR was opened, and no external state
+changed.

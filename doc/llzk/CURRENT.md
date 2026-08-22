@@ -31,9 +31,13 @@ commit is decision and process only: D035 selects executable `% 256` narrowing,
 exact modulo bounds, and power-of-two XOR/OR envelopes without importing hidden
 circuit assumptions. Clean-only overlay `3d086f32`, built from exact upstream
 base `0e53b9f2`, passed targeted and full builds plus three independent reviews
-and is now the accepted source-semantics pin. Frontend bound proofs and example
-promotion remain pending. Independent adversarial review is required at every
-phase boundary. See `sessions/S29-xor-range-contract.md`.
+and is now the accepted source-semantics pin. Atomic adoption merge `0e9f5d03`
+plus adversarial control repair `ab0affd3` passed G0-G12 on the accepted tools:
+15 modules, 51 vectors, both backends and both output scopes, 17/17 admissions,
+10 SMT lowerings / 7 declared skips, and 61 G11 paths. Frontend bound proofs and
+example promotion remain pending. Independent adversarial review is required at
+every phase boundary. See `sessions/S29-xor-range-contract.md` and
+`evidence/S29/adoption-gates.txt`.
 
 Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
@@ -121,7 +125,7 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase M Clean-overlay adoption; backend bound work not started)
+Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase M complete; Phase B backend bounds next)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 

@@ -1,6 +1,6 @@
 # S29 — Source-visible XOR byte range and headline promotion
 
-Status: decision/bootstrap; no feature code yet
+Status: Phase M complete on `ab0affd3`; Phase B backend bounds next
 Depends on: audited frontend baseline `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Base integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Frontend branch: `clean-to-llzk/s29-xor-range-contract`
