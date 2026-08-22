@@ -222,4 +222,170 @@ private def failedWitness : VectorCase :=
   context := "Xor32 reference control"
   message := "fixed public reference output 2 is 69, but Clean's witness produced 68" }
 
+/-! ## BLAKE3.G reference boundary before external promotion
+
+This is intentionally a second, independently written transcription of the
+six oracle rows. `blake3gEntry` is compiled and checked here, but HR keeps it
+absent from the external corpus until its exact proof/shape boundary is frozen.
+-/
+
+private def blakeSrc : Source Bab :=
+  Compilable.source (Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear))
+
+private def blakeCheck (vector : VectorCase) : Except Diagnostic Witness :=
+  vector.checkedWitness .babybear .fixedRequired "BLAKE3.G reference control"
+
+private def blakeWithReference (vector : VectorCase) (values : Array Nat) : VectorCase :=
+  match vector.publicExpectation with
+  | .fixed scope _ => { vector with publicExpectation := .fixed scope values }
+  | .fromWitness => vector
+
+private def blakeMutateOutput (vector : VectorCase) (index : Nat) : VectorCase :=
+  match vector.publicExpectation with
+  | .fixed scope values =>
+      { vector with publicExpectation := .fixed scope (values.set! index (values[index]! + 1)) }
+  | .fromWitness => vector
+
+private def blakeWithScope (vector : VectorCase) (scope : ReferenceScope) : VectorCase :=
+  match vector.publicExpectation with
+  | .fixed _ values => { vector with publicExpectation := .fixed scope values }
+  | .fromWitness => vector
+
+private def blakeCarriedReference (vector : VectorCase) : Option ReferencedVector :=
+  match vector.publicExpectation with
+  | .fixed scope values => some ⟨vector.name, vector.inputs, scope, values⟩
+  | .fromWitness => none
+
+private def blakeFixedValues (vector : VectorCase) : Array Nat :=
+  match vector.publicExpectation with
+  | .fixed _ values => values
+  | .fromWitness => #[]
+
+private def zeros (count : Nat) : Array Nat := Array.replicate count 0
+private def maxBytes (count : Nat) : Array Nat := Array.replicate count 255
+
+private def alternatingStateBytes : Array Nat :=
+  (Array.range 16).flatMap fun index =>
+    Array.replicate 4 (if index % 2 = 0 then 170 else 85)
+
+private def expectedBlakeReferences : Array ReferencedVector :=
+  #[ ⟨"spec_zero", zeros 72, .spec, zeros 64⟩
+   , ⟨"spec_max_bytes", maxBytes 72, .spec,
+       #[220, 255, 15, 0, 228, 27, 184, 61, 254, 13, 2, 220, 255, 13, 0, 220]
+         ++ maxBytes 48⟩
+   , ⟨"spec_alternating",
+       alternatingStateBytes ++ #[170, 170, 170, 170, 85, 85, 85, 85], .spec,
+       #[45, 255, 207, 255, 69, 208, 6, 13, 169, 221, 167, 124, 0, 51, 0, 210]
+         ++ alternatingStateBytes.extract 16 64⟩
+   , ⟨"spec_carry_heavy",
+       #[128, 128, 128, 128, 1, 0, 0, 0, 254, 255, 255, 255, 255, 255, 255, 255]
+         ++ zeros 48 ++ #[254, 255, 255, 255, 255, 255, 255, 127], .spec,
+       #[133, 120, 72, 248, 127, 159, 27, 7, 132, 71, 8, 122, 7, 200, 135, 250]
+         ++ zeros 48⟩
+   , ⟨"spec_high_bit",
+       #[0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 255, 255, 255, 255]
+         ++ zeros 48 ++ #[0, 0, 0, 128, 1, 0, 0, 0], .spec,
+       #[0, 0, 248, 255, 240, 239, 1, 3, 254, 7, 0, 127, 255, 7, 0, 255]
+         ++ zeros 48⟩
+   , ⟨"spec_lane_markers",
+       Array.range 16 ++ (Array.range 48).map (207 + ·) ++ (Array.range 8).map (16 + ·), .spec,
+       #[105, 78, 178, 21, 206, 103, 135, 114, 120, 197, 49, 162, 92, 170, 15, 125]
+         ++ (Array.range 48).map (207 + ·)⟩ ]
+
+private def blakeReferencedEntry : Entry := blake3gEntry
+
+private def blakeScopeValid (vector : ReferencedVector) : Bool :=
+  vector.scope = .spec && vector.inputs.size = 72 && vector.outputs.size = 64 &&
+    vector.inputs.all (· < 256) && vector.outputs.all (· < 256)
+
+private def blakeMarkerInputs : Array Nat :=
+  Array.range 16 ++ (Array.range 48).map (207 + ·) ++ (Array.range 8).map (16 + ·)
+
+private def blakeMarkerOutputs : Array Nat :=
+  #[105, 78, 178, 21, 206, 103, 135, 114, 120, 197, 49, 162, 92, 170, 15, 125]
+    ++ (Array.range 48).map (207 + ·)
+
+private def blakeMarker : VectorCase :=
+  { name := "spec_lane_markers"
+    inputs := blakeMarkerInputs
+    cleanWitness := LLZK.witness blakeSrc blakeMarkerInputs
+    publicExpectation := .fixed .spec blakeMarkerOutputs }
+
+private def swappedXYInputs (inputs : Array Nat) : Array Nat :=
+  inputs.extract 0 64 ++ inputs.extract 68 72 ++ inputs.extract 64 68
+
+private def reinput (vector : VectorCase) (inputs : Array Nat) : VectorCase :=
+  { vector with inputs, cleanWitness := LLZK.witness blakeSrc inputs }
+
+/-! Positive carrier and exact-transcription baselines. -/
+
+#guard blake3gVectors.size = 6
+#guard blake3gVectors == expectedBlakeReferences
+#guard blakeReferencedEntry.name = "BLAKE3G"
+#guard blakeReferencedEntry.publicReferencePolicy = .fixedRequired
+#guard blakeReferencedEntry.module.toOption.isSome
+#guard blakeReferencedEntry.constraintsAgree = some true
+#guard blakeReferencedEntry.witnessAgree = some true
+#guard blakeReferencedEntry.vectors.size = 6
+#guard blakeReferencedEntry.vectors.all fun vector => vector.publicExpectation.isFixed
+#guard blakeReferencedEntry.vectors.all fun vector => (blakeCheck vector).isOk
+#guard blakeReferencedEntry.vectors.map blakeCarriedReference ==
+  expectedBlakeReferences.map some
+#guard expectedBlakeReferences.map (·.name) ==
+  #["spec_zero", "spec_max_bytes", "spec_alternating", "spec_carry_heavy",
+    "spec_high_bit", "spec_lane_markers"]
+#guard expectedBlakeReferences.all blakeScopeValid
+#guard expectedBlakeReferences.all fun vector =>
+  vector.outputs.extract 16 64 == vector.inputs.extract 16 64
+
+-- HR is a reference freeze, not an external promotion. This guard must flip in HC.
+#guard (Corpus.corpus.filter fun entry => entry.name = "BLAKE3G").isEmpty
+
+/-! Every fixed output in every row is live, including all unchanged tail lanes. -/
+
+#guard blakeReferencedEntry.vectors.all fun vector =>
+  (Array.range 64).all fun index => !(blakeCheck (blakeMutateOutput vector index)).isOk
+
+#guard blakeFixedValues blakeMarker ==
+  #[105, 78, 178, 21, 206, 103, 135, 114, 120, 197, 49, 162, 92, 170, 15, 125]
+    ++ (Array.range 48).map (207 + ·)
+#guard (blakeFixedValues blakeMarker).all fun value =>
+  ((blakeFixedValues blakeMarker).filter (· == value)).size = 1
+#guard (blakeFixedValues blakeMarker).all (· != 0)
+
+-- The last eight input limbs are x then y. Swapping them with a freshly
+-- computed witness remains red against the fixed marker result.
+#guard blakeMarker.inputs.extract 64 72 == #[16, 17, 18, 19, 20, 21, 22, 23]
+#guard !(blakeCheck (reinput blakeMarker (swappedXYInputs blakeMarker.inputs))).isOk
+
+/-! Width, scope, canonicality, policy, and input association controls. -/
+
+#guard !(blakeCheck (blakeWithReference blakeMarker
+  ((blakeFixedValues blakeMarker).extract 0 63))).isOk
+#guard !(blakeCheck (blakeWithReference blakeMarker
+  (blakeFixedValues blakeMarker ++ #[1]))).isOk
+#guard !(blakeCheck (blakeWithReference blakeMarker
+  ((blakeFixedValues blakeMarker).set! 0 pBabybear))).isOk
+
+private def blakeDowngraded : VectorCase :=
+  { blakeMarker with publicExpectation := .fromWitness }
+
+#guard !(blakeCheck blakeDowngraded).isOk
+#guard match blakeCarriedReference (blakeWithScope blakeMarker .computeOnly) with
+  | some vector => !blakeScopeValid vector
+  | none => false
+
+private def blakeWrongInputs : VectorCase :=
+  { blakeMarker with inputs := blakeMarker.inputs.set! 0 1 }
+
+#guard !(blakeCheck blakeWrongInputs).isOk
+
+private def nonByteBlakeReference : ReferencedVector :=
+  { name := "spec_lane_markers"
+    inputs := blakeMarkerInputs.set! 0 256
+    scope := .spec
+    outputs := blakeMarkerOutputs }
+
+#guard !blakeScopeValid nonByteBlakeReference
+
 end LLZK.Test.Corpus

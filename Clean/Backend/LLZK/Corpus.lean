@@ -2,6 +2,7 @@ import Clean.Backend.LLZK.Examples
 import Clean.Backend.LLZK.Differential
 import Clean.Backend.LLZK.RendererFixture
 import Clean.Backend.LLZK.WitnessCheck
+import Clean.Gadgets.BLAKE3.BLAKE3G
 import Clean.Gadgets.Xor.Xor32
 
 /-!
@@ -223,6 +224,92 @@ def xor32Vectors : Array ReferencedVector := xor32SpecVectors ++ xor32ComputeVec
 def xor32Entry : Entry :=
   Entry.ofSourceReferenced withBytesAndXor "Xor32"
     (Compilable.source (Gadgets.Xor32.circuit (p := pBabybear))) xor32Vectors
+
+/-! ## Independently referenced BLAKE3.G vectors
+
+These six normalized rows exercise exactly `G 0 1 2 3`. Inputs flatten the
+sixteen state words, then `x`, then `y`; outputs flatten the complete state.
+Words use four little-endian byte limbs. The fixed results come from the
+standalone official-reference transcription in
+`doc/llzk/evidence/S29/blake3g_oracle.py`, not from Clean. This entry remains
+outside `corpus` until the proof and external-harness phases are frozen. -/
+
+private def leBytes32 (word : Nat) : Array Nat :=
+  #[word % 256, word / 256 % 256, word / (256 ^ 2) % 256, word / (256 ^ 3) % 256]
+
+private def flattenWordsLE (words : Array Nat) : Array Nat :=
+  words.flatMap leBytes32
+
+private structure Blake3GWordCase where
+  name : String
+  state : Array Nat
+  x : Nat
+  y : Nat
+  updated : Array Nat
+
+private def Blake3GWordCase.toReferenced (vector : Blake3GWordCase) : ReferencedVector :=
+  { name := vector.name
+    inputs := flattenWordsLE (vector.state ++ #[vector.x, vector.y])
+    scope := .spec
+    outputs := flattenWordsLE (vector.updated ++ vector.state.extract 4 vector.state.size) }
+
+private def zeroState : Array Nat := Array.replicate 16 0
+private def maxState : Array Nat := Array.replicate 16 (2 ^ 32 - 1)
+private def alternatingState : Array Nat :=
+  (Array.range 16).map fun index => if index % 2 = 0 then 0xAAAAAAAA else 0x55555555
+private def carryState : Array Nat :=
+  #[0x80808080, 0x00000001, 0xFFFFFFFE, 0xFFFFFFFF] ++ Array.replicate 12 0
+private def highBitState : Array Nat :=
+  #[0x80000000, 0x00000000, 0x80000000, 0xFFFFFFFF] ++ Array.replicate 12 0
+private def markerState : Array Nat :=
+  #[ 0x03020100, 0x07060504, 0x0B0A0908, 0x0F0E0D0C
+   , 0xD2D1D0CF, 0xD6D5D4D3, 0xDAD9D8D7, 0xDEDDDCDB
+   , 0xE2E1E0DF, 0xE6E5E4E3, 0xEAE9E8E7, 0xEEEDECEB
+   , 0xF2F1F0EF, 0xF6F5F4F3, 0xFAF9F8F7, 0xFEFDFCFB ]
+
+private def zeroUpdated : Array Nat :=
+  #[0x00000000, 0x00000000, 0x00000000, 0x00000000]
+private def maxUpdated : Array Nat :=
+  #[0x000FFFDC, 0x3DB81BE4, 0xDC020DFE, 0xDC000DFF]
+private def alternatingUpdated : Array Nat :=
+  #[0xFFCFFF2D, 0x0D06D045, 0x7CA7DDA9, 0xD2003300]
+private def carryUpdated : Array Nat :=
+  #[0xF8487885, 0x071B9F7F, 0x7A084784, 0xFA87C807]
+private def highBitUpdated : Array Nat :=
+  #[0xFFF80000, 0x0301EFF0, 0x7F0007FE, 0xFF0007FF]
+private def markerUpdated : Array Nat :=
+  #[0x15B24E69, 0x728767CE, 0xA231C578, 0x7D0FAA5C]
+
+private def Blake3GWordCase.canonical (vector : Blake3GWordCase) : Bool :=
+  vector.state.size = 16 && vector.updated.size = 4 &&
+    (vector.state ++ #[vector.x, vector.y] ++ vector.updated).all (· < 2 ^ 32)
+
+private def blake3gWordCases : Array Blake3GWordCase :=
+  #[ ⟨"spec_zero", zeroState, 0x00000000, 0x00000000, zeroUpdated⟩
+   , ⟨"spec_max_bytes", maxState, 0xFFFFFFFF, 0xFFFFFFFF, maxUpdated⟩
+   , ⟨"spec_alternating", alternatingState, 0xAAAAAAAA, 0x55555555,
+       alternatingUpdated⟩
+   , ⟨"spec_carry_heavy", carryState, 0xFFFFFFFE, 0x7FFFFFFF, carryUpdated⟩
+   , ⟨"spec_high_bit", highBitState, 0x80000000, 0x00000001, highBitUpdated⟩
+   , ⟨"spec_lane_markers", markerState, 0x13121110, 0x17161514, markerUpdated⟩ ]
+
+-- `leBytes32` is intentionally total, so guard its six call sites before it
+-- can truncate a malformed source/checkpoint word modulo 2^32.
+#guard blake3gWordCases.size = 6
+#guard blake3gWordCases.all Blake3GWordCase.canonical
+#guard !Blake3GWordCase.canonical ⟨"bad-state", zeroState.set! 0 (2 ^ 32), 0, 0,
+  zeroUpdated⟩
+#guard !Blake3GWordCase.canonical ⟨"bad-x", zeroState, 2 ^ 32, 0, zeroUpdated⟩
+#guard !Blake3GWordCase.canonical ⟨"bad-y", zeroState, 0, 2 ^ 32, zeroUpdated⟩
+#guard !Blake3GWordCase.canonical ⟨"bad-output", zeroState, 0, 0,
+  zeroUpdated.set! 0 (2 ^ 32)⟩
+
+def blake3gVectors : Array ReferencedVector :=
+  blake3gWordCases.map Blake3GWordCase.toReferenced
+
+def blake3gEntry : Entry :=
+  Entry.ofSourceReferenced withBytesAndXor "BLAKE3G"
+    (Compilable.source (Gadgets.BLAKE3.G.circuit 0 1 2 3 (p := pBabybear))) blake3gVectors
 
 /-! ## Registry conformance
 
