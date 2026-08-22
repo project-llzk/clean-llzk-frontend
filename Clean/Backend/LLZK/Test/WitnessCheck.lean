@@ -1,6 +1,7 @@
 import Clean.Backend.LLZK.WitnessCheck
 import Clean.Backend.LLZK.Corpus
 import Clean.Backend.LLZK.Examples
+import Clean.Gadgets.Xor.Xor32
 
 /-!
 # Gate G9, witness side: the emitted `@compute` against Clean's witness programs
@@ -154,6 +155,8 @@ private def lowByteSrc : Source Bab := Compilable.source lowByte
 private def bits8Src : Source Bab := Compilable.source bits8
 private def addSrc : Source Bab :=
   Compilable.source (Gadgets.Addition8FullCarry.circuit (p := pBabybear))
+private def xorSrc : Source Bab :=
+  Compilable.source (Gadgets.Xor32.circuit (p := pBabybear))
 
 #guard cross babybear mulSrc mulSrc
 #guard cross babybear decSrc decSrc
@@ -162,6 +165,7 @@ private def addSrc : Source Bab :=
 #guard cross babybear (Compilable.source passthrough) (Compilable.source passthrough)
 #guard cross babybear (Compilable.source constOut) (Compilable.source constOut)
 #guard cross withBytes addSrc addSrc
+#guard cross withBytesAndXor xorSrc xorSrc
 
 -- The shapes, pinned so that a change in how many cells or outputs a circuit has
 -- is a reviewed diff. `Addition8FullCarry` witnesses the low byte and the carry,
@@ -174,8 +178,120 @@ private def shape (src : Source Bab) : Option (Nat × Nat) :=
 #guard shape lowByteSrc == some (1, 1)
 #guard shape bits8Src == some (8, 8)
 #guard shape addSrc == some (2, 2)
+#guard shape xorSrc == some (4, 4)
 #guard shape (Compilable.source passthrough) == some (0, 1)
 #guard shape (Compilable.source constOut) == some (0, 1)
+
+/-! ### Xor32's exact source, recognized, typed-module, and reader shapes -/
+
+private def xorCells : List WExpr :=
+  [ .u64Bin .bitXor (.umod (.cell 0) 256) (.umod (.cell 4) 256)
+  , .u64Bin .bitXor (.umod (.cell 1) 256) (.umod (.cell 5) 256)
+  , .u64Bin .bitXor (.umod (.cell 2) 256) (.umod (.cell 6) 256)
+  , .u64Bin .bitXor (.umod (.cell 3) 256) (.umod (.cell 7) 256) ]
+
+private def xorWitnessSet : WitnessSet :=
+  { inputs := 8
+    cells := xorCells
+    outputs := [.cell 8, .cell 9, .cell 10, .cell 11] }
+
+#guard WitnessSet.ofSource xorSrc == some xorWitnessSet
+
+private def xorSourceShape : Bool :=
+  xorSrc.inputSize == 8 && xorSrc.outputs.size == 4 &&
+    match xorSrc.operations with
+    | [.witness 4 _, .lookup _, .lookup _, .lookup _, .lookup _] => true
+    | _ => false
+
+#guard xorSourceShape
+
+private def xorFieldExprs : Array FieldExpr :=
+  #[ .u64Bin .bitXor (.umod (.var 0) 256) (.umod (.var 4) 256)
+   , .u64Bin .bitXor (.umod (.var 1) 256) (.umod (.var 5) 256)
+   , .u64Bin .bitXor (.umod (.var 2) 256) (.umod (.var 6) 256)
+   , .u64Bin .bitXor (.umod (.var 3) 256) (.umod (.var 7) 256) ]
+
+private def xorLookupRows : Array (Array FieldExpr) :=
+  #[ #[.var 0, .var 4, .var 8]
+   , #[.var 1, .var 5, .var 9]
+   , #[.var 2, .var 6, .var 10]
+   , #[.var 3, .var 7, .var 11] ]
+
+private def xorRecognizedExact : Bool :=
+  match recognize withBytesAndXor.toConfig xorSrc with
+  | .error _ => false
+  | .ok recognized =>
+      recognized.inputSize == 8 && recognized.witnesses == xorFieldExprs &&
+      recognized.asserts.isEmpty &&
+      recognized.lookups.map (fun lookup =>
+        (lookup.tableName, lookup.tableRows, lookup.tableArity, lookup.entry)) ==
+          xorLookupRows.map (fun row => ("ByteXor", 65536, 3, row)) &&
+      recognized.tables.map (fun table => (table.name, table.arity, table.rows)) ==
+        #[("ByteXor", 3, byteXorRows)] &&
+      recognized.outputs == #[.var 8, .var 9, .var 10, .var 11]
+
+#guard xorRecognizedExact
+
+private def xorModuleExact : Bool :=
+  match compile withBytesAndXor (Gadgets.Xor32.circuit (p := pBabybear)) with
+  | .error _ => false
+  | .ok m =>
+      let inputParams := (Array.range 8).map fun i =>
+        (Ty.felt "babybear", some s!"arg{i}")
+      m.globals.map (fun table => (table.name, table.elemTy, table.arity, table.rows)) ==
+          #[("ByteXor", Ty.felt "babybear", 3, byteXorRows)] &&
+        m.root.compute.params.map (fun param => (param.ty, param.argName)) == inputParams &&
+        m.root.constrain.params.map (fun param => (param.ty, param.argName)) ==
+          #[(rootTy, none)] ++ inputParams &&
+        m.root.members.map (fun member => (member.name, member.ty, member.visibility)) ==
+          #[ ("w0", Ty.felt "babybear", .signal)
+           , ("w1", Ty.felt "babybear", .signal)
+           , ("w2", Ty.felt "babybear", .signal)
+           , ("w3", Ty.felt "babybear", .signal)
+           , ("out0", Ty.felt "babybear", .pub)
+           , ("out1", Ty.felt "babybear", .pub)
+           , ("out2", Ty.felt "babybear", .pub)
+           , ("out3", Ty.felt "babybear", .pub) ] &&
+        WitnessSet.ofModule (Ty.felt "babybear") m == some xorWitnessSet
+
+#guard xorModuleExact
+
+/-! Xor-specific G9 mutations. Each mutant reads successfully against itself
+before the normal compiled module is required to reject it as a reference. -/
+
+private def sourceF (index : Nat) : Witgen.FExpr Bab := .expr (.var ⟨index⟩)
+
+private def narrow (index : Nat) (divisor : UInt64 := 256) : Witgen.U64Expr Bab :=
+  .mod (.val (sourceF index)) (.const divisor)
+
+private def xorCell (x y : Nat) : Witgen.FExpr Bab :=
+  .ofU64 (.lxor (narrow x) (narrow y))
+
+private def xorProgramSource (cells : Vector (Witgen.FExpr Bab) 4) : Source Bab :=
+  { xorSrc with operations := xorSrc.operations.map fun
+      | .witness _ _ => .witness 4 (.ir [] (.lit cells))
+      | operation => operation }
+
+private def wrongDivisorXor : Source Bab := xorProgramSource
+  #v[.ofU64 (.lxor (narrow 0 128) (narrow 4)), xorCell 1 5, xorCell 2 6, xorCell 3 7]
+
+private def wrongOperatorXor : Source Bab := xorProgramSource
+  #v[xorCell 0 4, .ofU64 (.lor (narrow 1) (narrow 5)), xorCell 2 6, xorCell 3 7]
+
+private def wrongOperandXor : Source Bab := xorProgramSource
+  #v[xorCell 0 4, xorCell 1 5, xorCell 2 7, xorCell 3 7]
+
+private def permutedXorOutputs : Source Bab :=
+  { xorSrc with outputs := #[.var ⟨9⟩, .var ⟨8⟩, .var ⟨10⟩, .var ⟨11⟩] }
+
+#guard cross withBytesAndXor wrongDivisorXor wrongDivisorXor
+#guard cross withBytesAndXor wrongOperatorXor wrongOperatorXor
+#guard cross withBytesAndXor wrongOperandXor wrongOperandXor
+#guard cross withBytesAndXor permutedXorOutputs permutedXorOutputs
+#guard !cross withBytesAndXor xorSrc wrongDivisorXor
+#guard !cross withBytesAndXor xorSrc wrongOperatorXor
+#guard !cross withBytesAndXor xorSrc wrongOperandXor
+#guard !cross withBytesAndXor xorSrc permutedXorOutputs
 
 /-! ## The gate can go red -/
 

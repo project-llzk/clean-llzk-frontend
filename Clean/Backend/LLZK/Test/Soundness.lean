@@ -161,4 +161,61 @@ theorem and8_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recogniz
   spec_of_compile_sourceRows hcompile hm hrec and8_resolve and8_no_interactions env outs heqs
     ((and8_lookup_iff hrec env).mp hlookups) input hinput hassm
 
+/-! ## S29: the four-limb Xor32 instantiation -/
+
+private abbrev xor32 : FormalCircuit Bab Gadgets.Xor32.Inputs U32 :=
+  Gadgets.Xor32.circuit (p := pBabybear)
+
+#guard (compile withBytesAndXor xor32).toOption.isSome
+#guard (recognize withBytesAndXor.toConfig (Compilable.source xor32)).isOk
+
+theorem xor32_no_interactions :
+    ((xor32.main (varFromOffset Gadgets.Xor32.Inputs 0)).operations
+      (size Gadgets.Xor32.Inputs)).interactions = [] := by
+  simp [circuit_norm, Gadgets.Xor32.circuit, Gadgets.Xor32.main,
+    Operations.interactions]
+
+/-- **The emitted four ByteXor membership rows plus output equalities imply
+Xor32's own Spec under its normalized-byte assumptions.**
+
+Planned compute-only vectors intentionally cannot invoke this theorem: `hassm`
+is retained explicitly. The remaining compile/readback/recognition premises and
+D017 boundary are the same as the existing Add8 and And8 instantiations. -/
+theorem xor32_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognized}
+    (hcompile : compile withBytesAndXor xor32 = .ok m)
+    (hm : ConstraintSet.ofModule (F := Bab) (Ty.felt withBytesAndXor.field.name) m = some C)
+    (hrec : recognize withBytesAndXor.toConfig (Compilable.source xor32) = .ok r)
+    (env : Environment Bab) (outs : Nat → Bab)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+    (hlookups : C.LookupRowsHold env outs)
+    (input : Gadgets.Xor32.Inputs Bab)
+    (hinput : eval env
+      (varFromOffset Gadgets.Xor32.Inputs 0 : Var Gadgets.Xor32.Inputs Bab) = input)
+    (hassm : xor32.Assumptions input) :
+    xor32.Spec input
+      (eval env (xor32.output (varFromOffset Gadgets.Xor32.Inputs 0)
+        (size Gadgets.Xor32.Inputs))) :=
+  spec_of_compile hcompile hm hrec xor32_resolve xor32_no_interactions env outs heqs hlookups
+    input hinput hassm
+
+/-- The same Xor32 implication with lookup membership stated on Clean's source
+rows; `xor32_lookup_iff` supplies the conversion to concrete certified registry rows. -/
+theorem xor32_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recognized}
+    (hcompile : compile withBytesAndXor xor32 = .ok m)
+    (hm : ConstraintSet.ofModule (F := Bab) (Ty.felt withBytesAndXor.field.name) m = some C)
+    (hrec : recognize withBytesAndXor.toConfig (Compilable.source xor32) = .ok r)
+    (env : Environment Bab) (outs : Nat → Bab)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0)
+    (hlookups : ∀ l ∈ FlatOperation.lookups (Compilable.source xor32).operations,
+      l.Contains env)
+    (input : Gadgets.Xor32.Inputs Bab)
+    (hinput : eval env
+      (varFromOffset Gadgets.Xor32.Inputs 0 : Var Gadgets.Xor32.Inputs Bab) = input)
+    (hassm : xor32.Assumptions input) :
+    xor32.Spec input
+      (eval env (xor32.output (varFromOffset Gadgets.Xor32.Inputs 0)
+        (size Gadgets.Xor32.Inputs))) :=
+  spec_of_compile_sourceRows hcompile hm hrec xor32_resolve xor32_no_interactions env outs heqs
+    ((xor32_lookup_iff hrec env).mp hlookups) input hinput hassm
+
 end LLZK.Test.Soundness

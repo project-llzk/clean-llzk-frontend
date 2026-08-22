@@ -1,5 +1,6 @@
 import Clean.Backend.LLZK.Lookups
 import Clean.Backend.LLZK.Examples
+import Clean.Gadgets.Xor.Xor32
 
 /-!
 # GAPS §4, instantiated
@@ -43,6 +44,8 @@ private def addSrc : Source Bab :=
   Compilable.source (Gadgets.Addition8FullCarry.circuit (p := pBabybear))
 private def andSrc : Source Bab :=
   Compilable.source (Gadgets.And.And8.circuit (p := pBabybear))
+private def xorSrc : Source Bab :=
+  Compilable.source (Gadgets.Xor32.circuit (p := pBabybear))
 
 -- The compiler accepts this circuit, which is the one hypothesis below that is
 -- checked rather than proved. Same check as G1 and the corpus.
@@ -160,5 +163,41 @@ theorem and8_lookup_iff {r : Recognized}
             ∃ values ∈ ct.exported.rows,
               values.map FiniteField.fromNat = (entry.map env).toArray) :=
   ofSource_lookups_iff hrec env and8_resolve
+
+/-! ## Xor32: four concrete ByteXor rows -/
+
+#guard (FlatOperation.lookups xorSrc.operations).length == 4
+#guard (recognize withBytesAndXor.toConfig xorSrc).isOk
+
+/-- Every one of Xor32's four limb lookups resolves to the certified ByteXor
+table. The separate count guard above prevents a vacuous universal proof. -/
+theorem xor32_lookups_are_byteXor : ∀ l ∈ FlatOperation.lookups xorSrc.operations,
+    l.table = (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw := by
+  simp [circuit_norm, xorSrc, Compilable.source, Source.ofFormalCircuit,
+    Gadgets.Xor32.circuit, Gadgets.Xor32.main, FlatOperation.lookups,
+    Operations.toFlat]
+
+/-- Resolve all four source lookups to the exact certified registry carrier. -/
+theorem xor32_resolve : ∀ l ∈ FlatOperation.lookups xorSrc.operations,
+    ∃ ct ∈ withBytesAndXor.tables, ∃ entry : Vector (Expression Bab) ct.table.arity,
+      l = ⟨ct.table, entry⟩ := by
+  intro l hl
+  obtain ⟨tbl, entry⟩ := l
+  have htbl : tbl = (Gadgets.Xor.ByteXorTable (p := pBabybear)).toRaw :=
+    xor32_lookups_are_byteXor _ hl
+  subst htbl
+  exact ⟨byteXorCert, byteXorCert_mem, entry, rfl⟩
+
+/-- Xor32's four Clean lookup constraints are exactly membership of the four
+ordered rows in the concrete certified ByteXor table carried by `withBytesAndXor`. -/
+theorem xor32_lookup_iff {r : Recognized}
+    (hrec : recognize withBytesAndXor.toConfig xorSrc = .ok r) (env : Environment Bab) :
+    (∀ l ∈ FlatOperation.lookups xorSrc.operations, l.Contains env)
+      ↔ (∀ l ∈ FlatOperation.lookups xorSrc.operations,
+          ∀ ct ∈ withBytesAndXor.tables,
+          ∀ entry : Vector (Expression Bab) ct.table.arity, l = ⟨ct.table, entry⟩ →
+            ∃ values ∈ ct.exported.rows,
+              values.map FiniteField.fromNat = (entry.map env).toArray) :=
+  ofSource_lookups_iff hrec env xor32_resolve
 
 end LLZK.Test.Lookups

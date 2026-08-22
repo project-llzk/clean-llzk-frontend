@@ -1,4 +1,5 @@
 import Clean.Backend.LLZK.Corpus
+import Clean.Gadgets.Xor.Xor32
 
 /-!
 # Gate G9: the emitted constraints, checked against Clean's
@@ -46,6 +47,8 @@ private def addSrc : Source Bab :=
   Compilable.source (Gadgets.Addition8FullCarry.circuit (p := pBabybear))
 private def andSrc : Source Bab :=
   Compilable.source (Gadgets.And.And8.circuit (p := pBabybear))
+private def xorSrc : Source Bab :=
+  Compilable.source (Gadgets.Xor32.circuit (p := pBabybear))
 
 /-! ## The corpus agrees
 
@@ -109,6 +112,18 @@ private def bumped (s : Source Bab) : Source Bab :=
 #guard cross babybear mulSrc mulSrc
 #guard cross withBytes addSrc addSrc
 #guard cross withBytesAndXor andSrc andSrc
+#guard cross withBytesAndXor xorSrc xorSrc
+
+private def dropFirstLookupOps : List (FlatOperation Bab) → List (FlatOperation Bab)
+  | [] => []
+  | .lookup _ :: operations => operations
+  | operation :: operations => operation :: dropFirstLookupOps operations
+
+private def xorMissingOneLookup : Source Bab :=
+  { xorSrc with operations := dropFirstLookupOps xorSrc.operations }
+
+#guard cross withBytesAndXor xorMissingOneLookup xorMissingOneLookup
+#guard !cross withBytesAndXor xorMissingOneLookup xorSrc
 
 -- A module compared against a different circuit's constraints.
 #guard !cross babybear mulSrc decSrc
@@ -378,5 +393,31 @@ private def shape (cfg : CertifiedConfig Bab) (src : Source Bab) : Option (Nat �
 #guard shape babybear (Compilable.source passthrough) == some (1, 0)
 #guard shape babybear (Compilable.source constOut) == some (1, 0)
 #guard shape withBytes addSrc == some (4, 1)
+#guard shape withBytesAndXor xorSrc == some (4, 4)
+
+private def xorEqs : List (Poly Bab) :=
+  [ Poly.sub (Poly.var (.output 0)) (Poly.var (.circuit 8))
+  , Poly.sub (Poly.var (.output 1)) (Poly.var (.circuit 9))
+  , Poly.sub (Poly.var (.output 2)) (Poly.var (.circuit 10))
+  , Poly.sub (Poly.var (.output 3)) (Poly.var (.circuit 11)) ]
+
+private def xorLookups : List (String × Array (Poly Bab)) :=
+  [ ("ByteXor", #[Poly.var (.circuit 0), Poly.var (.circuit 4), Poly.var (.circuit 8)])
+  , ("ByteXor", #[Poly.var (.circuit 1), Poly.var (.circuit 5), Poly.var (.circuit 9)])
+  , ("ByteXor", #[Poly.var (.circuit 2), Poly.var (.circuit 6), Poly.var (.circuit 10)])
+  , ("ByteXor", #[Poly.var (.circuit 3), Poly.var (.circuit 7), Poly.var (.circuit 11)]) ]
+
+private def xorConstraintReaderExact : Bool :=
+  match compile withBytesAndXor (Gadgets.Xor32.circuit (p := pBabybear)) with
+  | .error _ => false
+  | .ok m =>
+      match ofModule (F := Bab) (Ty.felt "babybear") m with
+      | none => false
+      | some constraints =>
+          constraints.inputs == 8 && constraints.eqs == xorEqs &&
+            constraints.lookups == xorLookups &&
+            constraints.globals == [("ByteXor", byteXorRows)]
+
+#guard xorConstraintReaderExact
 
 end LLZK.Test.Constraints
