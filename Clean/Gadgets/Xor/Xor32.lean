@@ -18,10 +18,10 @@ deriving ProvableStruct
 def main (input : Var Inputs (F p)) : Circuit (F p) (Var U32 (F p))  := do
   let ⟨x, y⟩ := input
   let z ← witness <|
-    let z0 := (x.x0.val ^^^ y.x0.val).toField
-    let z1 := (x.x1.val ^^^ y.x1.val).toField
-    let z2 := (x.x2.val ^^^ y.x2.val).toField
-    let z3 := (x.x3.val ^^^ y.x3.val).toField
+    let z0 := ((x.x0.val % 256) ^^^ (y.x0.val % 256)).toField
+    let z1 := ((x.x1.val % 256) ^^^ (y.x1.val % 256)).toField
+    let z2 := ((x.x2.val % 256) ^^^ (y.x2.val % 256)).toField
+    let z3 := ((x.x3.val % 256) ^^^ (y.x3.val % 256)).toField
     U32.mk z0 z1 z2 z3
 
   lookup ByteXorTable (x.x0, y.x0, z.x0)
@@ -93,7 +93,7 @@ theorem completeness : Completeness (F p) main Assumptions := by
 
   simp only [h_input, circuit_norm] at h_env ⊢
   simp only [circuit_norm, explicit_provable_type, U32.mk.injEq] at h_env ⊢
-  simp_all [circuit_norm, xor_val]
+  simp_all [circuit_norm, Nat.mod_eq_of_lt, xor_val]
 
 def circuit : FormalCircuit (F p) Inputs U32 where
   main
