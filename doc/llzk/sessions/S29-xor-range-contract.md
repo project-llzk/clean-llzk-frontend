@@ -145,13 +145,16 @@ promoted corpus claim yet. Proof, gate, and independent-review evidence is in
 
 ## Cross-cutting harness controls
 
-The current witness discriminator perturbs only the first JSON key. Before a
-64-field public result becomes headline evidence, perturb first, middle, and
-last fields in both public and full-witness expectations, and run the self-test
-on the widest promoted artifact. A checker which validates only `out0` must be
-red. Pin exact SMT-lowered and declared-skip counts; a minimum of one skip is no
-longer sufficient. The final banner and active docs must say both backends and
-both output scopes.
+Phase X begins by strengthening the witness discriminator from the first JSON
+key to first, middle, and last fields in both public and full-witness
+expectations, ordered by the numeric signal suffix rather than JSON serialization
+order. The self-test derives the widest promoted artifact from emitted public
+JSON, rather than relying on corpus order. Separate G11 shims which
+validate only `out0` or only `w0` must remain red. SMT-lowered and declared-skip
+counts are pinned exactly; a floor in either direction is forbidden. The final
+banner and active docs say both backends and both output scopes. Before a
+64-field public result becomes headline evidence in Phase H, that derived
+widest-artifact path must select it automatically.
 
 Add a fail-closed independent-reference layer to corpus emission. A promoted
 entry carries fixed expected public outputs in addition to the witness derived

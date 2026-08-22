@@ -91,8 +91,18 @@ selftest_inputs=("${out_dir}"/*.0.inputs.json)
 # single fixed probe, a wrapper honest on that one artifact and lying about the
 # other twelve passed every gate. Two probes do not make that impossible -- only
 # harder to write by accident -- and the real defence is that the probe paths are
-# derived rather than fixed. See require_llzk_witgen_discriminates.
-for selftest_input in "${selftest_inputs[0]}" "${selftest_inputs[${#selftest_inputs[@]}-1]}"; do
+# derived rather than fixed. S29 also requires the widest public interface, so
+# first/middle/last perturbations cannot all land on `out0` of a tiny fixture.
+widest_selftest_input="$(llzk_widest_public_input "${out_dir}")"
+selftest_probes=("${selftest_inputs[0]}" "${selftest_inputs[${#selftest_inputs[@]}-1]}")
+seen_selftest_inputs=()
+for selftest_input in "${selftest_probes[@]}"; do
+  duplicate=false
+  for seen in "${seen_selftest_inputs[@]}"; do
+    [[ "${seen}" == "${selftest_input}" ]] && duplicate=true
+  done
+  ${duplicate} && continue
+  seen_selftest_inputs+=("${selftest_input}")
   selftest_name="$(basename -- "${selftest_input}" .0.inputs.json)"
   echo "-- on ${selftest_name}"
   require_llzk_witgen_discriminates \
@@ -103,6 +113,19 @@ for selftest_input in "${selftest_inputs[0]}" "${selftest_inputs[${#selftest_inp
     "${out_dir}"
   require_llzk_opt_discriminates "${out_dir}" "${out_dir}/${selftest_name}.llzk"
 done
+
+# Always run the widest probe in strict mode, even if it duplicates an endpoint:
+# all three positions in both full-witness groups and the public group must be
+# distinct keys rather than three copies of a one-field test.
+selftest_name="$(basename -- "${widest_selftest_input}" .0.inputs.json)"
+echo "-- widest interface: ${selftest_name}"
+require_llzk_witgen_discriminates \
+  "${out_dir}/${selftest_name}.llzk" \
+  "${widest_selftest_input}" \
+  "${out_dir}/${selftest_name}.0.expected.json" \
+  "${out_dir}/${selftest_name}.0.public.json" \
+  "${out_dir}" true
+require_llzk_opt_discriminates "${out_dir}" "${out_dir}/${selftest_name}.llzk"
 echo
 
 # G10 is in two halves.
@@ -119,14 +142,18 @@ echo
 # excused.
 #
 # Neither half checks constraints or witnesses. G9 does both, in Lean.
-# Without a floor, a change that put a felt.umod in every module would give
+# Without an exact split, a change that put a felt.umod in every module could give
 # smt_ok=0, smt_skipped=13 and still print PASS — the count is the only signal
-# G10b produces, and nothing compared it to anything (R4b-5).
-LLZK_EXPECTED_SMT_OK="${LLZK_EXPECTED_SMT_OK:-10}"
-LLZK_EXPECTED_SMT_SKIPPED="${LLZK_EXPECTED_SMT_SKIPPED:-1}"
-LLZK_EXPECTED_ARTIFACTS="${LLZK_EXPECTED_ARTIFACTS:-15}"
-LLZK_EXPECTED_VECTORS="${LLZK_EXPECTED_VECTORS:-51}"
-LLZK_EXPECTED_FIXTURES="${LLZK_EXPECTED_FIXTURES:-2}"
+# G10b produces. A floor also lets a new acceptance hide a new refusal. Pinning
+# both aggregate totals exactly detects either unbalanced direction; a
+# compensating per-artifact swap remains outside this count gate and must be
+# reviewed from the named logs. These literals are deliberately not environment
+# overrides: changing a count is a source diff (R4b-5, S29).
+readonly LLZK_EXPECTED_SMT_OK=10
+readonly LLZK_EXPECTED_SMT_SKIPPED=7
+readonly LLZK_EXPECTED_ARTIFACTS=15
+readonly LLZK_EXPECTED_VECTORS=51
+readonly LLZK_EXPECTED_FIXTURES=2
 smt_ok=0
 smt_skipped=0
 smt_log="${out_dir}/.smt.log"
@@ -209,37 +236,32 @@ for fixture in "${fixtures[@]}"; do
 done
 echo
 
-(( smt_ok >= LLZK_EXPECTED_SMT_OK )) || fail "G10b: only ${smt_ok} module(s) lowered to SMT, \
-expected at least ${LLZK_EXPECTED_SMT_OK}. Something that used to be admissible no longer is. \
-Set LLZK_EXPECTED_SMT_OK if the corpus legitimately shrank."
+llzk_require_exact_count "G10b modules lowered to SMT" \
+  "${smt_ok}" "${LLZK_EXPECTED_SMT_OK}"
 
-# G10b's own discriminate check, and the reason it is a floor on *skips* rather
-# than a probe. `--llzk-to-smt-no-cf` is the one pass with no self-test: a shim
+# G10b's own discriminate check. `--llzk-to-smt-no-cf` is the one pass with no
+# separate self-test: a shim
 # honest on --llzk-product-program and exiting 0 on the SMT flag would report
-# every module lowered, and the smt_ok floor above would *reward* it (R5d's
+# every module lowered, and an acceptance-only count would *reward* it (R5d's
 # D-3). The corpus contains modules the pass genuinely cannot lower -- anything
 # with a felt.umod -- so a run in which it refused nothing means it is not
 # running. Both directions observed, on real artifacts, every run.
-(( smt_skipped >= LLZK_EXPECTED_SMT_SKIPPED )) || fail "G10b: --llzk-to-smt-no-cf refused \
-nothing in this run (${smt_skipped} skipped, expected at least \
-${LLZK_EXPECTED_SMT_SKIPPED}). The corpus has modules it cannot lower, so a pass that accepts \
-all of them is not running -- and ${smt_ok} acceptances mean nothing. Set \
-LLZK_EXPECTED_SMT_SKIPPED=0 only if LLZK gained support for every construct in the corpus."
+llzk_require_exact_count "G10b modules skipped for declared reasons" \
+  "${smt_skipped}" "${LLZK_EXPECTED_SMT_SKIPPED}"
 
 # No silent shrinking. Every count below is reported in the PASS banner, and a
 # banner that says "3 circuit(s)" after a change that dropped ten of them reads
 # exactly like a pass (R5d's D-10).
-(( ${#artifacts[@]} >= LLZK_EXPECTED_ARTIFACTS )) || fail "the corpus emitted \
-${#artifacts[@]} artifact(s), expected at least ${LLZK_EXPECTED_ARTIFACTS}. Coverage shrank; \
-set LLZK_EXPECTED_ARTIFACTS if that was intended."
-(( vectors >= LLZK_EXPECTED_VECTORS )) || fail "the corpus ran ${vectors} input vector(s), \
-expected at least ${LLZK_EXPECTED_VECTORS}. G5, G6 and G7 are only as good as the vectors \
-that exist; set LLZK_EXPECTED_VECTORS if the reduction was intended."
-(( ${#fixtures[@]} >= LLZK_EXPECTED_FIXTURES )) || fail "the corpus emitted \
-${#fixtures[@]} renderer fixture(s), expected at least ${LLZK_EXPECTED_FIXTURES}."
+llzk_require_exact_count "corpus artifacts" \
+  "${#artifacts[@]}" "${LLZK_EXPECTED_ARTIFACTS}"
+llzk_require_exact_count "corpus input vectors" \
+  "${vectors}" "${LLZK_EXPECTED_VECTORS}"
+llzk_require_exact_count "renderer fixtures" \
+  "${#fixtures[@]}" "${LLZK_EXPECTED_FIXTURES}"
 
 echo "PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12"
-echo "  ${#artifacts[@]} circuit(s), ${vectors} input vector(s), both witgen backends."
+echo "  ${#artifacts[@]} circuit(s), ${vectors} input vector(s), both witgen backends,"
+echo "  full-witness and public output scopes."
 echo "  ${#fixtures[@]} renderer fixture(s), syntax only."
 echo "  G8 and G9 are carried inside G1 and G2: the rejection fixtures by"
 echo "  'lake build CleanTests', the constraint comparison by both that and the"

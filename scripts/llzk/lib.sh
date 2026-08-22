@@ -52,45 +52,88 @@ both must come from the same LLZK installation"
   echo "  version: not self-reported; provenance from ${ref_var} (same installation)"
 }
 
-# require_llzk_witgen_discriminates ARTIFACT INPUTS EXPECTED WORKDIR
+# require_llzk_witgen_discriminates ARTIFACT INPUTS EXPECTED PUBLIC_EXPECTED WORKDIR
 #
 # Proves, on a real emitted artifact, that llzk-witgen --check-output can go both
-# green and red. Runs it twice: once against the expected witness, which must
-# succeed, and once against the same witness with one signal perturbed, which
-# must fail.
+# green and red. For both output scopes, the expected document must succeed and
+# three independently corrupted documents -- first, middle, and last field --
+# must fail. The three positions matter for wide headline outputs: a checker
+# that validates only `out0` must not make the rest of the matrix look green.
 #
 # Without this, every green below is unfalsifiable: the harness cannot tell a
-# passing check from a binary that exits 0 unconditionally. It costs one extra
-# invocation and it is the reason the 27 subsequent greens mean anything. It is
-# R2's Control 1, promoted from something a reviewer did by hand to something the
-# harness does every run.
+# passing check from a binary that exits 0 unconditionally. The expanded probes
+# cost multiple invocations per backend/scope/group; they are R2's Control 1,
+# promoted from something a reviewer did by hand to something the harness does
+# every run and strengthened for S29's wide outputs.
 require_llzk_witgen_discriminates() {
   local artifact="$1" inputs="$2" expected="$3" public_expected="$4" workdir="$5"
+  local require_distinct="${6:-false}"
+  case "${require_distinct}" in
+    true|false) ;;
+    *) llzk_fail "llzk-witgen self-test: strict-distinct flag must be true or false, got \
+${require_distinct}" ;;
+  esac
   # Not a fixed name. R5d's D-5: two six-line shims that special-cased the
   # scratch paths defeated both self-tests, because those paths were literals a
   # shim could recognise. The basename and PID make them unguessable from
   # inside the tool.
   local tag; tag="$(basename -- "${artifact}" .llzk).$$"
-  local corrupted="${workdir}/witgen-selftest-${tag}.json"
-  local public_corrupted="${workdir}/witgen-public-selftest-${tag}.json"
+  local corrupted_prefix="${workdir}/witgen-selftest-${tag}"
+  local public_corrupted_prefix="${workdir}/witgen-public-selftest-${tag}"
+  local positions=(first middle last)
 
-  python3 - "${expected}" "${corrupted}" "${public_expected}" "${public_corrupted}" <<'PYEOF' \
+  python3 - "${expected}" "${corrupted_prefix}" \
+      "${public_expected}" "${public_corrupted_prefix}" "${require_distinct}" <<'PYEOF' \
     || llzk_fail "llzk-witgen self-test: \
 could not build the corrupted witness"
-import json, sys
-witness = json.load(open(sys.argv[1]))
-signals = witness["signals"]
-if not signals:
-    raise SystemExit("expected witness has no signals to perturb")
-key = next(iter(signals))
-signals[key] = str(int(signals[key]) + 1)
-json.dump(witness, open(sys.argv[2], "w"))
-public = json.load(open(sys.argv[3]))
+import copy, json, sys
+
+def corrupt_positions(document, keys, prefix, what, group):
+    if not keys:
+        return
+    positions = (("first", 0), ("middle", len(keys) // 2), ("last", len(keys) - 1))
+    for label, index in positions:
+        changed = copy.deepcopy(document)
+        target = changed["signals"] if what != "public output" else changed
+        key = keys[index]
+        value = int(target[key])
+        target[key] = "1" if value == 0 else "0"
+        with open(f"{prefix}-{group}-{label}.json", "w") as output:
+            json.dump(changed, output)
+
+with open(sys.argv[1]) as source:
+    witness = json.load(source)
+signals = witness.get("signals", {})
+if not isinstance(signals, dict):
+    raise SystemExit("expected full witness signals are not an object")
+def numbered_keys(values, prefix):
+    keys = [key for key in values if key.startswith(prefix)
+            and key[len(prefix):].isdigit()
+            and key == prefix + str(int(key[len(prefix):]))]
+    return sorted(keys, key=lambda key: int(key[len(prefix):]))
+
+witness_keys = numbered_keys(signals, "w")
+output_keys = numbered_keys(signals, "out")
+if not witness_keys and not output_keys:
+    raise SystemExit("expected full witness has no signal or output to perturb")
+if sys.argv[5] == "true":
+    for label, values in (("witness cells", witness_keys),
+                          ("full-witness outputs", output_keys)):
+        if len(values) < 3:
+            raise SystemExit(f"widest artifact has only {len(values)} distinct {label}; need 3")
+corrupt_positions(witness, witness_keys, sys.argv[2], "witness signals", "witness")
+corrupt_positions(witness, output_keys, sys.argv[2], "full-witness outputs", "output")
+
+with open(sys.argv[3]) as source:
+    public = json.load(source)
 if not public:
     raise SystemExit("expected public output has no value to perturb")
-key = next(iter(public))
-public[key] = str(int(public[key]) + 1)
-json.dump(public, open(sys.argv[4], "w"))
+public_keys = numbered_keys(public, "out")
+if len(public_keys) != len(public):
+    raise SystemExit("public expectation contains a key other than out{j}")
+if sys.argv[5] == "true" and len(public_keys) < 3:
+    raise SystemExit(f"widest artifact has only {len(public_keys)} distinct public outputs; need 3")
+corrupt_positions(public, public_keys, sys.argv[4], "public output", "output")
 PYEOF
 
   # Both backends, because both are gates. R5d's D-1: the self-test ran only the
@@ -105,26 +148,94 @@ PYEOF
       || llzk_fail "llzk-witgen self-test (${backend}): ${artifact} does not match its own \
 expected witness; every later green would be meaningless"
 
-    if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
-         --output-scope=full-witness --check-output "${corrupted}" >/dev/null 2>&1; then
-      llzk_fail "llzk-witgen self-test (${backend}): ${LLZK_WITGEN} accepted a witness with one \
-signal perturbed, so --check-output is not checking anything. Every G5/G6/G7 green below would \
-be vacuous."
-    fi
+    local group position corrupted
+    for group in witness output; do
+      for position in "${positions[@]}"; do
+        corrupted="${corrupted_prefix}-${group}-${position}.json"
+        [[ -f "${corrupted}" ]] || continue
+        if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+             --output-scope=full-witness --check-output "${corrupted}" >/dev/null 2>&1; then
+          llzk_fail "llzk-witgen self-test (${backend}): ${LLZK_WITGEN} accepted a full witness \
+with its ${group} group's ${position} field perturbed, so --check-output is incomplete. Every \
+G5/G6/G7 green below would be vacuous."
+        fi
+      done
+    done
 
     "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
       --output-scope=public --check-output "${public_expected}" >/dev/null \
       || llzk_fail "llzk-witgen public-output self-test (${backend}): ${artifact} does not match \
 its own expected output; every later public-scope green would be meaningless"
 
-    if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
-         --output-scope=public --check-output "${public_corrupted}" >/dev/null 2>&1; then
-      llzk_fail "llzk-witgen public-output self-test (${backend}): ${LLZK_WITGEN} accepted a \
-perturbed public output, so the visibility/value gate would be vacuous."
-    fi
+    local public_corrupted
+    for position in "${positions[@]}"; do
+      public_corrupted="${public_corrupted_prefix}-output-${position}.json"
+      if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+           --output-scope=public --check-output "${public_corrupted}" >/dev/null 2>&1; then
+        llzk_fail "llzk-witgen public-output self-test (${backend}): ${LLZK_WITGEN} accepted an \
+expectation with its ${position} public output perturbed, so the visibility/value gate is \
+incomplete."
+      fi
+    done
   done
-  rm -f "${corrupted}" "${public_corrupted}"
-  echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, red on perturbation"
+  local position
+  for group in witness output; do
+    for position in "${positions[@]}"; do
+      rm -f -- "${corrupted_prefix}-${group}-${position}.json"
+    done
+  done
+  for position in "${positions[@]}"; do
+    rm -f -- "${public_corrupted_prefix}-output-${position}.json"
+  done
+  if [[ "${require_distinct}" == "true" ]]; then
+    echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, \
+red on distinct first/middle/last witness-cell, full-output, and public-output perturbations"
+  else
+    echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, \
+red on every available first/middle/last probe (positions can coincide; empty groups are skipped)"
+  fi
+}
+
+# llzk_widest_public_input OUTPUT_DIRECTORY
+#
+# Returns the vector-zero input path belonging to the artifact with the widest
+# public expectation. Deriving the probe from emitted JSON means BLAKE3.G's
+# eventual 64-field interface automatically becomes the discriminator target.
+llzk_widest_public_input() {
+  local directory="$1" selected
+  selected="$(python3 - "${directory}" <<'PYEOF'
+import glob, json, os, sys
+
+candidates = []
+for path in glob.glob(os.path.join(sys.argv[1], "*.0.public.json")):
+    with open(path) as source:
+        public = json.load(source)
+    if not isinstance(public, dict) or not public:
+        raise SystemExit(f"{path}: public expectation is not a nonempty object")
+    candidates.append((len(public), path))
+if not candidates:
+    raise SystemExit("no vector-zero public expectation found")
+_, widest = max(candidates, key=lambda item: (item[0], item[1]))
+print(widest.removesuffix(".public.json") + ".inputs.json")
+PYEOF
+)" || llzk_fail "could not select the widest public-output self-test artifact"
+  [[ -f "${selected}" ]] \
+    || llzk_fail "widest public-output self-test has no input file: ${selected}"
+  echo "${selected}"
+}
+
+# llzk_require_exact_count LABEL ACTUAL EXPECTED
+#
+# Count floors let a new refusal hide behind an unrelated new success, or let a
+# permissive lowering turn every declared skip green. Exact counts reject both
+# smaller and larger totals; callers must state separately whether an aggregate
+# permits compensating per-item changes.
+llzk_require_exact_count() {
+  local label="$1" actual="$2" expected="$3"
+  [[ "${actual}" =~ ^[0-9]+$ && "${expected}" =~ ^[0-9]+$ ]] \
+    || llzk_fail "${label}: counts must be natural numbers (got ${actual}, expected ${expected})"
+  (( actual == expected )) \
+    || llzk_fail "${label}: got ${actual}, expected exactly ${expected}"
 }
 
 # require_llzk_opt_discriminates WORKDIR ARTIFACT

@@ -126,14 +126,18 @@ verified both by corrupting an expected value and by injecting a one-off into
 Clean's witness computation. Note that editing a generated file in place is *not*
 a valid check: `e2e.sh` removes and regenerates its output directory every run.
 
-Since S09 the harness does not take that on trust. Before the loop,
-`require_llzk_witgen_discriminates` runs `llzk-witgen` twice on a real corpus
-artifact — once against its own expected witness, which must pass, and once
-against the same witness with one signal perturbed, which must fail. R2-06 showed
-why: with `llzk-witgen` replaced by a two-line `exit 0` script sitting next to a
-symlinked `llzk-opt`, the harness reported `PASS … 16 input vectors, both witgen
-backends` and exited 0. Provenance by co-location was necessary and not
-sufficient; what the gates need is that the binary discriminates.
+Since S09 the harness does not take that on trust. S29 strengthens the
+discriminator across both scopes: each backend must accept the original
+expectation and reject independent first, middle, and last field mutations in
+the full-witness and public JSON. The probes include both corpus endpoints and
+the artifact selected from emitted JSON as having the widest public interface.
+G11 has separate partial-checker attacks that validate only `w0` or only `out0`.
+R2-06 showed why this is necessary: with `llzk-witgen` replaced by a two-line
+`exit 0` script sitting next to a symlinked `llzk-opt`, the harness reported
+PASS and exited 0. Provenance by co-location was necessary and not sufficient;
+what the gates need is that the binary discriminates across both scopes and the
+witness-cell/full-output/public-output groups at the sampled first, middle, and
+last positions.
 
 ## G9 — the emitted constraints
 
@@ -226,8 +230,10 @@ artifact contains. The tolerance list holds only reasons a corpus artifact
 actually produces, because a tolerance nothing exercises can only ever excuse
 something. At the LLZK 3.0.0 pin those are natural and bitwise/shift felt
 operations, which the lowering marks illegal, and a module with no felt type,
-whose prime field cannot be deduced. Ten of the sixteen corpus-plus-fixture
-modules lower; six are out of scope for exactly those declared reasons.
+whose prime field cannot be deduced. Both sides of the split are exact gates,
+not floors: at the pre-promotion S29 harness boundary, ten of the seventeen
+corpus-plus-fixture modules lower and seven are out of scope for exactly those
+declared reasons.
 
 **The solver step is not reachable from the pinned tools.** `llzk-smt-check`
 ships in the same `bin/` and takes SMT-LIB, and `llzk-translate --smt-to-smtlib`
@@ -276,8 +282,16 @@ the cases are the negative direction of
 positive direction ran on the real tools every time while the direction that
 matters ran never.
 
-There are now 61 cases. The audit control rejects a witgen shim that is honest
-for full-witness output but permissive for public output. Seven S29 controls
+There are now 88 cases. The witness controls reject a permissive shim, a stub
+execution backend, a checker permissive for public output, and three
+content-aware partial checkers: public `out0` only, full-witness `w0` plus all
+outputs, and full-witness all cells plus `out0`. Each partial checker is first
+shown green on its baseline, red on a checked field, and falsely green on an
+ignored canonical mutation. The controls independently exercise each strict
+minimum, prove numeric rather than serialized-key ordering with scrambled
+double-digit fields, and pin widest-interface selection, empty/malformed/missing
+selector inputs, deterministic ties, literal count pins, and both directions of
+exact-count enforcement. Seven S29 overlay controls
 independently reject a missing overlay, unrelated overlay, indirect overlay,
 an extra overlay path, wrong status on the expected path, and committed or
 uncommitted post-overlay Xor32 drift. Ten enforce

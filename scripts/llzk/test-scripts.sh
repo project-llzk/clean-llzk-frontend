@@ -537,9 +537,41 @@ chmod +x "${workdir}/shim/llzk-witgen-permissive"
 printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1"}}\n' > "${workdir}/expected.json"
 printf '{"out0":"1"}\n' > "${workdir}/public.json"
 printf '{"arg0":1}\n' > "${workdir}/inputs.json"
-expect "llzk-witgen self-test catches a permissive shim" 1 "is not checking anything" \
+expect "llzk-witgen self-test catches a permissive shim" 1 "--check-output is incomplete" \
   -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
        bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/expected.json" "${workdir}/public.json" "${workdir}"
+printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","out0":"1","out1":"2","out2":"3"}}\n' \
+  > "${workdir}/strict-witness-small.json"
+printf '{"out0":"1","out1":"2","out2":"3"}\n' \
+  > "${workdir}/strict-public-wide.json"
+expect "strict widest self-test independently requires three witness cells" 1 \
+  "only 1 distinct witness cells; need 3" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" true' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/strict-witness-small.json" "${workdir}/strict-public-wide.json" "${workdir}"
+printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"1"}}\n' \
+  > "${workdir}/strict-full-output-small.json"
+expect "strict widest self-test independently requires three full outputs" 1 \
+  "only 1 distinct full-witness outputs; need 3" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" true' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/strict-full-output-small.json" "${workdir}/strict-public-wide.json" "${workdir}"
+printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"1","out1":"2","out2":"3"}}\n' \
+  > "${workdir}/strict-full-wide.json"
+expect "strict widest self-test independently requires three public outputs" 1 \
+  "only 1 distinct public outputs; need 3" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" true' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/strict-full-wide.json" "${workdir}/public.json" "${workdir}"
+expect "llzk-witgen self-test rejects an invalid strict-mode flag" 1 \
+  "strict-distinct flag must be true or false" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" maybe' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
        "${workdir}/expected.json" "${workdir}/public.json" "${workdir}"
 
@@ -611,6 +643,292 @@ expect "llzk-witgen self-test catches a permissive public scope" 1 "public-outpu
        bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6"' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
        "${workdir}/expected.json" "${workdir}/public.json" "${workdir}"
+
+# Three content-aware partial checkers. Each is first shown green on the exact
+# baseline, red on a field it really checks, and falsely green on a different
+# canonical mutation it ignores. Only then is the helper required to catch it.
+> "${workdir}/shim/llzk-witgen-first-public-only" cat <<'SHIM'
+#!/usr/bin/env bash
+scope=full-witness
+check=""
+for a in "$@"; do
+  case "${a}" in
+    --output-scope=*) scope="${a#--output-scope=}" ;;
+    --check-output) check="next" ;;
+    *) [[ "${check}" == "next" ]] && { check="${a}"; } ;;
+  esac
+done
+if [[ "${scope}" == "full-witness" ]]; then
+  python3 - "${check}" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as source:
+    actual = json.load(source)
+expected = {"w0":"1", "w1":"2", "w2":"3", "out0":"1", "out1":"2", "out2":"3"}
+raise SystemExit(0 if actual.get("signals") == expected else 1)
+PYEOF
+  exit $?
+fi
+python3 - "${check}" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as source:
+    actual = json.load(source)
+raise SystemExit(0 if actual.get("out0") == "1" else 1)
+PYEOF
+SHIM
+chmod +x "${workdir}/shim/llzk-witgen-first-public-only"
+printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"1","out1":"2","out2":"3"}}\n' \
+  > "${workdir}/expected-wide.json"
+printf '{"out0":"1","out1":"2","out2":"3"}\n' > "${workdir}/public-wide.json"
+printf '{"out0":"0","out1":"2","out2":"3"}\n' \
+  > "${workdir}/manual-public-output-first.json"
+printf '{"out0":"1","out1":"0","out2":"3"}\n' \
+  > "${workdir}/manual-public-output-middle.json"
+expect "out0-only checker accepts its correct public baseline" 0 "" \
+  -- "${workdir}/shim/llzk-witgen-first-public-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=public \
+       --check-output "${workdir}/public-wide.json"
+expect "out0-only checker rejects the public field it checks" 1 "" \
+  -- "${workdir}/shim/llzk-witgen-first-public-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=public \
+       --check-output "${workdir}/manual-public-output-first.json"
+expect "out0-only checker demonstrably ignores a middle public mutation" 0 "" \
+  -- "${workdir}/shim/llzk-witgen-first-public-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=public \
+       --check-output "${workdir}/manual-public-output-middle.json"
+expect "llzk-witgen self-test catches a checker that validates only out0" 1 \
+  "middle public output perturbed" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-first-public-only" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/expected-wide.json" "${workdir}/public-wide.json" "${workdir}"
+
+> "${workdir}/shim/llzk-witgen-full-w0-only" cat <<'SHIM'
+#!/usr/bin/env bash
+scope=full-witness
+check=""
+for a in "$@"; do
+  case "${a}" in
+    --output-scope=*) scope="${a#--output-scope=}" ;;
+    --check-output) check="next" ;;
+    *) [[ "${check}" == "next" ]] && { check="${a}"; } ;;
+  esac
+done
+if [[ "${scope}" == "public" ]]; then
+  python3 - "${check}" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as source:
+    actual = json.load(source)
+raise SystemExit(0 if actual == {"out0":"1", "out1":"2", "out2":"3"} else 1)
+PYEOF
+  exit $?
+fi
+python3 - "${check}" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as source:
+    signals = json.load(source).get("signals", {})
+checked = (signals.get("w0") == "1" and
+           [signals.get(f"out{i}") for i in range(3)] == ["1", "2", "3"])
+raise SystemExit(0 if checked else 1)
+PYEOF
+SHIM
+chmod +x "${workdir}/shim/llzk-witgen-full-w0-only"
+printf '{"inputs":{"arg0":"1"},"signals":{"w0":"0","w1":"2","w2":"3","out0":"1","out1":"2","out2":"3"}}\n' \
+  > "${workdir}/manual-witness-first.json"
+printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"0","w2":"3","out0":"1","out1":"2","out2":"3"}}\n' \
+  > "${workdir}/manual-witness-middle.json"
+expect "w0-only checker accepts its correct full-witness baseline" 0 "" \
+  -- "${workdir}/shim/llzk-witgen-full-w0-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=full-witness \
+       --check-output "${workdir}/expected-wide.json"
+expect "w0-only checker rejects the witness cell it checks" 1 "" \
+  -- "${workdir}/shim/llzk-witgen-full-w0-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=full-witness \
+       --check-output "${workdir}/manual-witness-first.json"
+expect "w0-only checker demonstrably ignores a middle witness-cell mutation" 0 "" \
+  -- "${workdir}/shim/llzk-witgen-full-w0-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=full-witness \
+       --check-output "${workdir}/manual-witness-middle.json"
+expect "llzk-witgen self-test catches a checker that validates only w0" 1 \
+  "witness group's middle field perturbed" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-full-w0-only" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/expected-wide.json" "${workdir}/public-wide.json" "${workdir}"
+
+> "${workdir}/shim/llzk-witgen-full-out0-only" cat <<'SHIM'
+#!/usr/bin/env bash
+scope=full-witness
+check=""
+for a in "$@"; do
+  case "${a}" in
+    --output-scope=*) scope="${a#--output-scope=}" ;;
+    --check-output) check="next" ;;
+    *) [[ "${check}" == "next" ]] && { check="${a}"; } ;;
+  esac
+done
+if [[ "${scope}" == "public" ]]; then
+  python3 - "${check}" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as source:
+    actual = json.load(source)
+raise SystemExit(0 if actual == {"out0":"1", "out1":"2", "out2":"3"} else 1)
+PYEOF
+  exit $?
+fi
+python3 - "${check}" <<'PYEOF'
+import json, sys
+with open(sys.argv[1]) as source:
+    signals = json.load(source).get("signals", {})
+checked = ([signals.get(f"w{i}") for i in range(3)] == ["1", "2", "3"] and
+           signals.get("out0") == "1")
+raise SystemExit(0 if checked else 1)
+PYEOF
+SHIM
+chmod +x "${workdir}/shim/llzk-witgen-full-out0-only"
+printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"0","out1":"2","out2":"3"}}\n' \
+  > "${workdir}/manual-full-output-first.json"
+printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1","w1":"2","w2":"3","out0":"1","out1":"0","out2":"3"}}\n' \
+  > "${workdir}/manual-full-output-middle.json"
+expect "full out0-only checker accepts its correct full-witness baseline" 0 "" \
+  -- "${workdir}/shim/llzk-witgen-full-out0-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=full-witness \
+       --check-output "${workdir}/expected-wide.json"
+expect "full out0-only checker rejects the output field it checks" 1 "" \
+  -- "${workdir}/shim/llzk-witgen-full-out0-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=full-witness \
+       --check-output "${workdir}/manual-full-output-first.json"
+expect "full out0-only checker demonstrably ignores a middle output mutation" 0 "" \
+  -- "${workdir}/shim/llzk-witgen-full-out0-only" "${workdir}/dummy.llzk" \
+       --inputs "${workdir}/inputs.json" --output-scope=full-witness \
+       --check-output "${workdir}/manual-full-output-middle.json"
+expect "full-witness self-test catches a checker that validates only out0" 1 \
+  "output group's middle field perturbed" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-full-out0-only" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/expected-wide.json" "${workdir}/public-wide.json" "${workdir}"
+
+# JSON object order is not a signal-number order: lexically, out10 precedes
+# out2 and out9 is last. This checker rejects only semantic indices 0, 6, and
+# 11, so the helper goes green only if it sorts the numeric suffixes itself.
+> "${workdir}/shim/llzk-witgen-numeric-positions" cat <<'SHIM'
+#!/usr/bin/env bash
+scope=full-witness
+check=""
+for a in "$@"; do
+  case "${a}" in
+    --output-scope=*) scope="${a#--output-scope=}" ;;
+    --check-output) check="next" ;;
+    *) [[ "${check}" == "next" ]] && { check="${a}"; } ;;
+  esac
+done
+python3 - "${scope}" "${check}" <<'PYEOF'
+import json, os, sys
+
+scope, path = sys.argv[1:]
+with open(path) as source:
+    actual = json.load(source)
+if scope == "full-witness":
+    values = actual.get("signals", {})
+    baseline = {f"w{i}": "1" for i in range(12)}
+    baseline.update({f"out{i}": "1" for i in range(12)})
+else:
+    values = actual
+    baseline = {f"out{i}": "1" for i in range(12)}
+if values == baseline:
+    raise SystemExit(0)
+
+differences = [key for key in baseline
+               if values.get(key) != baseline[key]]
+name = os.path.basename(path)
+position = next((label for label in ("first", "middle", "last")
+                 if name.endswith(f"-{label}.json")), None)
+index = {"first": 0, "middle": 6, "last": 11}.get(position)
+group = "w" if scope == "full-witness" and "-witness-" in name else "out"
+expected = None if index is None else f"{group}{index}"
+# Reject exactly the intended canonical 1 -> 0 mutation. An incorrect lexical
+# target is accepted, which makes the surrounding discriminator fail closed.
+correct = (differences == [expected] and values.get(expected) == "0"
+           and set(values) == set(baseline))
+raise SystemExit(1 if correct else 0)
+PYEOF
+SHIM
+chmod +x "${workdir}/shim/llzk-witgen-numeric-positions"
+printf '{"inputs":{"arg0":"1"},"signals":{"w10":"1","w2":"1","w0":"1","w11":"1","w5":"1","w1":"1","w9":"1","w3":"1","w8":"1","w4":"1","w7":"1","w6":"1","out10":"1","out2":"1","out0":"1","out11":"1","out5":"1","out1":"1","out9":"1","out3":"1","out8":"1","out4":"1","out7":"1","out6":"1"}}\n' \
+  > "${workdir}/expected-scrambled-12.json"
+printf '{"out10":"1","out2":"1","out0":"1","out11":"1","out5":"1","out1":"1","out9":"1","out3":"1","out8":"1","out4":"1","out7":"1","out6":"1"}\n' \
+  > "${workdir}/public-scrambled-12.json"
+expect "witness discriminator uses numeric first middle and last positions" 0 \
+  "red on distinct first/middle/last" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-numeric-positions" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6" true' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/expected-scrambled-12.json" "${workdir}/public-scrambled-12.json" "${workdir}"
+
+mkdir -p "${workdir}/public-widths"
+printf '{"out0":"1"}\n' > "${workdir}/public-widths/AThin.0.public.json"
+printf '{"out0":"1","out1":"2","out2":"3"}\n' \
+  > "${workdir}/public-widths/MiddleWide.0.public.json"
+printf '{"out0":"1","out1":"2"}\n' > "${workdir}/public-widths/ZThin.0.public.json"
+touch "${workdir}/public-widths/AThin.0.inputs.json" \
+  "${workdir}/public-widths/MiddleWide.0.inputs.json" \
+  "${workdir}/public-widths/ZThin.0.inputs.json"
+expect "widest public-output artifact is selected from emitted expectations" 0 \
+  "MiddleWide.0.inputs.json" \
+  -- run_helper llzk_widest_public_input "${workdir}/public-widths"
+
+mkdir -p "${workdir}/public-width-tie"
+printf '{"out0":"1","out1":"2","out2":"3"}\n' \
+  > "${workdir}/public-width-tie/AEqual.0.public.json"
+printf '{"out0":"1","out1":"2","out2":"3"}\n' \
+  > "${workdir}/public-width-tie/ZEqual.0.public.json"
+touch "${workdir}/public-width-tie/AEqual.0.inputs.json" \
+  "${workdir}/public-width-tie/ZEqual.0.inputs.json"
+expect "widest selector resolves equal widths deterministically" 0 \
+  "ZEqual.0.inputs.json" \
+  -- run_helper llzk_widest_public_input "${workdir}/public-width-tie"
+
+mkdir -p "${workdir}/public-width-malformed"
+printf '[]\n' > "${workdir}/public-width-malformed/Broken.0.public.json"
+touch "${workdir}/public-width-malformed/Broken.0.inputs.json"
+expect "widest selector rejects a non-object public expectation" 1 \
+  "could not select the widest public-output" \
+  -- run_helper llzk_widest_public_input "${workdir}/public-width-malformed"
+
+mkdir -p "${workdir}/public-width-missing-input"
+printf '{"out0":"1","out1":"2","out2":"3"}\n' \
+  > "${workdir}/public-width-missing-input/NoInput.0.public.json"
+expect "widest selector rejects a missing paired input" 1 \
+  "widest public-output self-test has no input file" \
+  -- run_helper llzk_widest_public_input "${workdir}/public-width-missing-input"
+
+mkdir -p "${workdir}/public-width-empty"
+expect "widest selector rejects a directory with no candidates" 1 \
+  "could not select the widest public-output" \
+  -- run_helper llzk_widest_public_input "${workdir}/public-width-empty"
+
+expect "exact count accepts equality" 0 "" \
+  -- run_helper llzk_require_exact_count "test split" 10 10
+expect "exact count rejects a smaller value" 1 "got 9, expected exactly 10" \
+  -- run_helper llzk_require_exact_count "test split" 9 10
+expect "exact count rejects a larger value" 1 "got 11, expected exactly 10" \
+  -- run_helper llzk_require_exact_count "test split" 11 10
+expect "exact count rejects a non-natural value" 1 "counts must be natural numbers" \
+  -- run_helper llzk_require_exact_count "test split" ten 10
+
+expect "e2e exact counts are literal source pins" 0 "" \
+  -- bash -c '
+       for assignment in \
+         LLZK_EXPECTED_SMT_OK=10 \
+         LLZK_EXPECTED_SMT_SKIPPED=7 \
+         LLZK_EXPECTED_ARTIFACTS=15 \
+         LLZK_EXPECTED_VECTORS=51 \
+         LLZK_EXPECTED_FIXTURES=2
+       do
+         rg --fixed-strings --line-regexp "readonly ${assignment}" "$1/e2e.sh" >/dev/null \
+           || exit 1
+       done
+     ' _ "${script_dir}"
 
 echo
 if (( failed > 0 )); then
