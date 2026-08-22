@@ -38,12 +38,17 @@ plus adversarial control repair `ab0affd3` passed G0-G12 on the accepted tools:
 10 SMT lowerings / 7 declared skips, and 61 G11 paths. Frontend commit
 `7a0f209c` now proves the recursively checked literal-modulo bound and common
 XOR/OR power-of-two envelope, retains the field-prime and u64 guards, and passes
-the same complete matrix. Xor32 and BLAKE3.G compile in the capability sweep,
-but remain outside the external corpus until Phase X/H supplies independent
-references, exact shapes, concrete lookup resolution, and theorem instances.
+the same complete matrix. Cross-cutting Phase-X gate commit `8f0fab79` then
+expanded G11 to 88 harness control cases, pins exact corpus and SMT counts, and
+probes first/middle/last witness cells and output members in full-witness scope
+plus public outputs in public scope; its complete accepted-tool matrix passed,
+with `Bits8` derived as the widest current interface. Xor32 and BLAKE3.G compile
+in the capability sweep, but remain outside the external corpus until Phase X/H
+supplies independent references, exact shapes, concrete lookup resolution, and
+theorem instances.
 Independent adversarial review is required at every phase boundary. See
-`sessions/S29-xor-range-contract.md`, `evidence/S29/bounds.md`, and
-`evidence/S29/bounds-gates.txt`.
+`sessions/S29-xor-range-contract.md`, `evidence/S29/bounds.md`,
+`evidence/S29/bounds-gates.txt`, and `evidence/S29/harness-gates.txt`.
 
 Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
@@ -131,7 +136,7 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase B complete; Phase X Xor32 promotion next)
+Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase-X harness controls complete on `8f0fab79`; Xor32 corpus promotion next)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
@@ -416,12 +421,14 @@ an explicit decision, which was given.
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete runs: frontend audit commit
-`7c567f5451c2e40b7be88e96d8a519a7bf82495e`; see
-`evidence/AUDIT-2026-08-22/`. All G0-G12 passed against both the accepted LLZK
-pin and checked LLZK main. The audit axiom probe covers the active frontend
-theorem closure, including concrete Add8 and And8 spec chains, with no
-`sorryAx`.
+Latest complete accepted-tool run: S29 Phase-X gate commit
+`8f0fab79732789795b0c09599f768c4b662a768b`; see
+`evidence/S29/harness-gates.txt`. All G0-G12 passed. The latest two-toolchain
+run remains frontend audit commit `7c567f5451c2e40b7be88e96d8a519a7bf82495e`;
+see `evidence/AUDIT-2026-08-22/`. That audit's axiom probe covers its frozen
+frontend theorem closure, including concrete Add8 and And8 spec chains, with no
+`sorryAx`. Phase B's later modulo/XOR/OR theorem probe is recorded separately in
+`evidence/S29/bounds-gates.txt`, likewise with no `sorryAx`.
 
 | Gate | Result |
 |---|---|
@@ -436,7 +443,7 @@ theorem closure, including concrete Add8 and And8 spec chains, with no
 | G8 fail closed | PASS — exact negative fixtures include the new bound, shift-count, dynamic-operand, index, and oversized-`bitsOf` refusals, plus tool-version rejection |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 17 |
-| G11 the harness's own error paths | PASS — 54 exercised, including the worktree lock's opaque-owner branches, R7's uncommitted-core-edit branch of G0 (R7-01), ten CI dependency/permission/benchmark/cache policy controls, and the permissive-public-scope discriminator |
+| G11 the harness's own control cases | PASS — 88 exercised, including the lock/core/policy controls, partial full/public checker attacks, independent strict-width branches, numeric first/middle/last ordering, widest-selector failures, and exact-count failures |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |
@@ -445,9 +452,11 @@ theorem closure, including concrete Add8 and And8 spec chains, with no
 Every gate is checked to be falsifiable, and the checks are part of the gate
 rather than notes about it:
 
-- the witness gates, by `require_llzk_witgen_discriminates`, which runs
-  `llzk-witgen` against a perturbed witness before the loop and aborts if it
-  passes (R2-06);
+- the witness gates, by `require_llzk_witgen_discriminates`, which requires both
+  backends to accept the baseline and reject canonical first/middle/last
+  mutations in the available witness-cell, full-output, and public-output
+  groups; the separately derived widest interface requires all three positions
+  in every group to be distinct (R2-06, S29);
 - G3, G4 and G10, by `require_llzk_opt_discriminates`, which requires `llzk-opt`
   to reject a non-MLIR file *and* a well-formed MLIR module that is invalid LLZK
   — a shim answering only `--version` used to make all three vacuous while the
@@ -458,8 +467,10 @@ rather than notes about it:
   pins that the comparison goes red for each;
 - G10a, by the control in `evidence/S08-S15/controls.txt`: a module whose root is
   not `@Main` fails it;
-- G10b, by a floor on *refusals*: the corpus contains modules the SMT pass cannot
-  lower, so a run in which it refused nothing means it is not running;
+- G10b, by exact acceptance and declared-refusal totals: this catches either an
+  unbalanced new refusal or a permissive new acceptance; compensating
+  per-artifact swaps remain visible in the named logs rather than hidden by a
+  claim about the aggregate;
 - and the checks themselves, by G11 — `scripts/llzk/test-scripts.sh`, which
   drives each one against a shim built to defeat it. Until R5 nothing exercised
   any harness failure branch, which is how a repair to `check-pins.sh` shipped

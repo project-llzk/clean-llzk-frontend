@@ -1,0 +1,118 @@
+S29 Phase X0 — cross-cutting harness gates
+============================================
+
+Date: 2026-08-22
+
+Exact clean implementation commit tested:
+  8f0fab79732789795b0c09599f768c4b662a768b
+
+Sole parent:
+  4161fec163d492bfe54ab7d99ebf65578a111956
+
+Accepted LLZK source:
+  25fb3740ea3465c9129a06289297bb4f0554b7a5
+
+Accepted immutable tool output:
+  /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0
+
+Scope and review
+----------------
+
+X0 changes exactly five paths: lib.sh, e2e.sh, test-scripts.sh, GATES.md, and
+the S29 session packet. It does not change the compiler, proofs, corpus, Clean
+source, or generated showcase. The committed diff is 553 insertions and 85
+deletions.
+
+Three continuously assigned read-only adversarial reviewers covered semantic
+soundness (`/root/xor_soundness_audit`), process and attribution
+(`/root/xor_process_audit`), and red-control quality
+(`/root/xor_controls_audit`). The controls review
+initially returned NO-GO because one strict fixture exited before exercising
+the full-output and public-output minima, and serialized JSON order would have
+selected out9 rather than out63 as the last wide output. X0 was not frozen
+until the three minima were isolated and a scrambled 12-key content-aware shim
+proved numeric indices 0, 6, and 11 independently for witness cells,
+full-witness outputs, and public outputs. All three named lanes then returned GO
+on the exact five-path candidate. No reviewer edited the candidate.
+
+Focused exact-commit checks
+---------------------------
+
+The worktree was clean at X0 and remained held under
+LLZK_SESSION=s29-xor32-promotion. Commands:
+
+  bash scripts/llzk/check-pins.sh
+  bash scripts/llzk/test-scripts.sh
+
+Results:
+
+  check-pins.sh exit status: 0
+  test-scripts.sh exit status: 0
+  pin check: PASS
+  PASS: 88 error paths exercised
+
+The 88-path matrix includes baseline/red/ignored-field demonstrations for three
+content-aware partial checkers, independent strict minima, canonical 0/1
+mutations, numeric suffix ordering with scrambled double-digit keys,
+empty/malformed/missing widest-selector inputs, deterministic ties, invalid
+strict mode, natural-number validation, both directions of exact-count failure,
+and a static check that the five e2e count expectations are literal readonly
+source pins.
+
+Complete accepted-tool matrix on exact X0
+------------------------------------------
+
+Command:
+
+  LLZK_SESSION=s29-xor32-promotion \
+  LLZK_OPT=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt \
+  LLZK_WITGEN=/nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen \
+  bash scripts/llzk/e2e.sh
+
+Result:
+
+  e2e.sh exit status: 0
+  PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  15 circuit modules, 51 input vectors
+  both witness backends, full-witness and public output scopes
+  2 renderer fixtures
+  17/17 modules admitted by --llzk-product-program
+  10 modules lowered to SMT, 7 declared skips
+  88 G11 control cases
+  widest derived self-test artifact: Bits8
+
+Lean built 1876 Clean jobs and 1810 CleanTests jobs. The only warnings were the
+ten inherited Clean test-helper sorry declarations recorded by the frontend
+audit. The worktree was clean before and after the run.
+
+Tool versions and provenance:
+
+  Lean: v4.32.2
+  llzk-opt: LLZK version 3.0.0
+  llzk-witgen: sibling binary in the same immutable Nix output; its own version
+    surface does not identify LLZK, so provenance is carried by llzk-opt and the
+    shared output path
+
+Promotion boundary
+------------------
+
+This proves the strengthened harness and its control cases. The discriminator
+samples three distinct positions on the widest artifact; these red controls do
+not independently establish that every interface key is checked. Exact
+aggregate 10/7 totals do not detect a compensating
+per-artifact acceptance/refusal swap, whose named logs still require review.
+Witgen ignores `@constrain`, so X0 adds no empirical constraint-semantics
+evidence and does not change D017.
+
+The external corpus remains exactly 15 modules and 51 vectors. Xor32 and
+BLAKE3.G remain compile-capability results only; neither has fixed independent
+references, concrete lookup resolution, a corpus theorem instance, or an
+external-tool promotion claim at X0.
+
+This evidence file is added by a later documentary commit. It records the clean
+full run on exact X0; it does not claim that the later, dirty documentation
+closure itself received G0-G12. During closure, HEAD and every source path
+remained exact X0 while only CURRENT.md, the S29 packet, and this evidence file
+were dirty; focused G0 and G11 were rerun there.
+
+No branch was pushed and no external state changed.

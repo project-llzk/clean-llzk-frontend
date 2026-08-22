@@ -1,6 +1,6 @@
 # S29 — Source-visible XOR byte range and headline promotion
 
-Status: Phase B complete on `7a0f209c`; Phase X Xor32 promotion next
+Status: Phase-X harness controls complete on `8f0fab79`; Xor32 corpus promotion next
 Depends on: audited frontend baseline `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Base integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 Frontend branch: `clean-to-llzk/s29-xor-range-contract`
@@ -156,6 +156,14 @@ banner and active docs say both backends and both output scopes. Before a
 64-field public result becomes headline evidence in Phase H, that derived
 widest-artifact path must select it automatically.
 
+The cross-cutting gate boundary is frozen on exact commit
+`8f0fab79732789795b0c09599f768c4b662a768b`. Its accepted-tool G0-G12 run kept
+the pre-promotion corpus at 15 modules and 51 vectors, admitted all 17
+corpus-plus-fixture modules, lowered/skipped exactly 10/7, and exercised all 88
+G11 paths. The derived widest probe was `Bits8`. Evidence and independent review
+results are in `evidence/S29/harness-gates.txt`; Xor32 is still not a corpus
+claim at this boundary.
+
 Add a fail-closed independent-reference layer to corpus emission. A promoted
 entry carries fixed expected public outputs in addition to the witness derived
 from the same Clean source; emission refuses if Clean's public result disagrees.
@@ -226,6 +234,7 @@ Preserve under `doc/llzk/evidence/S29/`:
 - `clean-overlay.md` — U..K diff, build commands, results, and review;
 - `adoption-gates.txt` — clean M matrix;
 - `bounds.md`, `probe.lean`, and `bounds-gates.txt` — B proofs and gates;
+- `harness-gates.txt` — cross-cutting Phase-X falsification and exact-count gates;
 - `xor32.md` and `xor32-gates.txt` — vectors, theorem, and X gates;
 - `blake3g.md` and `blake3g-gates.txt` — references, theorem, and H gates;
 - phase-specific independent review findings and dispositions.
