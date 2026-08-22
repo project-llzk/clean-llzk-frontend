@@ -270,7 +270,9 @@ the cases are the negative direction of
 positive direction ran on the real tools every time while the direction that
 matters ran never.
 
-There are now 53 cases. Ten enforce the public CI policy in
+There are now 54 cases. The additional audit control rejects a witgen shim that
+is honest for full-witness output but permissive for public output. Ten enforce
+the public CI policy in
 `check-actions-pinned.sh`: mutable action tags, moving hosted-runner or Rust
 inputs, writable default tokens, and implicitly enabled hosted or self-hosted
 benchmark entry points go red. An LLZK job without the exact trusted public

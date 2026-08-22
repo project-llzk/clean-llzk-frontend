@@ -26,6 +26,14 @@ frozen through clean audit commit `7c567f54`. See
 `evidence/AUDIT-2026-08-22/`. This is not R8: the XOR range contract and
 headline-example promotion still precede candidate freeze.
 
+Active capability session: **S29 — source-visible XOR byte range**. Its first
+commit is decision and process only: D035 selects executable `% 256` narrowing,
+exact modulo bounds, and power-of-two XOR/OR envelopes without importing hidden
+circuit assumptions. A Clean-only overlay will be built and reviewed from exact
+upstream base `0e53b9f2`, then adopted atomically with a new Clean pin before
+frontend bound proofs or example promotion. Independent adversarial review is
+required at every phase boundary. See `sessions/S29-xor-range-contract.md`.
+
 Latest completed frontend-alignment session: **S25** — upstream Clean was fetched and accepted at
 `0e53b9f2d05f06defa2aa0a859f549b611583f10`, moving the host to Lean 4.32.2.
 Compatibility commit `6ccca6f8` preserves the accepted frontend subset, makes

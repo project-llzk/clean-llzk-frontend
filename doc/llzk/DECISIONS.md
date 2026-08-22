@@ -1436,3 +1436,76 @@ instantiated concretely for `And8`, and does so in `Test/Lookups.lean` and
 round-trip, product pipeline, and both witness backends complete within the
 recorded bounds in `evidence/S28/scale.md`. Implementation and scale acceptance
 are complete.
+
+## D035 — Make XOR byte bounds executable in witness semantics
+
+**Status:** accepted design; implementation pending
+
+**Date:** 2026-08-22
+
+**Enacted by:** S29
+
+The existing Xor32 witness computes each limb as `x.val ^^^ y.val`. Its byte
+bounds live in `FormalCircuit.Assumptions` and lookup constraints, neither of
+which is visible to the witness program or the frontend's independent witness
+reader. Teaching the backend to trust those hidden facts would invalidate
+D033's theorem-or-refusal boundary.
+
+S29 instead makes narrowing execute in the source witness IR. Each Xor32 limb
+will compute:
+
+```text
+(x.val % 256) ^^^ (y.val % 256)
+```
+
+Under `U32.Normalized`, both modulo operations are identities, so Xor32's
+existing semantic `Spec` is unchanged. Outside the assumptions, the narrowing
+still executes in Clean and in emitted LLZK. This is not a trusted range
+annotation and does not infer a witness fact from constraints.
+
+The generic bound analysis gains two rules. For a nonzero literal divisor `d`,
+if the recursively analyzed numerator has exclusive bound `ba`, modulo reports
+`min ba d`; the proof uses both `a % d ≤ a` and `a % d < d`. The existing
+operational checks still require `d < prime`, and emitter and independent reader
+must recursively admit the numerator. A small final bound may never hide an
+unsafe intermediate, an unsupported constructor, u64 wrap, or an earlier felt
+reduction.
+
+For `lor` and `lxor`, recursively obtained bounds `ba` and `bb` determine the
+common envelope
+
+```text
+2 ^ Nat.clog 2 (max ba bb).
+```
+
+The rule is admitted only when that envelope is at most `2^64`; the existing
+root check additionally requires it at most the configured field prime.
+`Nat.le_pow_clog`, followed by `Nat.or_lt_two_pow` or
+`Nat.xor_lt_two_pow`, supplies the source-side range theorem. Recursive child
+admission remains mandatory. Consequently `% 256` operands yield the exact
+exclusive bound 256, while a raw Babybear `.val ^^^ .val` obtains the next
+power-of-two envelope above the prime and remains refused.
+
+D033's `.val` rule is unchanged. A `.val` leaf is still admitted only when the
+field size is at most `2^64`; modulo's small result bound does not make a
+wide-field numerator faithful. Although `% 256` happens to commute with u64
+truncation, arbitrary `% d` does not, and S29 does not add the separate theorem
+needed to exploit that special case. Xor32 promotion is therefore scoped to the
+accepted Babybear configuration, not claimed for bn254 or grumpkin.
+
+The source change is Clean core, not a backend exception. It will live in a
+Clean-only commit based exactly on upstream `0e53b9f2`. The frontend adopts
+that commit by a reviewed merge which, in the same commit, advances the accepted
+Clean overlay pin and changes G0 to compare core byte identity from the overlay.
+G0 must retain the upstream base separately and verify that the overlay descends
+from it and changes only the reviewed Clean path. Xor32 must not be added to a
+backend allowlist.
+
+Required red controls include the existing bare XOR; separate modulo-wrapped
+additions whose intermediate exceeds the field prime and whose intermediate
+exceeds `2^64`; `.idx % 256`; dynamic, zero, prime-sized, and oversized modulo
+divisors; wide-field `.val % 3` and `.val % 256`; an XOR/OR envelope above the
+field prime; and G9 substitutions of OR for XOR, a wrong operand, and a wrong
+modulo divisor. Numeric guards pin the envelope around 255, 256, 257, `2^63`,
+and `2^64`. Xor32 corpus vectors must include per-limb out-of-assumption values
+which discriminate executable narrowing from the old raw XOR.
