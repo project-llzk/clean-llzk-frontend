@@ -22,6 +22,9 @@ reclassified as bugs fixed here.
 
 - Frontend branch: `clean-to-llzk/s28-multicolumn-tables`
 - Review starting commit: `13729783d9b7df162fcde86caa17ab0294f078ce`
+- Audited clean tree: `7c567f5451c2e40b7be88e96d8a519a7bf82495e`
+- Repair commits: `350c6348` (readback), `02a6ecbf` (public outputs),
+  `7c567f54` (audit record)
 - Clean base and upstream head: `0e53b9f2d05f06defa2aa0a859f549b611583f10`
 - Lean toolchain: `leanprover/lean4:v4.32.2`
 - Accepted LLZK pin: `25fb3740ea3465c9129a06289297bb4f0554b7a5`

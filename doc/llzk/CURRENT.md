@@ -20,7 +20,8 @@ on every vector; both typed readers require the exact member layout. Unused and
 misleading `lower_spec` proof vocabulary and obsolete wrappers were removed.
 The post-repair G0-G12 matrix passed on the accepted LLZK pin and on LLZK main
 `b5c110d1`: 15 modules, 51 vectors, two scopes in both backends, 17/17 product
-admissions, and 10 SMT lowerings / 7 declared skips. See
+admissions, and 10 SMT lowerings / 7 declared skips. The reviewed repair is
+frozen through clean audit commit `7c567f54`. See
 `review/FRONTEND-AUDIT-2026-08-22.md` and
 `evidence/AUDIT-2026-08-22/`. This is not R8: the XOR range contract and
 headline-example promotion still precede candidate freeze.
@@ -386,26 +387,27 @@ an explicit decision, which was given.
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete run: S28 post-review repair commit
-`129fbe6ed34be3643ae65e923aabc75ea0b1c359`; see
-`evidence/S28/review-gates.txt`. All G0-G12 passed. The S28 axiom probe covers
-row injectivity, generic and concrete certificates, the module-lookup bridge,
-renderer readback, and the And8 lookup/spec chain with no `sorryAx`.
+Latest complete runs: frontend audit commit
+`7c567f5451c2e40b7be88e96d8a519a7bf82495e`; see
+`evidence/AUDIT-2026-08-22/`. All G0-G12 passed against both the accepted LLZK
+pin and checked LLZK main. The audit axiom probe covers the active frontend
+theorem closure, including concrete Add8 and And8 spec chains, with no
+`sorryAx`.
 
 | Gate | Result |
 |---|---|
 | G0 state and pins | PASS — and since R6 it also fails on any change to Clean's core outside `Clean/Backend/LLZK/`, `Clean.lean` and `Clean/Test.lean` |
 | G1 lint + `lake build --wfail Clean` + `lake build CleanTests` | PASS |
-| G2 renderer: goldens plus checked constraint-surface round trip | PASS — 2 renderer fixtures, 15 corpus modules, including nested-table red mutations |
+| G2 renderer: goldens plus checked semantic-surface round trip | PASS — 2 renderer fixtures, 15 corpus modules, including arithmetic, visibility, parameter, member, and nested-table red mutations |
 | G3 `llzk-opt` parse and verify | PASS — 15 modules + 2 fixtures |
 | G4 `llzk-opt --verify-roundtrip` | PASS — 15 modules + 2 fixtures |
-| G5 `llzk-witgen` interpreter | PASS — 51 vectors |
-| G6 `llzk-witgen` execution engine | PASS — 51 vectors |
+| G5 `llzk-witgen` interpreter | PASS — 51 vectors in full-witness and public scopes |
+| G6 `llzk-witgen` execution engine | PASS — 51 vectors in full-witness and public scopes |
 | G7 both backends vs Clean's own interpreter | PASS — carried by `--check-output` |
 | G8 fail closed | PASS — exact negative fixtures include the new bound, shift-count, dynamic-operand, index, and oversized-`bitsOf` refusals, plus tool-version rejection |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission, so every circuit (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 17 |
-| G11 the harness's own error paths | PASS — 53 exercised, including the worktree lock's opaque-owner branches, R7's uncommitted-core-edit branch of G0 (R7-01), and ten CI dependency/permission/benchmark/cache policy controls |
+| G11 the harness's own error paths | PASS — 54 exercised, including the worktree lock's opaque-owner branches, R7's uncommitted-core-edit branch of G0 (R7-01), ten CI dependency/permission/benchmark/cache policy controls, and the permissive-public-scope discriminator |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |
