@@ -465,12 +465,13 @@ exit 0
 SHIM
 chmod +x "${workdir}/shim/llzk-witgen-permissive"
 printf '{"inputs":{"arg0":"1"},"signals":{"w0":"1"}}\n' > "${workdir}/expected.json"
+printf '{"out0":"1"}\n' > "${workdir}/public.json"
 printf '{"arg0":1}\n' > "${workdir}/inputs.json"
 expect "llzk-witgen self-test catches a permissive shim" 1 "is not checking anything" \
   -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-permissive" \
-       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5"' \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6"' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
-       "${workdir}/expected.json" "${workdir}"
+       "${workdir}/expected.json" "${workdir}/public.json" "${workdir}"
 
 > "${workdir}/shim/llzk-opt-mlironly" cat <<'SHIM'
 #!/usr/bin/env bash
@@ -508,14 +509,38 @@ for a in "$@"; do
   esac
 done
 [[ "${backend}" == "interpreter" ]] || exit 0
-case "${check}" in *expected*) exit 0 ;; *) exit 1 ;; esac
+case "${check}" in *expected*|*public.json) exit 0 ;; *) exit 1 ;; esac
 SHIM
 chmod +x "${workdir}/shim/llzk-witgen-interp-only"
 expect "llzk-witgen self-test catches a stub execution engine" 1 "execution-engine" \
   -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-interp-only" \
-       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5"' \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6"' \
        _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
-       "${workdir}/expected.json" "${workdir}"
+       "${workdir}/expected.json" "${workdir}/public.json" "${workdir}"
+
+# Honest on both full-witness backends, but accepts every public expectation.
+# This is the exact false green the 2026-08-22 public-output increment must make
+# impossible: the older discriminator never exercised the public scope.
+> "${workdir}/shim/llzk-witgen-full-only" cat <<'SHIM'
+#!/usr/bin/env bash
+scope=full-witness
+check=""
+for a in "$@"; do
+  case "${a}" in
+    --output-scope=*) scope="${a#--output-scope=}" ;;
+    --check-output) check="next" ;;
+    *) [[ "${check}" == "next" ]] && { check="${a}"; } ;;
+  esac
+done
+[[ "${scope}" == "public" ]] && exit 0
+case "${check}" in *expected*) exit 0 ;; *) exit 1 ;; esac
+SHIM
+chmod +x "${workdir}/shim/llzk-witgen-full-only"
+expect "llzk-witgen self-test catches a permissive public scope" 1 "public-output self-test" \
+  -- env LLZK_WITGEN="${workdir}/shim/llzk-witgen-full-only" \
+       bash -c 'source "$1/lib.sh"; require_llzk_witgen_discriminates "$2" "$3" "$4" "$5" "$6"' \
+       _ "${script_dir}" "${workdir}/dummy.llzk" "${workdir}/inputs.json" \
+       "${workdir}/expected.json" "${workdir}/public.json" "${workdir}"
 
 echo
 if (( failed > 0 )); then

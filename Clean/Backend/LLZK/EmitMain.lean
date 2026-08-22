@@ -9,6 +9,8 @@ For each entry of `LLZK.Corpus.corpus`, writes
 * `<Name>.<i>.inputs.json` — the `i`th input vector, for `llzk-witgen --inputs`;
 * `<Name>.<i>.expected.json` — Clean's own witness for it, in the shape
   `llzk-witgen --output-scope=full-witness --check-output` compares against.
+* `<Name>.<i>.public.json` — Clean's public outputs, in the shape
+  `llzk-witgen --output-scope=public --check-output` compares against.
 
 For each entry of `LLZK.Corpus.syntaxFixtures`, writes `<dir>/syntax/<Name>.llzk`
 — a renderer fixture with no input vectors, checked by `llzk-opt` alone.
@@ -63,6 +65,8 @@ private def emitEntry (directory : System.FilePath) (entry : Corpus.Entry) : IO 
         (inputsJson inputs).compress
       IO.FS.writeFile (directory / s!"{entry.name}.{i}.expected.json")
         (fullWitnessJson w).compress
+      IO.FS.writeFile (directory / s!"{entry.name}.{i}.public.json")
+        (publicOutputsJson w).compress
   return failed
 
 /-- Write one renderer fixture. Returns whether anything went wrong. -/
@@ -114,7 +118,7 @@ def emitMain (args : List String) : IO UInt32 := do
     IO.eprintln "usage: llzk-emit <output-directory>"
     IO.eprintln ""
     IO.eprintln "Writes the LLZK module, input vectors and Clean's expected"
-    IO.eprintln "witnesses for every entry of LLZK.Corpus.corpus, and the"
+    IO.eprintln "full witnesses and public outputs for every entry of LLZK.Corpus.corpus, and the"
     IO.eprintln "renderer fixtures under <output-directory>/syntax."
     return 2
 

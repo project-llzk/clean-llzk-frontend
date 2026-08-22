@@ -65,15 +65,17 @@ both must come from the same LLZK installation"
 # R2's Control 1, promoted from something a reviewer did by hand to something the
 # harness does every run.
 require_llzk_witgen_discriminates() {
-  local artifact="$1" inputs="$2" expected="$3" workdir="$4"
+  local artifact="$1" inputs="$2" expected="$3" public_expected="$4" workdir="$5"
   # Not a fixed name. R5d's D-5: two six-line shims that special-cased the
   # scratch paths defeated both self-tests, because those paths were literals a
   # shim could recognise. The basename and PID make them unguessable from
   # inside the tool.
   local tag; tag="$(basename -- "${artifact}" .llzk).$$"
   local corrupted="${workdir}/witgen-selftest-${tag}.json"
+  local public_corrupted="${workdir}/witgen-public-selftest-${tag}.json"
 
-  python3 - "${expected}" "${corrupted}" <<'PYEOF' || llzk_fail "llzk-witgen self-test: \
+  python3 - "${expected}" "${corrupted}" "${public_expected}" "${public_corrupted}" <<'PYEOF' \
+    || llzk_fail "llzk-witgen self-test: \
 could not build the corrupted witness"
 import json, sys
 witness = json.load(open(sys.argv[1]))
@@ -83,6 +85,12 @@ if not signals:
 key = next(iter(signals))
 signals[key] = str(int(signals[key]) + 1)
 json.dump(witness, open(sys.argv[2], "w"))
+public = json.load(open(sys.argv[3]))
+if not public:
+    raise SystemExit("expected public output has no value to perturb")
+key = next(iter(public))
+public[key] = str(int(public[key]) + 1)
+json.dump(public, open(sys.argv[4], "w"))
 PYEOF
 
   # Both backends, because both are gates. R5d's D-1: the self-test ran only the
@@ -103,9 +111,20 @@ expected witness; every later green would be meaningless"
 signal perturbed, so --check-output is not checking anything. Every G5/G6/G7 green below would \
 be vacuous."
     fi
+
+    "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+      --output-scope=public --check-output "${public_expected}" >/dev/null \
+      || llzk_fail "llzk-witgen public-output self-test (${backend}): ${artifact} does not match \
+its own expected output; every later public-scope green would be meaningless"
+
+    if "${LLZK_WITGEN}" "${artifact}" --inputs "${inputs}" --backend="${backend}" \
+         --output-scope=public --check-output "${public_corrupted}" >/dev/null 2>&1; then
+      llzk_fail "llzk-witgen public-output self-test (${backend}): ${LLZK_WITGEN} accepted a \
+perturbed public output, so the visibility/value gate would be vacuous."
+    fi
   done
-  rm -f "${corrupted}"
-  echo "llzk-witgen self-test: both backends green on the expected witness, red on a perturbed one"
+  rm -f "${corrupted}" "${public_corrupted}"
+  echo "llzk-witgen self-test: both backends and both scopes green on expected JSON, red on perturbation"
 }
 
 # require_llzk_opt_discriminates WORKDIR ARTIFACT

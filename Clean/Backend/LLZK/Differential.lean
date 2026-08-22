@@ -2,10 +2,10 @@ import Clean.Circuit.WitnessGeneration
 import Clean.Backend.LLZK.Circuit
 
 /-!
-# Differential witness generation (gates G5, G6, G7)
+# Differential witness and public-output generation (gates G5, G6, G7)
 
 Runs Clean's own witness generation on a circuit and renders the result in the
-shape `llzk-witgen --output-scope=full-witness --check-output` expects. The
+shapes `llzk-witgen --output-scope=full-witness/public --check-output` expect. The
 harness then makes both LLZK backends check themselves against it, so a
 disagreement between Clean and LLZK is a non-zero exit rather than something a
 reader has to spot in two JSON dumps.
@@ -88,5 +88,12 @@ def fullWitnessJson (w : Witness) : Json :=
     ("signals", object
       (w.cells.zipIdx.map (fun (v, k) => (witnessMember k, field v))
         ++ w.outputs.zipIdx.map fun (v, j) => (outputMember j, field v)))]
+
+/-- The `--output-scope=public --check-output` object. Unlike full-witness
+output, LLZK emits public members as one flat name/value object. Keeping this
+expectation separate makes member visibility an executed contract rather than
+only a renderer convention. -/
+def publicOutputsJson (w : Witness) : Json :=
+  object (w.outputs.zipIdx.map fun (v, j) => (outputMember j, field v))
 
 end LLZK

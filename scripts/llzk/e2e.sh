@@ -99,6 +99,7 @@ for selftest_input in "${selftest_inputs[0]}" "${selftest_inputs[${#selftest_inp
     "${out_dir}/${selftest_name}.llzk" \
     "${selftest_input}" \
     "${out_dir}/${selftest_name}.0.expected.json" \
+    "${out_dir}/${selftest_name}.0.public.json" \
     "${out_dir}"
   require_llzk_opt_discriminates "${out_dir}" "${out_dir}/${selftest_name}.llzk"
 done
@@ -164,9 +165,10 @@ for artifact in "${artifacts[@]}"; do
   echo "-- G10: LLZK analysis pipeline"
   check_smt_pipeline "${artifact}"
 
-  # G5/G6/G7 in one step per backend: --check-output compares llzk-witgen's
-  # full witness against the one Clean's own reference interpreter produced, so
-  # a disagreement is a non-zero exit rather than two dumps to eyeball.
+  # G5/G6/G7 in two scopes per backend: --check-output compares llzk-witgen's
+  # full witness and public interface against Clean's reference values. The
+  # public-scope check is load-bearing: full-witness output includes both signal
+  # and public members under `signals`, so it cannot detect a visibility change.
   inputs=("${out_dir}/${name}".*.inputs.json)
   (( ${#inputs[@]} > 0 )) \
     || fail "${name} has no input vectors; add some to LLZK.Corpus.corpus or the \
@@ -174,13 +176,19 @@ witness gates silently cover nothing"
   for input in "${inputs[@]}"; do
     index="${input##*/${name}.}"; index="${index%%.inputs.json}"
     expected="${out_dir}/${name}.${index}.expected.json"
+    public_expected="${out_dir}/${name}.${index}.public.json"
     [[ -f "${expected}" ]] || fail "missing ${expected}"
-    echo "-- G5/G7: interpreter vs Clean, vector ${index}"
+    [[ -f "${public_expected}" ]] || fail "missing ${public_expected}"
+    echo "-- G5/G7: interpreter vs Clean, vector ${index} (full witness + public)"
     "${LLZK_WITGEN}" "${artifact}" --inputs "${input}" \
       --output-scope=full-witness --check-output "${expected}" >/dev/null
-    echo "-- G6/G7: execution engine vs Clean, vector ${index}"
+    "${LLZK_WITGEN}" "${artifact}" --inputs "${input}" \
+      --output-scope=public --check-output "${public_expected}" >/dev/null
+    echo "-- G6/G7: execution engine vs Clean, vector ${index} (full witness + public)"
     "${LLZK_WITGEN}" "${artifact}" --inputs "${input}" --backend=execution-engine \
       --output-scope=full-witness --check-output "${expected}" >/dev/null
+    "${LLZK_WITGEN}" "${artifact}" --inputs "${input}" --backend=execution-engine \
+      --output-scope=public --check-output "${public_expected}" >/dev/null
     vectors=$(( vectors + 1 ))
   done
   echo "   ok"
