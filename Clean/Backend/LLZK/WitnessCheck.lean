@@ -17,8 +17,9 @@ The shape is the same as the constraint side, and so are its limits:
   expressions, and `eval_ofWitgen` proves that reading preserves
   `Witgen.FExpr.eval` — Clean's own semantics.
 * `WExpr.ofModule` reads the **emitted** `@compute` as data.
-* The two are compared, and the comparison is a precondition of emission (D018),
-  so it holds for every circuit rather than for the corpus.
+* The two are compared, and the comparison is a precondition of the supported
+  checked emission path (D018), so it holds for every `Source` successfully
+  returned by those entry points rather than merely for the corpus.
 
 ## Why a tree and not a polynomial
 
@@ -1055,12 +1056,14 @@ end LLZK
 
 /-! ## The verified entry points
 
-Both halves of G9 are preconditions of emission (D018): `compileSource'` checks
-`@constrain` against the circuit's constraints, and the step below checks
-`@compute` against its witness programs. `compile` and `emit` are the only public
-ways to obtain a module, and they go through both — so there is no path from a
-Clean circuit to LLZK text that has not been compared against the circuit on
-both sides.
+Both halves of G9 are preconditions of the supported checked emission path
+(D018): `compileSource'` checks `@constrain` against the circuit's constraints,
+and the step below checks `@compute` against its witness programs.
+`verify` runs both directly; `compileSourceVerified`, `compile`, `emit`, and
+`emitSource` go through both, so their modules or text have been compared
+against the circuit on both sides.
+Lower-level public module constructors (`compileSource`, `compileSource'`, and
+`lowerRecognized`) remain deliberately available and confined by G12.
 -/
 
 namespace LLZK
@@ -1112,7 +1115,7 @@ def compileSourceVerified [CanonicalRepr F] (cfg : CertifiedConfig F) (src : Sou
   | .error diagnostics => .error diagnostics
   | .ok m => verify cfg src m
 
-/-- **Every module this backend emits computes the circuit's witnesses.** -/
+/-- **Every module `compileSourceVerified` returns computes its source witnesses.** -/
 theorem witnessAgree_of_compileSourceVerified [CanonicalRepr F] {cfg : CertifiedConfig F}
     {src : Source F} {m : Module}
     (h : compileSourceVerified cfg src = .ok m) :

@@ -66,8 +66,19 @@ truth.
 # only the oleans `lake build Clean` already produces -- no native compilation.
 lake env lean --run Clean/Backend/LLZK/EmitMain.lean <output-directory>
 
-# Everything above, plus llzk-opt parse and round trip on every artifact.
-LLZK_OPT=... LLZK_WITGEN=... bash scripts/llzk/e2e.sh
+# Full G0-G12, including everything above plus llzk-opt parse and round trip on
+# every artifact. The subshell releases its advisory lock on success or failure.
+(
+  set -e
+  export LLZK_SESSION="gate-reproduction-${BASHPID}"
+  export LLZK_OPT=/path/to/llzk-opt
+  export LLZK_WITGEN=/path/to/llzk-witgen
+  bash scripts/llzk/worktree-lock.sh claim "reproduce LLZK gates"
+  trap 'bash scripts/llzk/worktree-lock.sh release' EXIT
+  bash scripts/llzk/e2e.sh
+  bash scripts/llzk/worktree-lock.sh release
+  trap - EXIT
+)
 ```
 
 The emitter also writes `<output-directory>/syntax/`: the renderer fixtures from
@@ -87,7 +98,7 @@ changed row grouping, malformed row construction, and wrong row field types.
 Thus G2 covers semantic constraint/table-surface drift as well as byte drift.
 
 There is deliberately no `#emit_llzk` macro. `#eval IO.print (LLZK.emit cfg
-"Name" circuit)` already does that job — the golden tests use exactly that form —
+circuit)` already does that job — the golden tests use exactly that form —
 and the artifact-producing command is the executable above, which is what a
 harness needs.
 
@@ -102,7 +113,9 @@ version appears.
 
 ## G5–G7 — witness generation, differentially
 
-`LLZK.Corpus.corpus` carries input vectors alongside each circuit. The emitter
+`LLZK.Corpus.corpus` carries input vectors alongside each module. Source-backed
+entries support Clean/LLZK differential comparison; the six source-free
+registry modules instead carry fixed registry-conformance expectations. The emitter
 writes, per vector, the `--inputs` object and a checked expected full/public
 witness. Historical entries derive it from Clean. Promoted reference-backed
 entries carry fixed independent public results which must equal Clean before
@@ -176,12 +189,15 @@ row-specific controls: splitting a row into scalar memberships, swapping
 columns, and regrouping a global without changing its flattened scalar bag.
 
 **G9 is not a property of the corpus.** Since S17 the comparison is a
-*precondition of emission*: `ConstraintSet.compileSource'` runs it and refuses to
-return a module that fails, and `compile`/`emit` go through it.
+*precondition of the supported checked emission path*:
+`ConstraintSet.compileSource'` runs it and refuses to return a module that
+fails, `verify` checks it directly, and the other checked entry points go
+through those checks.
 `agree_of_compileSource'` is the theorem, `witnessAgree_of_compileSourceVerified`
 its witness-side counterpart, and `eqs_iff_of_agree` plus
 `lookups_perm_of_agree` give the constraint agreement its semantic meaning. So
-this holds for every circuit, not only for the circuits in the corpus.
+this holds for every `Source` successfully returned by those checked entry
+points, not only for the source-backed entries in the corpus.
 
 This paragraph used to say `compile`/`emit` were "the only public entry points".
 D018 retracted that in the R4 round and this file was not updated, so R5 found
@@ -189,7 +205,8 @@ the retracted claim still standing here. The accurate statement is the one above
 **no module obtained through `compile` or `emit` has gone unchecked.** Other
 public entry points return a module without both halves — `compileSource`,
 `compileSource'`, `lowerRecognized` — and G12 confines them to the modules with a
-reason to name them, none of which is reachable from ordinary circuit code.
+reason to name them. The supported circuit path goes through `compile`/`emit`;
+public Lean callers can still choose a lower-level constructor explicitly.
 `Module.render` is public too, and G9 compares `Module`s rather than text; see
 the renderer entry in `GAPS.md`.
 
@@ -200,7 +217,8 @@ fragment after R5a showed that it neither composed nor excluded grossly wrong
 lowerings. `GAPS.md` item 5 records the requirements for a future whole-translator
 proof.
 
-**G9 has two halves, and both are preconditions of emission.**
+**G9 has two halves, and both are preconditions of the supported checked
+emission path.**
 `Constraints.lean` compares `@constrain` against the circuit's constraints;
 `WitnessCheck.lean` (S19) compares `@compute` against its witness programs, with
 `WExpr.eval_ofWitgen` proving that the Clean-side reading is `Witgen.FExpr.eval`.

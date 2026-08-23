@@ -23,9 +23,11 @@ The post-repair G0-G12 matrix passed on the accepted LLZK pin and on LLZK main
 admissions, and 10 SMT lowerings / 7 declared skips. The reviewed repair is
 frozen through clean audit commit `7c567f54`. See
 `review/FRONTEND-AUDIT-2026-08-22.md` and
-`evidence/AUDIT-2026-08-22/`. This is not R8: S29 has since completed the XOR
-range contract and Xor32/BLAKE3.G promotions; a separate R8 review of a frozen
-candidate still precedes publication.
+`evidence/AUDIT-2026-08-22/`. S29 has since completed the XOR range contract and
+Xor32/BLAKE3.G promotions. The first frozen R8 candidate `c60d8363` was reviewed
+and rejected on 2026-08-23 after the review found a module-output theorem gap
+and claim/reproduction defects. Repair and a full R8 restart are in progress;
+no candidate has passed R8 and publication remains out of scope.
 
 Latest completed capability session: **S29 — source-visible XOR byte range and
 headline promotion**. Its first
@@ -80,9 +82,11 @@ explicit `CopyCanon.run` used by `WitnessSet.ofSource`.
 proves the whole-list invariant: the representative map preserves the value of
 every circuit variable. The existing copy-chain and non-copy red controls remain
 green; theorem evidence is in `evidence/A7/`. This feature branch has not been
-integrated or pushed. Full G0-G12 passed on clean commit `a32593bf`: 12 modules,
-33 vectors through both witness backends, 2 renderer fixtures, G10a 14/14, and
-G10b 10 lowered / 4 declared out of scope.
+pushed; commit `a32593bf` was subsequently integrated into the audited baseline
+and is ancestral to the current branch and live replacement repair. Full G0-G12
+passed on that clean commit: 12 modules, 33 vectors through both witness
+backends, 2 renderer fixtures, G10a 14/14, and G10b 10 lowered / 4 declared out
+of scope.
 
 Latest completed presentation increment: **checked public showcase** —
 `EXAMPLES.md` is generated from `Corpus.corpus`; unknown or failed entries,
@@ -152,7 +156,9 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase H implementation sealed on `a3299ca0`; this documentation-only closure completes S29; candidate selection and R8 next)
+Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase H
+implementation sealed on `a3299ca0`; S29 documentation closure is `c60d8363`;
+that first frozen R8 candidate was rejected and its repair is in progress)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
@@ -234,19 +240,28 @@ export LLZK_OPT=/the/printed/store/path/bin/llzk-opt
 export LLZK_WITGEN=/the/printed/store/path/bin/llzk-witgen
 
 # 4. The gates.
-bash scripts/llzk/worktree-lock.sh claim "what you are doing"
-bash scripts/llzk/e2e.sh
+(
+  set -e
+  export LLZK_SESSION="manual-reproduction-${BASHPID}"
+  bash scripts/llzk/worktree-lock.sh claim "what you are doing"
+  trap 'bash scripts/llzk/worktree-lock.sh release' EXIT
+  bash scripts/llzk/e2e.sh
+  bash scripts/llzk/worktree-lock.sh release
+  trap - EXIT
+)
 ```
 
 `e2e.sh` refuses to run without the worktree lock (S24): it rebuilds
 `.lake/llzk` from scratch, and evidence is only attributable to a commit if one
-session owned the tree while it ran. **From an agent harness, prefix both
-commands with `LLZK_SESSION=<label>`** — each command there is its own POSIX
-session, so the default identity does not survive from the claim to the run.
+session owned the tree while it ran. The subshell above releases the lock on
+success and, through its `EXIT` trap, on failure. **From an agent harness, set
+the same `LLZK_SESSION=<label>` on every separately launched lock/gate command**
+— each command there is its own POSIX session, so the default identity does not
+survive from the claim to the run.
 `doc/llzk/CONCURRENCY.md` has the why.
 
-Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 17 circuits, 67
-input vectors, both witgen backends, and 2 renderer fixtures. G10a must admit all
+Expected: `PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12` — 17 corpus
+modules, 67 input vectors, both witgen backends, and 2 renderer fixtures. G10a must admit all
 19 modules; the measured G10b split is exactly 10 lowered / 9 declared skips and
 is pinned by the gate rather than inferred from the corpus count.
 
@@ -316,8 +331,9 @@ an explicit decision, which was given.
   - **R3**, a review of that repair: three defects in its own new code, fixed.
     `review/R3-findings.md`.
   - **S16–S18**, closing the three gaps the repair had documented rather than
-    fixed: D012's lookup rows (proved), G9's scope (now every circuit, not the
-    corpus), and R2-05's field law (now a required class).
+    fixed: D012's lookup rows (proved), G9's scope (now every `Source`
+    successfully returned by the supported checked path, not merely the corpus),
+    and R2-05's field law (now a required class).
   - **S19**, the witness side of G9, and the corpus outside
     `Addition8FullCarry`'s `Assumptions`.
   - **R4**, two *independent* adversarial reviews — the first review of this work
@@ -340,9 +356,10 @@ an explicit decision, which was given.
     stale by the next command and `claim` took a stale lock silently. `reclaim`
     is now separate, `LLZK_SESSION` is the identity, and CI claims rather than
     being exempted (D023). Then S23 was executed: `CertifiedConfig F` carries
-    the table certificates to the five public entry points (R7-15 corrected
-    "seven", which had counted two theorems), which no longer accept a plain
-    `Config`, so `GAPS.md` §1's first half — the *erasure* — is closed. Its
+    the table certificates to the five supported checked entry points in
+    `WitnessCheck.lean` (R7-15 corrected "seven", which had counted two
+    theorems), which no longer accept a plain `Config`, so `GAPS.md` §1's first
+    half — the *erasure* — is closed. Its
     second half is not, and is upstream.
   - **R6**, an adversarial review of the finished Stage 1 and its repair. The
     gates reproduced on the reviewed commit before anything changed; four claims
@@ -370,7 +387,10 @@ an explicit decision, which was given.
     assumes the project has. `Soundness.spec_of_compile` is a conditional
     soundness implication: for an assignment satisfying every reader-extracted
     equality and ordered lookup row, under exact input evaluation and the gadget
-    assumptions, the gadget `Spec` holds. Concrete resolution/no-interaction
+    assumptions, the gadget `Spec` holds for the typed output reconstructed from
+    the module's ordered `@out{j}` assignment. R8 found and repaired an earlier
+    version that concluded only for Clean's internally recomputed output.
+    Concrete resolution/no-interaction
     obligations are proved for `Addition8FullCarry`, `And8`, Xor32, and exact
     BLAKE3.G `G 0 1 2 3`; compilation, readback, recognition, equality/lookup
     satisfaction, input evaluation, and assumptions remain explicit premises.
@@ -447,8 +467,9 @@ an explicit decision, which was given.
   reference contract, HP `f3951231` the proof/shape boundary, and HC
   `a3299ca0` the exact `G 0 1 2 3` external promotion. Both full toolchain
   matrices passed with 17 modules, 67 vectors, 19 admissions, 10/9 SMT, both
-  scopes/backends, and 177 G11 control cases. This documentary closure is HD;
-  R8 has not started.
+  scopes/backends, and 177 G11 control cases. Documentary closure HD
+  `c60d8363` became the first frozen R8 candidate; R8 rejected it. The replacement
+  repair has not passed the two-toolchain matrices or restarted R8.
 - Blocked: none.
 
 ## Last green gates
@@ -570,8 +591,8 @@ behind them). The six BLAKE rows add fixed independent public outputs, while
 their 96 internal cells remain Clean-derived; S26's direct bitwise/shift probes
 remain separate evidence.
 
-**S20's partial preservation theorem was retired.** Every module `compile`
-returns has been compared against its
+**S20's partial preservation theorem was retired.** Every module the supported
+checked `compile` entry point returns has been compared against its
 circuit on both sides, so a lowering bug yields a *refusal*, never a wrong
 module; that part holds.
 
@@ -651,7 +672,8 @@ Stage 1 is finished, reproduced, and reviewed three times by sessions that did
 not write it. What remains sorts into five tracks. S28 and its post-completion
 review are accepted; S29 Phase B, Xor32 Phase X, and BLAKE3.G Phase H are
 complete. This documentation-only closure completes S29; next select and freeze
-one candidate, then begin R8.
+one candidate, then begin R8. That selection subsequently produced `c60d8363`;
+R8 rejected it, and the repair/restart is now in progress.
 
 **The two milestones, stated in the grant's terms.** Milestone 1 — one Clean
 circuit compiled through the whole LLZK pipeline, validated end to end — is
@@ -683,7 +705,8 @@ order they are written in there.
    because `recognize` on a real gadget does not reduce in the kernel.
 2. **§3 — done (A2).** `Soundness.lean` and `Test/Soundness.lean`:
    `spec_of_compile` is "the emitted module's constraints hold ⇒ the gadget's
-   `Spec` holds", and `add8_spec_of_compile` is it for `Addition8FullCarry`.
+   `Spec` holds for its reconstructed `@out{j}` assignment", and
+   `add8_spec_of_compile` is it for `Addition8FullCarry`.
    `Operations.FullGuarantees` turned out to be free — it quantifies over channel
    interactions, which `Analyze` refuses — so the chain is A1's lookup theorem
    plus three of Clean's own steps. Soundness direction only; A5 now bridges the
@@ -797,8 +820,9 @@ remeasured coverage are in place. **S28 is green on its clean implementation
 commit**, and **S29 Phase B has completed the witness-visible Xor32/BLAKE3.G
 range contract on `7a0f209c`**. **Xor32 promotion is complete on `06b80f2f`,
 and exact BLAKE3.G promotion on `a3299ca0`;** this documentation-only closure
-completes S29. Candidate selection and frozen R8 come next, while the witness-IR
-loop increment remains later. S27
+completes S29. The first frozen R8 candidate `c60d8363` was rejected; repair and
+a full R8 restart are in progress, while the witness-IR loop increment remains
+later. S27
 remains returned for re-scoping (R7-09).
 
 The assurance track's A5 renderer and A7 copy-canonicalisation items are now

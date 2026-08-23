@@ -14,7 +14,8 @@ and carry-out. It carries Lean soundness and completeness proofs, uses the
 certified 256-row byte lookup table, and is instantiated by
 `Test/Soundness.add8_spec_of_compile`: under the gadget assumptions and the
 named lookup hypothesis, satisfaction of the compiled typed module's
-constraints implies the gadget's own `Spec`.
+constraints implies the gadget's own `Spec` for the typed output reconstructed
+from the module assignment's ordered public `@out{j}` members.
 
 The corpus runs 9 boundary-oriented vectors for this gadget. Three of them
 are deliberately outside its assumptions: they do not test the gadget theorem,
@@ -32,7 +33,8 @@ program even where `llzk-witgen` ignores `@constrain`.
 module, independent witness/constraint readbacks, and full 65,536-row
 ByteXor identity are pinned by the backend tests.
 `Test/Soundness.xor32_spec_of_compile` proves the compiled constraint
-implication while retaining the gadget's normalized-byte assumptions.
+implication for the typed output reconstructed from the module's ordered
+public `@out{j}` assignment, while retaining the normalized-byte assumptions.
 
 The corpus carries 7 normalized spec vectors and
 3 compute-only vectors with wide limbs. The latter
@@ -55,8 +57,9 @@ and four rotations. Its pinned source and typed module have 72 inputs,
 `ByteXor` lookups. The concrete lookup identities and complete mixed-table
 resolution are proved rather than inferred from emitted names.
 `Test/Soundness.blake3g_spec_of_compile` proves the exact compiled
-constraint implication under the gadget's normalization assumptions,
-equality satisfaction, and lookup-row premises.
+constraint implication for the typed output reconstructed from the module's
+ordered public `@out{j}` assignment, under the gadget's normalization
+assumptions, equality satisfaction, and lookup-row premises.
 
 The corpus carries 6 normalized spec vectors and
 0 compute-only vectors. All 64 public outputs
@@ -123,11 +126,17 @@ From the repository root, after provisioning the pinned tools in
 [`PINS.md`](PINS.md):
 
 ```bash
-export LLZK_SESSION=showcase
-export LLZK_OPT=/path/to/pinned/llzk-opt
-export LLZK_WITGEN=/path/to/pinned/llzk-witgen
-bash scripts/llzk/worktree-lock.sh claim "reproduce public showcase"
-bash scripts/llzk/e2e.sh
+(
+  set -e
+  export LLZK_SESSION="showcase-${BASHPID}"
+  export LLZK_OPT=/path/to/pinned/llzk-opt
+  export LLZK_WITGEN=/path/to/pinned/llzk-witgen
+  bash scripts/llzk/worktree-lock.sh claim "reproduce public showcase"
+  trap 'bash scripts/llzk/worktree-lock.sh release' EXIT
+  bash scripts/llzk/e2e.sh
+  bash scripts/llzk/worktree-lock.sh release
+  trap - EXIT
+)
 ```
 
 Regenerate this page explicitly with:

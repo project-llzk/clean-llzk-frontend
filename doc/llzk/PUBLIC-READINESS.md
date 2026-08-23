@@ -7,10 +7,15 @@ Status: active
 Target: a frozen release-candidate commit suitable for an organization-owned
 repository under `project-llzk`
 
-Latest audit: `review/FRONTEND-AUDIT-2026-08-22.md`. Its repairs pass the full
+Latest completed pre-R8 audit: `review/FRONTEND-AUDIT-2026-08-22.md`; its R8
+erratum records the later output-carrier defect. Its repairs pass the full
 matrix on both the accepted LLZK pin and exact checked LLZK main `b5c110d1`.
 The later Phase-H implementation `a3299ca0` also passes both exact toolchains.
-These are pre-freeze reviews and matrices, not the required R8 review.
+The first frozen R8 candidate `c60d8363` was selected and independently reviewed
+on 2026-08-23, then rejected after the review found a module-output theorem gap
+and claim/reproduction defects. Repair and a full R8 restart are in progress;
+no candidate has passed R8.
+Live repair/review evidence is under `evidence/R8-2026-08-23/`.
 
 ## Outcome
 
@@ -53,7 +58,8 @@ authorized.
 
 - Preserve the Stage-1 vertical slice: `Addition8FullCarry` compiles, the LLZK
   tools accept it, both witness engines agree with Clean, and the typed module's
-  constraints imply the gadget's semantic `Spec` under named hypotheses.
+  constraints imply the gadget's semantic `Spec`, under named hypotheses, for
+  the typed output reconstructed from its ordered public `@out{j}` assignment.
 - **Done locally:** align to current upstream Clean before adding capability
   (S25, exact fetched head `0e53b9f2`, Lean 4.32.2).
 - **Done locally:** review the LLZK toolchain pin after S25 and before
@@ -116,8 +122,8 @@ P0 public documentation and repository hygiene
   -> S28 multi-column lookup tables (done locally)
   -> S29 proved witness-visible range contract for XOR (done locally)
   -> P1 Xor32 and BLAKE3.G promotions (done locally)
-  -> S29 documentation and evidence closure (complete in this commit)
-  -> candidate selection and R8 frozen-candidate adversarial review
+  -> S29 documentation and evidence closure (`c60d8363`, complete locally)
+  -> first frozen R8 candidate rejected; repair and full R8 restart in progress
   -> explicit publication decision
 ```
 
@@ -130,9 +136,10 @@ miss, and A7 removed the witness reader's remaining inspection-only semantic
 premise. S26 and S28 unlock `And8`; S29 Phase B supplies the range contract
 D033 exposed. Xor32's external corpus, independent references, concrete theorem
 instance, and adversarial gates are complete on `06b80f2f`; exact BLAKE3.G
-`G 0 1 2 3` is complete on `a3299ca0`. This documentary closure completes S29;
-selection and freezing of a candidate, followed by its separate R8 review,
-remain before any publication decision.
+`G 0 1 2 3` is complete on `a3299ca0`. Documentary closure `c60d8363` completed
+S29 and became the first frozen candidate; R8 rejected it. A replacement must
+be sealed and the full frozen-tree review restarted before any publication
+decision.
 
 ## Current scorecard
 
@@ -150,7 +157,7 @@ remain before any publication decision.
 | Headline bitwise examples end to end | complete locally | Xor32 is promoted on `06b80f2f`; exact BLAKE3.G `G 0 1 2 3` is promoted on `a3299ca0`; both have fixed independent outputs, concrete conditional theorem instances, and full external matrices |
 | Renderer round-trip assurance | strengthened locally | A5 plus the 2026-08-22 audit: complete constraint/member/parameter readback, public-output checks, and mutation regressions; final G0-G12 result recorded in the audit report |
 | Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |
-| Final frozen-tree review | not started | R8 |
+| Final frozen-tree review | in progress; first candidate rejected | repair, seal a replacement, and restart R8 from the beginning |
 | Organization access | available | active `project-llzk` admin verified 2026-08-21 |
 | Publication | not authorized | separate final action |
 

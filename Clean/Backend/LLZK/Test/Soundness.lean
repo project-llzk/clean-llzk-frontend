@@ -63,7 +63,7 @@ of the emitted component's cells (`env` for the circuit variables, `outs` for th
 `@out{j}` members D008 adds) that satisfies every polynomial the reader extracts
 from `@constrain` and every lookup it extracts, assume the gadget's own
 `Assumptions` of the input; then the gadget's own `Spec` holds of that input and
-the corresponding output.
+the typed output reconstructed from those ordered `@out{j}` members.
 
 Everything about the *circuit* is discharged. What remains hypothetical is this
 compile run, and D017 — that the emitted text means what the reader reads. -/
@@ -79,9 +79,7 @@ theorem add8_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognize
       (varFromOffset Gadgets.Addition8FullCarry.Inputs 0 :
         Var Gadgets.Addition8FullCarry.Inputs Bab) = input)
     (hassm : add8.Assumptions input) :
-    add8.Spec input
-      (eval env (add8.output (varFromOffset Gadgets.Addition8FullCarry.Inputs 0)
-        (size Gadgets.Addition8FullCarry.Inputs))) :=
+    add8.Spec input (moduleOutput (Output := Gadgets.Addition8FullCarry.Outputs) outs) :=
   spec_of_compile hcompile hm hrec add8_resolve add8_no_interactions env outs heqs hlookups
     input hinput hassm
 
@@ -102,9 +100,7 @@ theorem add8_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recogniz
       (varFromOffset Gadgets.Addition8FullCarry.Inputs 0 :
         Var Gadgets.Addition8FullCarry.Inputs Bab) = input)
     (hassm : add8.Assumptions input) :
-    add8.Spec input
-      (eval env (add8.output (varFromOffset Gadgets.Addition8FullCarry.Inputs 0)
-        (size Gadgets.Addition8FullCarry.Inputs))) :=
+    add8.Spec input (moduleOutput (Output := Gadgets.Addition8FullCarry.Outputs) outs) :=
   spec_of_compile_sourceRows hcompile hm hrec add8_resolve add8_no_interactions env outs heqs
     ((add8_lookup_iff hrec env).mp hlookups) input hinput hassm
 
@@ -136,9 +132,7 @@ theorem and8_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recognize
     (hinput : eval env
       (varFromOffset Gadgets.And.And8.Inputs 0 : Var Gadgets.And.And8.Inputs Bab) = input)
     (hassm : and8.Assumptions input) :
-    and8.Spec input
-      (eval env (and8.output (varFromOffset Gadgets.And.And8.Inputs 0)
-        (size Gadgets.And.And8.Inputs))) :=
+    and8.Spec input (moduleOutput (Output := field) outs) :=
   spec_of_compile hcompile hm hrec and8_resolve and8_no_interactions env outs heqs hlookups
     input hinput hassm
 
@@ -155,9 +149,7 @@ theorem and8_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recogniz
     (hinput : eval env
       (varFromOffset Gadgets.And.And8.Inputs 0 : Var Gadgets.And.And8.Inputs Bab) = input)
     (hassm : and8.Assumptions input) :
-    and8.Spec input
-      (eval env (and8.output (varFromOffset Gadgets.And.And8.Inputs 0)
-        (size Gadgets.And.And8.Inputs))) :=
+    and8.Spec input (moduleOutput (Output := field) outs) :=
   spec_of_compile_sourceRows hcompile hm hrec and8_resolve and8_no_interactions env outs heqs
     ((and8_lookup_iff hrec env).mp hlookups) input hinput hassm
 
@@ -192,9 +184,7 @@ theorem xor32_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recogniz
     (hinput : eval env
       (varFromOffset Gadgets.Xor32.Inputs 0 : Var Gadgets.Xor32.Inputs Bab) = input)
     (hassm : xor32.Assumptions input) :
-    xor32.Spec input
-      (eval env (xor32.output (varFromOffset Gadgets.Xor32.Inputs 0)
-        (size Gadgets.Xor32.Inputs))) :=
+    xor32.Spec input (moduleOutput (Output := U32) outs) :=
   spec_of_compile hcompile hm hrec xor32_resolve xor32_no_interactions env outs heqs hlookups
     input hinput hassm
 
@@ -212,9 +202,7 @@ theorem xor32_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recogni
     (hinput : eval env
       (varFromOffset Gadgets.Xor32.Inputs 0 : Var Gadgets.Xor32.Inputs Bab) = input)
     (hassm : xor32.Assumptions input) :
-    xor32.Spec input
-      (eval env (xor32.output (varFromOffset Gadgets.Xor32.Inputs 0)
-        (size Gadgets.Xor32.Inputs))) :=
+    xor32.Spec input (moduleOutput (Output := U32) outs) :=
   spec_of_compile_sourceRows hcompile hm hrec xor32_resolve xor32_no_interactions env outs heqs
     ((xor32_lookup_iff hrec env).mp hlookups) input hinput hassm
 
@@ -292,9 +280,7 @@ theorem blake3g_spec_of_compile {m : Module} {C : ConstraintSet Bab} {r : Recogn
     (hinput : eval env
       (varFromOffset Gadgets.BLAKE3.G.Inputs 0 : Var Gadgets.BLAKE3.G.Inputs Bab) = input)
     (hassm : blake3g.Assumptions input) :
-    blake3g.Spec input
-      (eval env (blake3g.output (varFromOffset Gadgets.BLAKE3.G.Inputs 0)
-        (size Gadgets.BLAKE3.G.Inputs))) :=
+    blake3g.Spec input (moduleOutput (Output := Gadgets.BLAKE3.BLAKE3State) outs) :=
   spec_of_compile hcompile hm hrec blake3g_resolve blake3g_no_interactions env outs heqs
     hlookups input hinput hassm
 
@@ -312,9 +298,7 @@ theorem blake3g_spec_of_compile' {m : Module} {C : ConstraintSet Bab} {r : Recog
     (hinput : eval env
       (varFromOffset Gadgets.BLAKE3.G.Inputs 0 : Var Gadgets.BLAKE3.G.Inputs Bab) = input)
     (hassm : blake3g.Assumptions input) :
-    blake3g.Spec input
-      (eval env (blake3g.output (varFromOffset Gadgets.BLAKE3.G.Inputs 0)
-        (size Gadgets.BLAKE3.G.Inputs))) :=
+    blake3g.Spec input (moduleOutput (Output := Gadgets.BLAKE3.BLAKE3State) outs) :=
   spec_of_compile_sourceRows hcompile hm hrec blake3g_resolve blake3g_no_interactions env outs
     heqs ((blake3g_lookup_iff hrec env).mp hlookups) input hinput hassm
 

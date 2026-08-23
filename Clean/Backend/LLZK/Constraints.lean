@@ -23,12 +23,15 @@ The two meet only at `Poly`. Neither reader can see the other's input, so an
 emitted constraint that is missing, duplicated, or carries a wrong coefficient
 makes the comparison fail.
 
-**The comparison is a precondition of emission** (D018). `compileSource'` runs it
-and refuses to return a module that fails, and `compile`/`emit` — the public
-entry points, which is why they are at the bottom of this file rather than in
-`Circuit.lean` — go through it. So this is not a property of the corpus: no
-module leaves this backend without it. `Test/Constraints.lean` additionally pins
-that the comparison can go *red*, which is what makes the green worth anything.
+**The comparison is a precondition of the supported checked emission path**
+(D018). `compileSource'` runs it and refuses to return a module that fails;
+`verify` checks it directly; and `compileSourceVerified`, `compile`, `emit`, and
+`emitSource` in `WitnessCheck.lean` go through those checks. So this is not a
+property of the corpus: no module or text obtained through those five supported
+checked entry points leaves unchecked. Lower-level public constructors remain
+confined by G12, as the later entry-point boundary spells out. `Test/Constraints.lean`
+additionally pins that the comparison can go *red*, which is what makes the
+green worth anything.
 
 ## What this establishes, and what it assumes
 
@@ -130,8 +133,9 @@ structure ConstraintSet (F : Type) where
   What it does establish is that the emitter did not drop, rename or reorder a
   table relative to the operations that look into it. Tying the rows to the Clean
   table is `ExportTable.Certifies`, demanded by `CertifiedConfig` — which the
-  public entry points take, so the proof reaches the compiler rather than being
-  erased at a wrapper (S24) — and confined by G12. -/
+  supported checked `WitnessCheck` entry points take, so the proof reaches that
+  emission path rather than being erased at a wrapper (S24) — and confined by
+  G12. -/
   globals : List (String × Array (Array Nat))
 deriving Repr
 
@@ -163,15 +167,15 @@ def ofSource (cfg : Config) (src : Source F) : ConstraintSet F where
   -- **This conjunct does not check that the rows are the Clean table's rows,**
   -- and an earlier docstring implied it did. Both sides derive from
   -- `cfg.tables`: here directly, and in the module via `recognize` and `lower`
-  -- with the same filter. On the only path that exists it is a tautology, which
-  -- is R5's X1. What it does catch is the emitter dropping, renaming or
-  -- reordering a table relative to the operations that look into it — a real
+  -- with the same filter. Within this reader comparison that row-identity claim
+  -- is a tautology, which is R5's X1. What it does catch is the emitter dropping,
+  -- renaming or reordering a table relative to the operations that look into it — a real
   -- failure mode, and the whole of what it establishes.
   --
   -- Tying the rows to the Clean table is `ExportTable.Certifies`
   -- (`Certificate.lean`), which `CertifiedConfig` demands of every table that
-  -- reaches a public entry point; G12 keeps every other supplier out of
-  -- non-test code.
+  -- reaches a supported checked `WitnessCheck` entry point; G12 keeps every
+  -- other supplier out of non-test code.
   globals :=
     (cfg.tables.filter fun table =>
       (FlatOperation.lookups src.operations).any (·.table.name = table.name)).toList.map
@@ -389,11 +393,13 @@ def agreeCompiled [CanonicalRepr F] (cfg : Config) (src : Source F) : Bool :=
 
 /-! ## Emission is verified, not merely checked
 
-`agree` is decidable, so the emitter can run it on every circuit it compiles and
-refuse to hand back a module that fails. That is what `compileSource'` below
-does: **no module leaves a supported entry point — `compile`, `emit`,
-`emitSource` in `WitnessCheck.lean` — without having been compared against its
-Clean source.** Not "no module leaves this backend": `compileSource`,
+`agree` is decidable, so `compileSource'` can run it on every `Source` it accepts
+and refuse to hand back a module that fails. That is what `compileSource'` below
+does. `WitnessCheck.lean` then makes the same comparison a precondition of each
+of its five supported checked entry points: `verify`, `compileSourceVerified`,
+`compile`, `emit`, and `emitSource`. **No module or text returned through that
+path has skipped the constraint comparison against its Clean source.** Not "no
+module leaves this backend": `compileSource`,
 `compileSource'` itself and `lowerRecognized` are public Lean defs that return
 un- or half-compared modules — the six `Square_*` registry entries come through
 the last of them with `constraintsAgree = none` — and what confines them to
@@ -406,8 +412,9 @@ This is translation validation rather than a verified translator. It is weaker
 than a preservation theorem about `lower` in one way — it says nothing about
 *why* the lowering is right, and a bug would surface as a refusal to compile
 rather than as a compile-time impossibility. It is stronger in the way that
-matters here: it holds for every circuit, not for the five in the corpus, and it
-needed no simulation argument over the `BuilderM` state monad.
+matters here: it holds for every `Source` successfully returned by this checked
+entry point, not just the source-backed corpus entries, and it needed no
+simulation argument over the `BuilderM` state monad.
 
 What remains outside it is D017's reading of the emitted IR, and D012's lookup
 rows — and the latter is discharged for every table in use by
@@ -430,10 +437,10 @@ def compileSource' [CanonicalRepr F] (cfg : Config) (src : Source F) :
   | .error diagnostics => .error diagnostics
   | .ok m => if agree cfg src m then .ok m else .error #[mismatch]
 
-/-- **Every module this backend emits carries its circuit's constraint system.**
+/-- **Every module `compileSource'` returns carries its source constraint system.**
 
-Not "every module in the corpus" — the comparison is a precondition of emission,
-so this is a theorem about all circuits. -/
+Not "every module in the corpus" — the comparison is a precondition of this
+checked entry point for every `Source` it successfully returns. -/
 theorem agree_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F} {m : Module}
     (h : compileSource' cfg src = .ok m) : agree cfg src m = true := by
   unfold compileSource' at h
@@ -447,8 +454,9 @@ theorem agree_of_compileSource' [CanonicalRepr F] {cfg : Config} {src : Source F
 
 end ConstraintSet
 
-/-! `compile` and `emit`, the public entry points, are **not** here either: they
-are in `Clean/Backend/LLZK/WitnessCheck.lean`, which adds the witness half of G9
-on top of `compileSource'`. Both halves are preconditions of emission (D018). -/
+/-! The supported checked `compile` and `emit` entry points are **not** here
+either: they are in `Clean/Backend/LLZK/WitnessCheck.lean`, which adds the
+witness half of G9 on top of `compileSource'`. Both halves are preconditions of
+that emission path (D018). -/
 
 end LLZK

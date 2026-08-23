@@ -8,8 +8,10 @@ import Clean.Gadgets.Xor.Xor32
 /-!
 # The conformance corpus
 
-What `scripts/llzk/e2e.sh` checks: each example circuit, the configuration it is
-compiled under, and the input vectors to compare Clean and LLZK on.
+What `scripts/llzk/e2e.sh` checks: each corpus module, the configuration it is
+compiled under, and its input vectors. Eleven current entries have a Clean
+source for differential comparison; six are source-free registry conformance
+modules for which G9 is explicitly not applicable.
 
 Separate from `Examples.lean` because importing
 `Clean.Circuit.WitnessGeneration` there changes what `elaborate_circuit` sees and
@@ -366,10 +368,10 @@ def registryEntry (spec : FieldSpec) : Entry :=
 /-! ## The corpus
 
 Every artifact `lake env lean --run Clean/Backend/LLZK/EmitMain.lean` materializes
-and `scripts/llzk/e2e.sh` checks. Only circuits that are expected to *compile*
-belong here; the rejected ones are pinned by the golden tests instead.
+and `scripts/llzk/e2e.sh` checks. Only entries expected to materialize belong
+here; rejected source circuits are pinned by the golden tests instead.
 
-A `Config` travels with each circuit entry because the field and the table
+A `Config` travels with each corpus entry because the field and the table
 registry are part of what is being tested, not incidental. -/
 
 def corpus : Array Entry :=

@@ -333,8 +333,8 @@ emitted array holds — which is what the emitted `constrain.in` asserts.
 
 **The certificate is carried, not enforced — and an earlier version of this
 entry said otherwise.** `CertifiedConfig` holds `CertifiedTable`s and is what
-the public entry points take (S24; it was `Config.ofCertified`, which erased
-them, when this was written). `Examples.withBytesAndXor` carries both current
+the supported checked entry points take (S24; it was `Config.ofCertified`, which
+erased them, when this was written). `Examples.withBytesAndXor` carries both current
 lookup tables, so each has its proof next to its rows and changing the rows
 breaks the build. But R4a-2 broke the
 "cannot be called without a proof" reading: the caller chooses *both* the export
@@ -591,7 +591,8 @@ target. It needs a simulation argument over the `BuilderM` state monad, relating
 the reader's slot map to the builder's SSA counter through every loop of
 `constrainBody`, and the state is behind private fields. That is a session of its
 own, and it would have delivered less than this one: before S17, G9 covered five
-circuits; after it, every circuit.
+corpus circuits; after it, agreement became a precondition of every `Source`
+successfully returned by the checked `compileSource'` path.
 
 What this trades away, stated plainly: a lowering bug shows up as a compile
 failure with a "this is a backend defect" diagnostic, not as an unrepresentable
@@ -840,9 +841,12 @@ and the actual size.
 **Date:** 2026-08-01
 **Enacted by:** S22, closing R5's X1
 
-`Config`'s constructor is now private. The only public way to supply lookup
-tables is `Config.unsafeWithTables`, and `Config.ofCertified` is the wrapper
-that supplies an `ExportTable.Certifies` proof. G12
+At S22, `Config`'s constructor became private. The only public way then to supply
+lookup tables directly to a `Config` was `Config.unsafeWithTables`, and
+`Config.ofCertified` was the wrapper that supplied an `ExportTable.Certifies`
+proof. S24 replaced that wrapper with `CertifiedConfig`; its public `toConfig`
+projection is now the certified table-bearing path, while `unsafeWithTables`
+remains the only arbitrary-row path. G12
 (`scripts/llzk/check-confinement.sh`) fails if any non-test module names the
 unsafe one.
 
@@ -869,9 +873,9 @@ now the path of least resistance and its absence is greppable and gated.
 sentence above — "greppable and gated" — was the honest description of a
 convention, and S23 said why that is not closure: `Config.ofCertified` demanded
 the certificates and then *erased* them, so what reached `compile` was a plain
-`Config`. The five public entry points in `WitnessCheck.lean` (`verify`,
-`compileSourceVerified`, `compile`, `emit`, `emitSource` — R7-15 corrected an
-earlier "seven", which counted the two theorems) now take a
+`Config`. The five supported checked entry points in `WitnessCheck.lean`
+(`verify`, `compileSourceVerified`, `compile`, `emit`, `emitSource` — R7-15
+corrected an earlier "seven", which counted the two theorems) now take a
 `CertifiedConfig F`; `ofCertified` is retired; there is no public function from a
 `Config` to a `CertifiedConfig`. `Config` and `unsafeWithTables` both stay, and
 both stay confined by G12, because the negative fixtures must be able to build
@@ -1439,7 +1443,7 @@ are complete.
 
 ## D035 — Make XOR byte bounds executable in witness semantics
 
-**Status:** accepted; Clean source contract and frontend bounds enacted, promotion pending
+**Status:** accepted and enacted; Xor32 and BLAKE3.G promotions complete
 
 **Date:** 2026-08-22
 
@@ -1509,3 +1513,39 @@ field prime; and G9 substitutions of OR for XOR, a wrong operand, and a wrong
 modulo divisor. Numeric guards pin the envelope around 255, 256, 257, `2^63`,
 and `2^64`. Xor32 corpus vectors must include per-limb out-of-assumption values
 which discriminate executable narrowing from the old raw XOR.
+
+## D036 — A module soundness theorem must carry the module's public output
+
+**Status:** accepted and enacted by the R8 repair
+
+**Date:** 2026-08-23
+
+**Enacted by:** replacement repair after R8 rejected `c60d8363`
+
+The pre-repair `spec_of_compile` accepted an assignment `outs` for the emitted
+component's public `@out{j}` members and assumed all reader-extracted equalities,
+but concluded `Spec` for Clean's internally recomputed output expression. The
+output-equality conjunct of `ConstraintSet.eqs_iff_of_agree` was therefore not
+present in the theorem's conclusion. This was a real claim/API gap even though
+the internal output is equal under the same premises, and it allowed public
+documentation to read stronger than the theorem type.
+
+The theorem now reconstructs the typed module output as
+
+```text
+fromElements (Vector.mapRange (size Output) outs)
+```
+
+through the named `moduleOutput` definition. `moduleOutput_eq_of_agree` uses the
+output half of G9 to prove that reconstruction equals evaluation of the Clean
+output expressions; `moduleOutput_eq_of_compile` exposes the same fact for the
+supported checked compile path. Both generic soundness forms and all Add8,
+And8, Xor32, and BLAKE3.G wrappers conclude `Spec` for `moduleOutput outs`.
+
+This adds no trusted premise, lookup assumption, gadget assumption, or new
+axiom to the output bridge. It still relies on D017 for the meaning of rendered
+LLZK and proves only the soundness direction for assignments satisfying the
+reader-extracted module constraints. Exact application and axiom probes are in
+`evidence/R8-2026-08-23/`. Because this repair followed a frozen-candidate
+rejection, the replacement must pass both full matrices and a restarted R8;
+the earlier candidate's green evidence is not inherited.

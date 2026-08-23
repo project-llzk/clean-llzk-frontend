@@ -76,7 +76,7 @@ echo "confinement:"
 
 confine 'Config.unsafeWithTables' 'unsafeWithTables' \
   '^(Clean/Backend/LLZK/Basic\.lean|Clean/Backend/LLZK/Certificate\.lean|Clean/Backend/LLZK/Test/.*\.lean)$' \
-  'supply tables through a CertifiedConfig, which requires an ExportTable.Certifies proof per table (Certificate.lean) and is what the public entry points take. If a table genuinely cannot be certified, that is a decision to record, not a call site to add.'
+  'supply tables through a CertifiedConfig, which requires an ExportTable.Certifies proof per table (Certificate.lean) and is what the supported checked WitnessCheck entry points take. If a table genuinely cannot be certified, that is a decision to record, not a call site to add.'
 
 # `Witness.lean`, `Lookups.lean` and `Soundness.lean` used to be on this list for
 # prose alone. They are not any more: the check reads code (A2), so a docstring

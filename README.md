@@ -38,7 +38,8 @@ Start here:
 - [Current status and exact next action](doc/llzk/CURRENT.md)
 - [Capability roadmap](doc/llzk/ROADMAP.md)
 - [Assurance gaps and claim boundary](doc/llzk/GAPS.md)
-- [Latest complete frontend audit](doc/llzk/review/FRONTEND-AUDIT-2026-08-22.md)
+- [Completed pre-R8 frontend audit, with R8 erratum](doc/llzk/review/FRONTEND-AUDIT-2026-08-22.md)
+- [R8 repair and review evidence](doc/llzk/evidence/R8-2026-08-23/README.md)
 
 Project governance:
 
@@ -58,11 +59,17 @@ The full LLZK conformance run needs the pinned tools described in
 [`doc/llzk/PINS.md`](doc/llzk/PINS.md):
 
 ```bash
-export LLZK_SESSION=my-session
-export LLZK_OPT=/path/to/llzk-opt
-export LLZK_WITGEN=/path/to/llzk-witgen
-bash scripts/llzk/worktree-lock.sh claim "full LLZK conformance run"
-bash scripts/llzk/e2e.sh
+(
+  set -e
+  export LLZK_SESSION="manual-reproduction-${BASHPID}"
+  export LLZK_OPT=/path/to/llzk-opt
+  export LLZK_WITGEN=/path/to/llzk-witgen
+  bash scripts/llzk/worktree-lock.sh claim "full LLZK conformance run"
+  trap 'bash scripts/llzk/worktree-lock.sh release' EXIT
+  bash scripts/llzk/e2e.sh
+  bash scripts/llzk/worktree-lock.sh release
+  trap - EXIT
+)
 ```
 
 The latest recorded run passed 17 corpus modules and 67 vectors through both

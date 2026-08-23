@@ -307,7 +307,7 @@ llzk_require_exact_count "G10b modules skipped for declared reasons" \
   "${smt_skipped}" "${LLZK_EXPECTED_SMT_SKIPPED}"
 
 # No silent shrinking. Every count below is reported in the PASS banner, and a
-# banner that says "3 circuit(s)" after a change that dropped ten of them reads
+# banner that says "3 corpus module(s)" after a change that dropped ten reads
 # exactly like a pass (R5d's D-10).
 llzk_require_exact_count "corpus artifacts" \
   "${#artifacts[@]}" "${LLZK_EXPECTED_ARTIFACTS}"
@@ -317,7 +317,7 @@ llzk_require_exact_count "renderer fixtures" \
   "${#fixtures[@]}" "${LLZK_EXPECTED_FIXTURES}"
 
 echo "PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12"
-echo "  ${#artifacts[@]} circuit(s), ${vectors} input vector(s), both witgen backends,"
+echo "  ${#artifacts[@]} corpus module(s), ${vectors} input vector(s), both witgen backends,"
 echo "  full-witness and public output scopes."
 echo "  ${#fixtures[@]} renderer fixture(s), syntax only."
 echo "  G8 and G9 are carried inside G1 and G2: the rejection fixtures by"
@@ -337,13 +337,13 @@ echo "The six Square_* entries are built from a hand-written Recognized with no"
 echo "Clean circuit behind them, so there is nothing for G9 to compare against and"
 echo "EmitMain reports them as none rather than as passing. G12 keeps the entry"
 echo "points that skip G9 out of ordinary code. This banner used to say 'no module"
-echo "leaves this backend without them', which was false for six of the eleven"
-echo "modules the same run certifies (R5d)."
+echo "leaves this backend without them', which is false for the six source-free"
+echo "modules in today's seventeen-module corpus (R5d)."
 echo
 echo "What remains beyond that is doc/llzk/GAPS.md -- above all D017, the reading"
 echo "of LLZK's own semantics: that felt.add is +, constrain.in is membership, and"
 echo "felt.umod reads its operands as canonical representatives. The @compute half"
-echo "of that reading is what the ${vectors} vectors above test, on two independent"
-echo "backends. The @constrain half has no executor in this toolchain and so no"
+echo "of that reading is what the ${vectors} vectors above test, on both LLZK"
+echo "witness backends. The @constrain half has no executor in this toolchain and so no"
 echo "empirical check at all. G10 shows the modules are admissible to LLZK's"
 echo "analysis pipeline; it runs no solver."

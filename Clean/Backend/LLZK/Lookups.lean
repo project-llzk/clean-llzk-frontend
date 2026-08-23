@@ -65,7 +65,8 @@ theorem canonical_of_recognize [CanonicalRepr F] {cfg : Config} {src : Source F}
     (diagnose_of_mem_registry (registryOk_of_recognize h) ht)
 
 /-- The same, for a table carried by a `CertifiedConfig` — which is what the
-public entry points take, so this is the form a caller can actually reach. -/
+supported checked `WitnessCheck` entry points take, so this is the form callers
+of that emission path reach. -/
 theorem canonical_of_recognize' [CanonicalRepr F] {cfg : CertifiedConfig F} {src : Source F}
     {r : Recognized} (h : recognize cfg.toConfig src = .ok r)
     {ct : CertifiedTable F} (hct : ct ∈ cfg.tables) :

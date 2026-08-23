@@ -24,7 +24,7 @@ in Lean can settle it without a formal model of LLZK.
 
 Everything here is generic. `TableCert.lean` discharges the obligation for the
 concrete tables the corpus uses, and to do that it must import the gadgets those
-tables belong to. Since S24 the public compile entry points take a
+tables belong to. Since S24 the supported checked compile entry points take a
 `CertifiedConfig`, so whatever module defines it is imported by
 `WitnessCheck.lean` — and the compiler's public surface should not transitively
 depend on `Clean.Gadgets.ByteLookup` in order to say the word "certificate".
@@ -139,9 +139,9 @@ theorem certified_membership {e : ExportTable} {table : RawTable F}
 
 /-! ## Carrying the certificate — and what that is *not*
 
-`CertifiedConfig` is what the public compile entry points take, so the corpus's
-lookup tables carry their certificates next to their rows rather than in a
-docstring. Changing the rows breaks the build.
+`CertifiedConfig` is what the supported checked compile entry points take, so
+the corpus's lookup tables carry their certificates next to their rows rather
+than in a docstring. Changing the rows breaks the build.
 
 **It is not a guarantee, and an earlier version of this comment said it was.**
 R4a-2 broke that claim: `CertifiedTable` lets the caller choose *both* the export
@@ -182,10 +182,10 @@ structure CertifiedTable (F : Type) [FiniteField F] where
 
 /-- A configuration whose tables carry their certificates.
 
-This is what every public entry point in `WitnessCheck.lean` takes. The
-constructor is public and `⟨spec, #[]⟩` is free — a configuration with no lookup
-tables has nothing to certify, which is the honest reading. What does not exist
-is any way for a *table* to get in without its proof: the field is an
+This is what the five supported checked entry points in `WitnessCheck.lean`
+take. The constructor is public and `⟨spec, #[]⟩` is free — a configuration with
+no lookup tables has nothing to certify, which is the honest reading. What does
+not exist is any way for a *table* to get in without its proof: the field is an
 `Array (CertifiedTable F)`, and there is no public function from a `Config` to
 one of these. That is the whole of what the type buys, and `GAPS.md` item 1's
 second half is what it does not. -/

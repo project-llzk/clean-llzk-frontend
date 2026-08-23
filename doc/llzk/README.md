@@ -53,7 +53,10 @@ For reproducibility and review:
 - [`GATES.md`](GATES.md) defines G0-G12 and their falsification controls.
 - [`DECISIONS.md`](DECISIONS.md) records semantic and trust-boundary decisions.
 - [`review/FRONTEND-AUDIT-2026-08-22.md`](review/FRONTEND-AUDIT-2026-08-22.md)
-  is the latest complete frontend audit and release recommendation.
+  is the completed pre-R8 frontend audit; its dated R8 erratum records why its
+  later first frozen candidate was rejected.
+- [`evidence/R8-2026-08-23/README.md`](evidence/R8-2026-08-23/README.md)
+  records the live repair/review round. No replacement candidate has passed yet.
 - [`review/`](review/) contains adversarial findings and dispositions.
 - [`evidence/`](evidence/) contains captured gate and probe results.
 - [`sessions/`](sessions/) is the historical execution record; it is not the
@@ -65,14 +68,21 @@ First obtain the pinned LLZK tools using [`PINS.md`](PINS.md). Then, from the
 repository root:
 
 ```bash
-export LLZK_SESSION=manual-reproduction
-export LLZK_OPT=/path/to/llzk-opt
-export LLZK_WITGEN=/path/to/llzk-witgen
-bash scripts/llzk/worktree-lock.sh claim "reproduce Clean to LLZK"
-bash scripts/llzk/e2e.sh
+(
+  set -e
+  export LLZK_SESSION="manual-reproduction-${BASHPID}"
+  export LLZK_OPT=/path/to/llzk-opt
+  export LLZK_WITGEN=/path/to/llzk-witgen
+  bash scripts/llzk/worktree-lock.sh claim "reproduce Clean to LLZK"
+  trap 'bash scripts/llzk/worktree-lock.sh release' EXIT
+  bash scripts/llzk/e2e.sh
+  bash scripts/llzk/worktree-lock.sh release
+  trap - EXIT
+)
 ```
 
-The recorded S29 Phase-H result on clean implementation commit `a3299ca0` is:
+The last pre-R8 historical S29 Phase-H result on clean implementation commit
+`a3299ca0` is (the banner below is retained verbatim as historical output):
 
 ```text
 PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
@@ -102,7 +112,9 @@ artifacts, so its output is attributable only when one session owns the tree.
 
 The strongest established generic result is that, subject to the named lookup
 hypothesis and the gadget's assumptions, satisfaction of the compiled typed
-module's constraints implies the gadget's `Spec`. A separate renderer theorem
+module's constraints implies the gadget's `Spec` for the typed output
+reconstructed from that module assignment's ordered public `@out{j}` members.
+A separate renderer theorem
 ties its protected globals, members, constraint parameters, and complete
 `@constrain` body to the typed module; both backends also execute the public
 output contract. Witness-side

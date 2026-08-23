@@ -70,8 +70,15 @@ end = "# G10 is in two halves."
 if source.count(start) != 1 or source.count(blake) != 1 or source.count(end) != 1:
     print("headline e2e block markers are not unique")
     raise SystemExit(1)
+banner = ('echo "of that reading is what the ${vectors} vectors above test, on both LLZK"\n'
+          'echo "witness backends. The @constrain half has no executor in this toolchain and so no"')
+module_banner = 'echo "  ${#artifacts[@]} corpus module(s), ${vectors} input vector(s), both witgen backends,"'
+if (source.count(banner) != 1 or source.count(module_banner) != 1
+        or "two independent backends" in source or "circuit(s)" in source):
+    print("e2e semantic-boundary banner is missing or overclaims backend independence")
+    raise SystemExit(1)
 actual = hashlib.sha256(source.encode()).hexdigest()
-expected = "bf0e65b8b2007087040267c9ccf91c5fe7fa619d40434833059c7e2a08420383"
+expected = "720de1d845070a344249f4c99b77a0f3d1914c5ab3219ec680aec2c5f9bc1ef6"
 if actual != expected:
     print(f"headline e2e file digest mismatch: {actual}")
     raise SystemExit(1)

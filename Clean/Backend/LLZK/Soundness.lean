@@ -41,8 +41,9 @@ condition Clean's soundness bridge needs.
 
 It says: **if the emitted module's `@constrain` is satisfied at an assignment,
 and the gadget's `Assumptions` hold of the input there, then the gadget's `Spec`
-holds of the input and the output that assignment gives.** That is the soundness
-direction, for the module rather than for the circuit.
+holds of the input and the typed output reconstructed from that assignment's
+ordered `@out{j}` members.** That is the soundness direction, for the module
+rather than only for the circuit's internally recomputed output expressions.
 
 It does not say anything about completeness — that the module *has* a satisfying
 assignment — and it does not remove D017. Every hypothesis about the emitted side
@@ -209,6 +210,53 @@ theorem constraintsHoldFlat_of_emitted [CanonicalRepr F] {cfg : CertifiedConfig 
 
 variable {Input Output : TypeMap} [ProvableType Input] [ProvableType Output]
 
+/-- Reconstruct a circuit's typed output from the emitted component's ordered
+`@out0` through `@out{size Output - 1}` assignment. -/
+def moduleOutput (outs : Nat → F) : Output F :=
+  fromElements (Vector.mapRange (size Output) outs)
+
+/-- G9's output equalities identify the emitted component's typed `@out{j}`
+assignment with evaluation of the Clean circuit's output expressions.
+
+This is the output conjunct of `eqs_iff_of_agree`, kept as a named theorem so
+the soundness chain cannot silently discard it while proving only the internal
+Clean output. -/
+theorem moduleOutput_eq_of_agree {cfg : Config} {c : FormalCircuit F Input Output}
+    {m : Module} {C : ConstraintSet F}
+    (ha : agree cfg (Compilable.source c) m = true)
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
+    (env : Environment F) (outs : Nat → F)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0) :
+    moduleOutput (Output := Output) outs =
+      eval env (c.output (varFromOffset Input 0) (size Input)) := by
+  unfold moduleOutput
+  rw [ProvableType.fromElements_eq_iff]
+  rw [Vector.ext_iff]
+  intro i hi
+  simp only [Vector.getElem_mapRange]
+  rw [← ProvableType.getElem_eval_toElements]
+  have hout := (ConstraintSet.eqs_iff_of_agree ha hm env outs).mp heqs |>.2
+  have hall : ∀ x ∈ (Compilable.source c).outputs.toList.zipIdx,
+      outs x.2 = x.1.eval env := by
+    rintro ⟨e, j⟩ hj
+    exact hout e j hj
+  have hi' : i < (Compilable.source c).outputs.toList.length := by
+    simp [Compilable.source, Source.ofFormalCircuit, hi]
+  have hidx := (List.forall_mem_zipIdx').mp hall i hi'
+  have hcoutput : (c.main (varFromOffset Input 0)).output (size Input) =
+      c.output (varFromOffset Input 0) (size Input) := by
+    exact c.elaborated.output_eq _ _
+  calc
+    outs i = Expression.eval env
+        (toElements (M := Output)
+          ((c.main (varFromOffset Input 0)).output (size Input)))[i] := by
+      simp [Compilable.source, Source.ofFormalCircuit] at hidx
+      exact hidx
+    _ = Expression.eval env
+        (toElements (M := Output)
+          (c.output (varFromOffset Input 0) (size Input)))[i] := by
+      rw [hcoutput]
+
 omit [DecidableEq F] in
 /-- **Clean's flat constraints imply the gadget's `Spec`.**
 
@@ -236,6 +284,20 @@ theorem spec_of_constraintsHoldFlat (c : FormalCircuit F Input Output) (env : En
 
 /-! ## The composition -/
 
+/-- Successful checked compilation pins the typed module output directly to the
+Clean output expressions. This needs equality satisfaction, but no lookup or
+gadget-assumption premise. -/
+theorem moduleOutput_eq_of_compile [CanonicalRepr F] {cfg : CertifiedConfig F}
+    {c : FormalCircuit F Input Output} {m : Module} {C : ConstraintSet F}
+    (hcompile : compile cfg c = .ok m)
+    (hm : ofModule (F := F) (Ty.felt cfg.field.name) m = some C)
+    (env : Environment F) (outs : Nat → F)
+    (heqs : ∀ p ∈ C.eqs, Poly.eval (assign env outs) p = 0) :
+    moduleOutput (Output := Output) outs =
+      eval env (c.output (varFromOffset Input 0) (size Input)) :=
+  moduleOutput_eq_of_agree (constraintsAgree_of_compileSourceVerified hcompile)
+    hm env outs heqs
+
 /-- **The emitted module's constraints imply the gadget's `Spec`.**
 
 `GAPS.md` §3, for a circuit whose lookups resolve to certified tables and which
@@ -249,8 +311,8 @@ lookup satisfied. The conclusion is the gadget's own `Spec`, which is what its
 `soundness` field is about.
 
 `compile` is the hypothesis rather than `compileSourceVerified` because it is the
-public entry point, and it takes a `CertifiedConfig`, so a table cannot reach it
-without its certificate. -/
+supported checked circuit entry point, and it takes a `CertifiedConfig`, so a
+table cannot reach that path without its certificate. -/
 theorem spec_of_compile [CanonicalRepr F] {cfg : CertifiedConfig F}
     {c : FormalCircuit F Input Output} {m : Module} {C : ConstraintSet F} {r : Recognized}
     (hcompile : compile cfg c = .ok m)
@@ -266,8 +328,9 @@ theorem spec_of_compile [CanonicalRepr F] {cfg : CertifiedConfig F}
     (input : Input F)
     (hinput : eval env (varFromOffset Input 0 : Var Input F) = input)
     (hassm : c.Assumptions input) :
-    c.Spec input (eval env (c.output (varFromOffset Input 0) (size Input))) :=
-  spec_of_constraintsHoldFlat c env
+    c.Spec input (moduleOutput (Output := Output) outs) := by
+  rw [moduleOutput_eq_of_compile hcompile hm env outs heqs]
+  exact spec_of_constraintsHoldFlat c env
     (constraintsHoldFlat_of_emitted (constraintsAgree_of_compileSourceVerified hcompile)
       hm hrec resolve env outs heqs hlookups)
     hnoint input hinput hassm
@@ -294,8 +357,9 @@ theorem spec_of_compile_sourceRows [CanonicalRepr F] {cfg : CertifiedConfig F}
     (input : Input F)
     (hinput : eval env (varFromOffset Input 0 : Var Input F) = input)
     (hassm : c.Assumptions input) :
-    c.Spec input (eval env (c.output (varFromOffset Input 0) (size Input))) :=
-  spec_of_constraintsHoldFlat c env
+    c.Spec input (moduleOutput (Output := Output) outs) := by
+  rw [moduleOutput_eq_of_compile hcompile hm env outs heqs]
+  exact spec_of_constraintsHoldFlat c env
     (constraintsHoldFlat_of_sourceRows (constraintsAgree_of_compileSourceVerified hcompile)
       hm hrec resolve env outs heqs hlookups)
     hnoint input hinput hassm

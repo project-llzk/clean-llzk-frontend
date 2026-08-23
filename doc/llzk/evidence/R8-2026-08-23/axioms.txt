@@ -1,0 +1,50 @@
+$ lake env lean doc/llzk/evidence/R8-2026-08-23/module-output-probe.lean
+'LLZK.moduleOutput_eq_of_compile' depends on axioms: [propext, Classical.choice, Quot.sound]
+'LLZK.Test.Soundness.add8_spec_of_compile' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1]
+'LLZK.Test.Soundness.add8_spec_of_compile'' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1]
+'LLZK.Test.Soundness.and8_spec_of_compile' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1,
+ Gadgets.And.And8.and_times_two_add_xor._native.bv_decide.ax_1_5]
+'LLZK.Test.Soundness.and8_spec_of_compile'' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1,
+ Gadgets.And.And8.and_times_two_add_xor._native.bv_decide.ax_1_5]
+'LLZK.Test.Soundness.xor32_spec_of_compile' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1]
+'LLZK.Test.Soundness.xor32_spec_of_compile'' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1]
+'LLZK.Test.Soundness.blake3g_spec_of_compile' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearHAddHPowOfNat_1._native.native_decide.ax_1,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1,
+ Gadgets.ByteDecomposition.Theorems.soundness._native.bv_decide.ax_1_6]
+'LLZK.Test.Soundness.blake3g_spec_of_compile'' depends on axioms: [propext,
+ Classical.choice,
+ Quot.sound,
+ instFactGtNatPBabybearHAddHPowOfNat_1._native.native_decide.ax_1,
+ instFactGtNatPBabybearOfNat._native.native_decide.ax_1,
+ primeBabybear._native.native_decide.ax_1,
+ Gadgets.ByteDecomposition.Theorems.soundness._native.bv_decide.ax_1_6]
+
+exit status: 0

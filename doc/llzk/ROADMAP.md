@@ -32,8 +32,9 @@ public documentation and hygiene
   → S28: multi-column lookup tables and certificates (complete locally)
   → S29: source-visible XOR range contract and generic bounds (complete locally)
   → end-to-end Xor32 (`06b80f2f`) and BLAKE3.G (`a3299ca0`) (complete locally)
-  → S29 documentation and evidence closure (complete in this commit)
-  → candidate selection and frozen-candidate adversarial review
+  → S29 documentation and evidence closure (`c60d8363`, complete locally)
+  → first frozen R8 candidate `c60d8363` rejected
+  → replacement repair, seal, and full R8 restart (in progress)
 ```
 
 This order joins the three goals that matter for publication. S25 removed the
@@ -47,10 +48,12 @@ boundary every pinned LLZK binary accepts without checking semantic content;
 A7 removed the remaining inspection-only premise from copy canonicalisation.
 S26, S28, and S29 Phase B turn measured refusals into compile-capable examples.
 Xor32 is promoted through the external-tool corpus on `06b80f2f`; exact
-BLAKE3.G `G 0 1 2 3` follows on `a3299ca0`. A candidate is selected only after
-this documentary closure; release readiness is reached only after that frozen
-candidate passes R8, not merely because `LLZK.compile` succeeds or both examples
-carry pre-R8 evidence.
+BLAKE3.G `G 0 1 2 3` follows on `a3299ca0`. Documentary closure `c60d8363`
+became the first frozen R8 candidate and was rejected after independent review
+found a module-output theorem gap and claim/reproduction defects. Its replacement
+repair is being hardened now; release readiness is reached only after that
+replacement is sealed and passes a full R8 restart, not merely because
+`LLZK.compile` succeeds or both examples carry pre-R8 evidence.
 
 The initial implementation lives under:
 
@@ -69,7 +72,7 @@ Clean/Backend/LLZK/
   Examples.lean    worked example circuits
   RendererFixture.lean  modules exercising every IR constructor, for G2 and G3
   Differential.lean  Clean's own witness, in llzk-witgen's --check-output shape
-  Corpus.lean      circuits, inputs, Clean-derived cells, and fixed headline outputs
+  Corpus.lean      corpus modules, inputs, Clean-derived cells, and fixed outputs
   EmitMain.lean    `lean --run` entry point that materializes the corpus
   Test/            goldens, rejection fixtures, and the G9 checks
 ```
@@ -285,10 +288,11 @@ Status against that definition:
 | every artifact is admissible to LLZK's analysis pipeline | done — G10a, all 19 emitted modules (17 corpus plus 2 renderer fixtures) |
 | both witgen backends agree | done — 67 input vectors in full-witness and public scopes, G5 and G6 |
 | witnesses match checked corpus expectations | done — G7, via `--check-output` against Clean-derived cells plus fixed headline outputs prechecked equal to `FlatOperation.witgen` |
-| the emitted constraints are Clean's | done — G9, and since S17 a precondition of emission, so for every circuit |
-| the emitted witnesses are Clean's | done — G9's witness half, S19/D020, likewise a precondition of emission |
+| the emitted constraints are Clean's | done — G9, and since S17 a precondition of each successful supported checked `Source` emission |
+| the emitted witnesses are Clean's | done — G9's witness half, S19/D020, likewise a precondition of that checked path |
 
-One command, `bash scripts/llzk/e2e.sh`, reproduces all of it.
+With the pinned tools exported and the worktree lock held, the single
+`scripts/llzk/e2e.sh` driver reproduces all of it.
 
 ### What is still not established
 
@@ -310,9 +314,9 @@ file.
   `!felt.type<"babybear">` is `ZMod 2013265921`. Nothing in Lean can settle it
   without a formal model of LLZK. Every emitted operation rests on it.
 - **The generic API does not tie a caller-selected table certificate to an
-  arbitrary circuit's own erased table.** The compiler does now *demand* a
-  certificate — the public entry points take a `CertifiedConfig` (S24, D022) —
-  but the caller picks both sides of `Certifies`, because `Table.toRaw` erased
+  arbitrary circuit's own erased table.** The supported checked entry points do
+  now *demand* a certificate through `CertifiedConfig` (S24, D022), but the
+  caller picks both sides of `Certifies`, because `Table.toRaw` erased
   which `Table` a `RawTable` came from. Current lookup-bearing headline
   instantiations separately prove exact circuit-specific resolution; the open
   generic gap and upstream repair are in GAPS.md item 1.

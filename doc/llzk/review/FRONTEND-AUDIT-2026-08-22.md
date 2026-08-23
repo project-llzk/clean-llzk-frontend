@@ -1,5 +1,15 @@
 # Clean-to-LLZK frontend audit — 2026-08-22
 
+> **R8 erratum — 2026-08-23.** This is the completed pre-R8 audit of its dated
+> tree, not the final frozen-tree review. R8 rejected the first later candidate
+> `c60d8363`: the `spec_of_compile` theorem recorded below concluded `Spec` for
+> Clean's internally recomputed output, not directly for the typed value of the
+> module assignment's ordered public `@out{j}` members. The replacement repair
+> introduces `moduleOutput` and `moduleOutput_eq_of_compile` and changes every
+> generic/concrete theorem conclusion accordingly. See the
+> [R8 repair evidence](../evidence/R8-2026-08-23/README.md). No replacement
+> candidate has yet passed R8.
+
 ## Verdict
 
 The frontend is a credible late-stage release candidate for its deliberately
