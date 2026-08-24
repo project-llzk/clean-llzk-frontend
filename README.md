@@ -16,7 +16,8 @@ checks the result with the pinned LLZK toolchain.
 
 Stage 1 is complete. Its reference example, Clean's formally proved
 `Addition8FullCarry` gadget, is compiled to LLZK, parsed, verified,
-round-tripped, and run through both LLZK witness generators. The composed
+round-tripped, and run through both backends of the pinned LLZK witness tool.
+The composed
 `BLAKE3.G 0 1 2 3` and `Xor32` headlines now follow the same external path with
 fixed independently derived public outputs. The emitted constraints and witness
 program are also compared in Lean with the circuit they came from. The
@@ -38,8 +39,6 @@ Start here:
 - [Current status and exact next action](doc/llzk/CURRENT.md)
 - [Capability roadmap](doc/llzk/ROADMAP.md)
 - [Assurance gaps and claim boundary](doc/llzk/GAPS.md)
-- [Completed pre-R8 frontend audit, with R8 erratum](doc/llzk/review/FRONTEND-AUDIT-2026-08-22.md)
-- [R8 repair and review evidence](doc/llzk/evidence/R8-2026-08-23/README.md)
 
 Project governance:
 
@@ -47,6 +46,11 @@ Project governance:
 - [Prepared organization settings](doc/llzk/PUBLICATION.md)
 - [Contribution guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
+
+Review archive and reproducibility evidence:
+
+- [Completed pre-R8 frontend audit, with R8 erratum](doc/llzk/review/FRONTEND-AUDIT-2026-08-22.md)
+- [R8 repair and review evidence](doc/llzk/evidence/R8-2026-08-23/README.md)
 
 To build the Lean project:
 
@@ -72,11 +76,11 @@ The full LLZK conformance run needs the pinned tools described in
 )
 ```
 
-The latest recorded run passed 17 corpus modules and 67 vectors through both
-LLZK witness backends in both full-witness and public-output scopes, with all
-19 emitted corpus-plus-fixture modules admitted to the product-program
-pipeline. Exact commit, tool, proof, and gate evidence is linked from
-[`doc/llzk/CURRENT.md`](doc/llzk/CURRENT.md).
+The latest complete two-toolchain run passed 17 corpus modules and 67 vectors
+through both backends of the pinned LLZK witness tool in both full-witness and
+public-output scopes, with all 19 emitted corpus-plus-fixture modules admitted
+to the product-program pipeline. Exact commit, tool, proof, and gate evidence is
+linked from [`doc/llzk/CURRENT.md`](doc/llzk/CURRENT.md).
 
 ## About Clean
 
