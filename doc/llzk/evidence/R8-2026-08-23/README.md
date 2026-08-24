@@ -46,6 +46,12 @@ Confirmed review findings were:
   without running the flagged operation. The first interrupted repair caught
   unconditional flagged success but still accepted a wrapper which merely
   stripped `--verify-roundtrip` and delegated to plain verification.
+- the later documentation closure still left a release-less contributor gate
+  recipe and direct owner-file deletion advice active. More importantly,
+  `reclaim --from` compared and replaced the owner in separate unsynchronized
+  operations, so a new holder could arrive between them and be overwritten.
+  Concurrent free-tree claims and release had the same race; release also let a
+  non-holder remove a provably stale numeric record.
 
 The replacement repair, while live before its clean seal:
 
@@ -117,8 +123,27 @@ The accepted-pin G0-G12 matrix also passed on exact clean `1e022fc4`: 17 corpus
 modules, 67 vectors, both backends of the pinned LLZK witness tool and both
 output scopes, two renderer fixtures, 19/19 product admissions, exact SMT split
 10/9, and 181 G11 paths. This was repair evidence, not the final
-replacement-candidate matrix. The R8 documentation lane then found and required
-the public-reading-path and live evidence repairs in this commit.
+replacement-candidate matrix. An independent documentation audit then found
+and required the public-reading-path and live evidence repairs in the next
+seal.
+
+Those documentation repairs were sealed at `beb2f54d22b5aa1fd29a2c74461489e11030ab20`.
+Its exact clean accepted-pin matrix passed G0-G12 with the same 17/67/2,
+19/19, 10/9, and 181 counts. This remains diagnostic evidence only: before a
+checked-main matrix began, an independent attached-tree concurrency audit
+rejected the candidate on the owner-record race and stale lifecycle text above.
+The matrix log remained only in `/tmp`, so it is not durable acceptance
+evidence and is not cited as such.
+
+The live replacement repair now serializes every cooperating lock command on a
+separate persistent per-worktree `flock` guard, atomically replaces complete
+three-line owner records, and requires exact owner identity for every release.
+Six deterministic G11 controls queue claims, reclaim, release, status, and
+require behind an externally held guard, make a failed kernel lock preserve the
+owner byte-for-byte, and close the stale-numeric release path. The focused
+working-diff check is `PASS: 187 error paths`; that result is pre-seal repair
+evidence, not candidate evidence. D037 records the platform prerequisite,
+transaction/ownership distinction, and residual advisory bypasses.
 
 The raw nine-declaration output is captured in `axioms.txt`.
 `moduleOutput_eq_of_compile` depends only on `propext`, `Classical.choice`, and
@@ -126,6 +151,7 @@ The raw nine-declaration output is captured in `axioms.txt`.
 Babybear/native proof facts; no printed closure contains `sorryAx`.
 
 This file does not claim a replacement-candidate R8 pass and does not authorize
-publication. After this evidence closure is sealed, its exact clean candidate
-must pass both LLZK toolchain matrices and a full frozen-tree R8 review restarted
-from the beginning before either an R8 pass or publication can be claimed.
+publication. After the transaction repair is independently reviewed and sealed,
+its exact clean candidate must pass both LLZK toolchain matrices and a full
+frozen-tree R8 review restarted from the beginning before either an R8 pass or
+publication can be claimed.

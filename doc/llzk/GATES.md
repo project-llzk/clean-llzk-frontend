@@ -310,7 +310,15 @@ cases exercise the negative directions of `require_llzk_opt_discriminates` and
 `require_llzk_witgen_discriminates`; their positive directions ran on the real
 tools every time while the directions that matter once ran never.
 
-There are now 181 cases. The `llzk-opt` controls separately reject a wholly
+There are now 187 cases. The worktree-lock controls serialize simultaneous
+free-tree claims and queue reclaim, release, status, and require behind an
+externally held transaction guard before changing the recorded owner. They
+also prove the queued descriptor is the exact controller-held guard inode,
+owner updates replace rather than truncate the record inode, a failed `flock`
+leaves the owner byte-identical, a non-holder cannot release a numeric-stale
+record, release preserves the persistent ignored guard inode, and the
+three-line owner record names the sole successful claimant. The
+`llzk-opt` controls separately reject a wholly
 permissive shim, a parser with no LLZK verifier, flag-selective G4/G10a shims,
 and a subtler wrapper which strips `--verify-roundtrip` while delegating to
 honest plain verification. The round-trip discriminator deliberately uses a

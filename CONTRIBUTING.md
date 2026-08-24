@@ -39,16 +39,23 @@ For a frontend change, obtain the pinned tools from `doc/llzk/PINS.md`, claim
 the worktree, and run the full conformance suite:
 
 ```bash
-export LLZK_SESSION=my-session
-export LLZK_OPT=/path/to/llzk-opt
-export LLZK_WITGEN=/path/to/llzk-witgen
-bash scripts/llzk/worktree-lock.sh claim "describe the change"
-bash scripts/llzk/e2e.sh
+(
+  set -e
+  export LLZK_SESSION="contributor-${BASHPID}"
+  export LLZK_OPT=/path/to/llzk-opt
+  export LLZK_WITGEN=/path/to/llzk-witgen
+  bash scripts/llzk/worktree-lock.sh claim "describe the change"
+  trap 'bash scripts/llzk/worktree-lock.sh release' EXIT
+  bash scripts/llzk/e2e.sh
+  bash scripts/llzk/worktree-lock.sh release
+  trap - EXIT
+)
 ```
 
 The claim prevents concurrent sessions from rebuilding the same generated
-artifacts and attributing evidence to the wrong tree. See
-`doc/llzk/CONCURRENCY.md` if the worktree is already claimed.
+artifacts and attributing evidence to the wrong tree; the subshell releases it
+on success or failure. See `doc/llzk/CONCURRENCY.md` if the worktree is already
+claimed.
 
 The public corpus table in `doc/llzk/EXAMPLES.md` is generated from Lean. If a
 corpus entry or its purpose changes, regenerate it explicitly:

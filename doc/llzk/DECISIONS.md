@@ -1549,3 +1549,45 @@ reader-extracted module constraints. Exact application and axiom probes are in
 `evidence/R8-2026-08-23/`. Because this repair followed a frozen-candidate
 rejection, the replacement must pass both full matrices and a restarted R8;
 the earlier candidate's green evidence is not inherited.
+
+## D037 — Serialize advisory owner-record transactions on a persistent guard
+
+**Status:** accepted and enacted by the R8 replacement recovery
+
+**Date:** 2026-08-24
+
+**Enacted by:** replacement repair after R8 rejected `beb2f54d`
+
+D024 said a copied `reclaim --from` value could not displace a holder which
+arrived later. That was false in the enacted shell script: comparison and owner
+replacement were separate operations. Two fresh claims could both observe a
+free tree; release could validate one owner and then remove its successor; and
+status or require could read a partially rewritten three-line record. The
+owner file was an advisory convention, not a serialized protocol.
+
+Every `worktree-lock.sh` action now opens a separate persistent
+`.llzk-worktree-owner.guard` inode and takes an exclusive kernel `flock` before
+the first owner-record read. It holds that guard through its decision, atomic
+temporary-file replacement or removal, and final report. The guard is never
+deleted or renamed. It is a short transaction mutex, not the worktree ownership
+record, and its descriptor closes before `e2e.sh`; retaining it across the run
+would deadlock e2e's nested `require`. Kernel process exit releases the
+transaction lock, while an interrupted session's owner record deliberately
+survives for explicit recovery.
+
+The guarantee is limited to cooperating script invocations. Direct mutation,
+deleting the guard, spoofing or reusing `LLZK_SESSION`, ignoring the script, or
+a deliberate matching `reclaim --from` remain advisory override paths. Within
+that boundary, a queued command rereads the owner after acquiring the guard, so
+an earlier `--from` value cannot replace a successor which arrived through the
+same protocol. Release now always requires exact owner identity, including for
+a numeric owner whose process is gone.
+
+The command fails closed if util-linux `flock` is absent; Ubuntu 24.04 CI and
+the review host provide it, while other hosts must provision a compatible
+implementation. G11 uses Python 3 `os.fstat`/`os.stat` to prove a queued
+descriptor names the controller-held inode without depending on Linux procfs or
+GNU `stat`. It deterministically holds the real guard while queuing concurrent
+claimers and stale reclaim/release/read operations, and also pins exact guard
+identity and persistence, atomic owner replacement, failed-flock preservation,
+complete owner records, and stale-numeric release refusal.

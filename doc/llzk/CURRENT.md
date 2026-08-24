@@ -1,6 +1,6 @@
 # Clean → LLZK current state
 
-Updated: 2026-08-23
+Updated: 2026-08-24
 
 Active milestone: **public-ready Clean to LLZK release candidate** — make the
 repository suitable for an organization-owned home under `project-llzk`, with a
@@ -26,8 +26,12 @@ frozen through clean audit commit `7c567f54`. See
 `evidence/AUDIT-2026-08-22/`. S29 has since completed the XOR range contract and
 Xor32/BLAKE3.G promotions. The first frozen R8 candidate `c60d8363` was reviewed
 and rejected on 2026-08-23 after the review found a module-output theorem gap
-and claim/reproduction defects. Repair and a full R8 restart are in progress;
-no candidate has passed R8 and publication remains out of scope.
+and claim/reproduction defects. Replacement docs candidate `beb2f54d` was also
+rejected on 2026-08-24: its accepted-pin diagnostic matrix was green, but the
+independent attached-tree documentation/concurrency audit found stale lock
+instructions and an unserialized compare-and-displace race. The transaction-lock
+repair and a full R8 restart are in progress; no candidate has passed R8 and
+publication remains out of scope.
 
 Latest completed capability session: **S29 — source-visible XOR byte range and
 headline promotion**. Its first
@@ -468,8 +472,10 @@ an explicit decision, which was given.
   `a3299ca0` the exact `G 0 1 2 3` external promotion. Both full toolchain
   matrices passed with 17 modules, 67 vectors, 19 admissions, 10/9 SMT, both
   scopes/backends, and 177 G11 control cases. Documentary closure HD
-  `c60d8363` became the first frozen R8 candidate; R8 rejected it. The replacement
-  repair has not passed the two-toolchain matrices or restarted R8.
+  `c60d8363` became the first frozen R8 candidate; R8 rejected it. Later
+  candidate `beb2f54d` passed one diagnostic matrix but failed the independent
+  attached-tree lock/documentation audit. The replacement repair has not passed
+  the two-toolchain matrices or restarted R8 from a new clean seal.
 - Blocked: none.
 
 ## Last green gates

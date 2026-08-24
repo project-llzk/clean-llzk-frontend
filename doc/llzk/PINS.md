@@ -12,6 +12,15 @@ updates require an explicit session and decision-log entry.
 | upstream VeIR | `a4e6194d5810a02d74f0094ff6014cda6db6d617` | Long-term Lean MLIR framework |
 | llzk-lean VeIR | `d899d95004d4bd988c8456d686c33b11a7a5eb4a` | Previously accepted differential harness pin |
 
+The conformance host must provide Bash, Python 3, and the util-linux `flock`
+command (or a compatible implementation). `worktree-lock.sh` fails closed
+without `flock`, because all owner-record reads and transitions must be
+serialized. G11 already uses Python for its e2e digest and now also uses portable
+`os.stat`/`os.fstat` descriptor-identity controls. Ubuntu 24.04 CI and the
+recorded review host provide these tools. A macOS/BSD reviewer must provision a
+compatible `flock` or use the documented Linux environment; no path silently
+falls back to an unlocked owner record.
+
 The accepted Clean overlay is a local, frontend-owned direct child of the
 upstream pin; it is not claimed to be published upstream. Its full U..K delta is
 exactly `M Clean/Gadgets/Xor/Xor32.lean`. G0 verifies both immutable commits,

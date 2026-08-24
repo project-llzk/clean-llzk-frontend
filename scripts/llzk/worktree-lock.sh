@@ -33,9 +33,28 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 lock="${repo_root}/.llzk-worktree-owner"
+lock_guard="${lock}.guard"
 
 # shellcheck source=scripts/llzk/lib.sh
 source "${script_dir}/lib.sh"
+
+# Every cooperating invocation serializes its complete owner-record transaction
+# on a separate, persistent inode. Locking the owner record itself would be
+# unsound: `release` removes it, so a waiter could lock the old inode while a new
+# claimant locked its replacement. The guard is never removed. The kernel drops
+# this invocation's flock when the script exits, including after interruption.
+#
+# This is still an advisory protocol: a writer can ignore the script, and an
+# explicit matching `reclaim --from` remains the documented human override. It
+# does make claim/check/write, compare-and-displace, release, and read-only
+# diagnostics serializable with respect to every invocation that uses it.
+command -v flock >/dev/null 2>&1 \
+  || llzk_fail "worktree ownership requires the 'flock' command"
+if ! exec {lock_guard_fd}>>"${lock_guard}"; then
+  llzk_fail "cannot open the worktree lock transaction guard: ${lock_guard}"
+fi
+flock --exclusive "${lock_guard_fd}" \
+  || llzk_fail "cannot acquire the worktree lock transaction guard: ${lock_guard}"
 
 # Identity is LLZK_SESSION when set, and otherwise the POSIX *session id* — not
 # $$ or $PPID, because a session invokes this from many short-lived subshells and
@@ -96,7 +115,18 @@ lock_owner_is_opaque() {
 }
 
 take_it() {
-  printf '%s\n%s\n%s\n' "$(me)" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${lock}"
+  local record
+  record="$(mktemp "${lock}.new.XXXXXX")" \
+    || llzk_fail "cannot create a new worktree owner record"
+  if ! printf '%s\n%s\n%s\n' "$(me)" "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+      > "${record}"; then
+    rm -f -- "${record}"
+    llzk_fail "cannot write the new worktree owner record"
+  fi
+  if ! mv -f -- "${record}" "${lock}"; then
+    rm -f -- "${record}"
+    llzk_fail "cannot install the new worktree owner record"
+  fi
   echo "worktree claimed by session $(me) — $1"
 }
 
@@ -175,7 +205,7 @@ machine can look up. If you know that session is done, say which one you are dis
     ;;
   release)
     if [[ ! -f "${lock}" ]]; then echo "no lock held"; exit 0; fi
-    if lock_is_live && [[ "$(owner_id)" != "$(me)" ]]; then
+    if [[ "$(owner_id)" != "$(me)" ]]; then
       llzk_fail "session $(owner_id) — $(owner_label) holds the lock; only the holder may release it"
     fi
     rm -f "${lock}"; echo "worktree released"

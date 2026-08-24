@@ -18,12 +18,14 @@
 #
 # Deliberately does not invoke `e2e.sh`: that would need the LLZK tools and a
 # Lean build. `lib.sh`'s helpers are called directly, and `check-pins.sh` is
-# driven against throwaway clones, so this runs in about a second with no
-# external dependency beyond git.
+# driven against throwaway clones, so this runs without an LLZK/Lean dependency.
+# It uses the normal gate-host tools, including git, Python 3, and the `flock`
+# prerequisite recorded in PINS.md.
 set -uo pipefail   # not -e: this script runs commands that are meant to fail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
+real_flock="$(command -v flock || true)"
 workdir="$(mktemp -d)"
 trap 'rm -rf "${workdir}"' EXIT
 
@@ -96,6 +98,7 @@ make_clone() {
   local name="$1" dir="${workdir}/$1"
   git clone --quiet --shared --no-checkout "${repo_root}" "${dir}" 2>/dev/null
   git -C "${dir}" checkout --quiet "$(git -C "${repo_root}" rev-parse HEAD)" 2>/dev/null
+  cp "${repo_root}/.gitignore" "${dir}/.gitignore"
   cp "${script_dir}"/*.sh "${script_dir}"/*.py "${dir}/scripts/llzk/"
   echo "${dir}"
 }
@@ -423,6 +426,241 @@ echo "== worktree-lock.sh =="
 # touched. LLZK_SESSION supplies the identity, which is also how a session under
 # an agent harness must supply it -- see the note at the top of the script.
 lock_of() { echo "$1/scripts/llzk/worktree-lock.sh"; }
+guard_of() { echo "$1/.llzk-worktree-owner.guard"; }
+path_identity() {
+  python3 - "$1" <<'PYEOF'
+import os, sys
+
+identity = os.stat(sys.argv[1])
+print(f"{identity.st_dev}:{identity.st_ino}")
+PYEOF
+}
+
+# Run a lock command through the real flock while announcing that it reached
+# the kernel-lock call. The shim first proves the passed descriptor resolves to
+# the same guard inode the controller holds; a wrong-path implementation must
+# not satisfy the barrier by flocking some unrelated file. The controller can
+# then change the owner record and release the queued command without a timing
+# race.
+make_signalling_flock() {
+  local bin="$1"
+  mkdir -p "${bin}"
+  cat > "${bin}/flock" <<'SHIM'
+#!/usr/bin/env bash
+fd="${!#}"
+actual="$(python3 - "${fd}" <<'PYEOF'
+import os, sys
+
+identity = os.fstat(int(sys.argv[1]))
+print(f"{identity.st_dev}:{identity.st_ino}")
+PYEOF
+)" || exit 87
+if [[ "${actual}" != "${LLZK_EXPECTED_GUARD:?}" ]]; then
+  echo "wrong transaction guard: ${actual}, expected ${LLZK_EXPECTED_GUARD}" >&2
+  exit 87
+fi
+: > "${LLZK_FLOCK_SIGNAL_DIR:?}/${LLZK_SESSION:?}"
+exec "${LLZK_REAL_FLOCK:?}" "$@"
+SHIM
+  chmod +x "${bin}/flock"
+}
+
+wait_for_flock_signal() {
+  local signal="$1" pid="$2" spin
+  for ((spin = 0; spin < 500; spin++)); do
+    [[ -f "${signal}" ]] && return 0
+    kill -0 "${pid}" 2>/dev/null || return 1
+    sleep 0.01
+  done
+  return 1
+}
+
+check_concurrent_claims() {
+  local clone="$1" guard bin signals out_a out_b pid_a pid_b status_a status_b
+  local guard_fd guard_identity winner loser owner lines owner_inode_before owner_inode_after
+  guard="$(guard_of "${clone}")"
+  bin="${workdir}/flock-bin-claims"
+  signals="${workdir}/flock-signals-claims"
+  out_a="${workdir}/claim-a.out"
+  out_b="${workdir}/claim-b.out"
+  mkdir -p "${signals}"
+  make_signalling_flock "${bin}"
+
+  exec {guard_fd}>>"${guard}" || return 1
+  guard_identity="$(path_identity "${guard}")" || return 1
+  "${real_flock}" --exclusive "${guard_fd}" || return 1
+  env PATH="${bin}:${PATH}" LLZK_REAL_FLOCK="${real_flock}" \
+    LLZK_EXPECTED_GUARD="${guard_identity}" LLZK_FLOCK_SIGNAL_DIR="${signals}" \
+    LLZK_SESSION=owner-a \
+    bash "$(lock_of "${clone}")" claim "claim A" >"${out_a}" 2>&1 &
+  pid_a=$!
+  env PATH="${bin}:${PATH}" LLZK_REAL_FLOCK="${real_flock}" \
+    LLZK_EXPECTED_GUARD="${guard_identity}" LLZK_FLOCK_SIGNAL_DIR="${signals}" \
+    LLZK_SESSION=owner-b \
+    bash "$(lock_of "${clone}")" claim "claim B" >"${out_b}" 2>&1 &
+  pid_b=$!
+  if ! wait_for_flock_signal "${signals}/owner-a" "${pid_a}" \
+      || ! wait_for_flock_signal "${signals}/owner-b" "${pid_b}"; then
+    "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
+    wait "${pid_a}" 2>/dev/null; wait "${pid_b}" 2>/dev/null
+    echo "a claimant did not reach the transaction guard"; return 1
+  fi
+  "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
+  wait "${pid_a}"; status_a=$?
+  wait "${pid_b}"; status_b=$?
+
+  if [[ "${status_a}" -eq 0 && "${status_b}" -eq 1 ]]; then
+    winner=owner-a; loser="${out_b}"
+  elif [[ "${status_a}" -eq 1 && "${status_b}" -eq 0 ]]; then
+    winner=owner-b; loser="${out_a}"
+  else
+    echo "claim exits were ${status_a}/${status_b}, expected one 0 and one 1"; return 1
+  fi
+  owner="$(sed -n '1p' "${clone}/.llzk-worktree-owner")"
+  lines="$(wc -l < "${clone}/.llzk-worktree-owner" | tr -d ' ')"
+  [[ "${owner}" == "${winner}" ]] || { echo "winner ${winner}, record ${owner}"; return 1; }
+  [[ "${lines}" == 3 ]] || { echo "owner record has ${lines} lines"; return 1; }
+  rg -q "held by session ${winner}" "${loser}" || return 1
+  git -C "${clone}" check-ignore -q .llzk-worktree-owner.guard || return 1
+  git -C "${clone}" check-ignore -q .llzk-worktree-owner.new.control || return 1
+  owner_inode_before="$(path_identity "${clone}/.llzk-worktree-owner")" || return 1
+  env LLZK_SESSION="${winner}" bash "$(lock_of "${clone}")" \
+    reclaim "atomic relabel" >/dev/null || return 1
+  owner_inode_after="$(path_identity "${clone}/.llzk-worktree-owner")" || return 1
+  [[ "${owner_inode_before}" != "${owner_inode_after}" ]] \
+    || { echo "owner record was not atomically replaced"; return 1; }
+  env LLZK_SESSION="${winner}" bash "$(lock_of "${clone}")" release >/dev/null || return 1
+  [[ -f "${guard}" ]] || { echo "release removed the transaction guard"; return 1; }
+  [[ "$(path_identity "${guard}")" == "${guard_identity}" ]] \
+    || { echo "release replaced the transaction guard inode"; return 1; }
+  echo "concurrent claims serialized; complete owner record matched the sole winner"
+}
+
+check_reclaim_rereads_owner() {
+  local clone="$1" guard bin signals out pid status guard_fd guard_identity
+  guard="$(guard_of "${clone}")"
+  bin="${workdir}/flock-bin-reclaim"
+  signals="${workdir}/flock-signals-reclaim"
+  out="${workdir}/reclaim-reread.out"
+  mkdir -p "${signals}"
+  make_signalling_flock "${bin}"
+  printf 'old\nold owner\n2026-01-01T00:00:00Z\n' > "${clone}/.llzk-worktree-owner"
+
+  exec {guard_fd}>>"${guard}" || return 1
+  guard_identity="$(path_identity "${guard}")" || return 1
+  "${real_flock}" --exclusive "${guard_fd}" || return 1
+  env PATH="${bin}:${PATH}" LLZK_REAL_FLOCK="${real_flock}" \
+    LLZK_EXPECTED_GUARD="${guard_identity}" LLZK_FLOCK_SIGNAL_DIR="${signals}" \
+    LLZK_SESSION=reclaimer \
+    bash "$(lock_of "${clone}")" reclaim "new work" --from old >"${out}" 2>&1 &
+  pid=$!
+  if ! wait_for_flock_signal "${signals}/reclaimer" "${pid}"; then
+    "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
+    wait "${pid}" 2>/dev/null
+    echo "reclaimer did not reach the transaction guard"; return 1
+  fi
+  printf 'new\nnew owner\n2026-02-02T00:00:00Z\n' > "${clone}/.llzk-worktree-owner"
+  "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
+  wait "${pid}"; status=$?
+  [[ "${status}" -eq 1 ]] || { echo "stale reclaim exited ${status}"; return 1; }
+  rg -q -- "--from old does not match the recorded owner new" "${out}" || return 1
+  [[ "$(sed -n '1p' "${clone}/.llzk-worktree-owner")" == new ]] || return 1
+  echo "queued reclaim reread and preserved the replacement owner"
+}
+
+check_release_rereads_owner() {
+  local clone="$1" guard bin signals out pid status guard_fd guard_identity
+  guard="$(guard_of "${clone}")"
+  bin="${workdir}/flock-bin-release"
+  signals="${workdir}/flock-signals-release"
+  out="${workdir}/release-reread.out"
+  mkdir -p "${signals}"
+  make_signalling_flock "${bin}"
+  printf 'old\nold owner\n2026-01-01T00:00:00Z\n' > "${clone}/.llzk-worktree-owner"
+
+  exec {guard_fd}>>"${guard}" || return 1
+  guard_identity="$(path_identity "${guard}")" || return 1
+  "${real_flock}" --exclusive "${guard_fd}" || return 1
+  env PATH="${bin}:${PATH}" LLZK_REAL_FLOCK="${real_flock}" \
+    LLZK_EXPECTED_GUARD="${guard_identity}" LLZK_FLOCK_SIGNAL_DIR="${signals}" \
+    LLZK_SESSION=old \
+    bash "$(lock_of "${clone}")" release >"${out}" 2>&1 &
+  pid=$!
+  if ! wait_for_flock_signal "${signals}/old" "${pid}"; then
+    "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
+    wait "${pid}" 2>/dev/null
+    echo "releaser did not reach the transaction guard"; return 1
+  fi
+  printf 'new\nnew owner\n2026-02-02T00:00:00Z\n' > "${clone}/.llzk-worktree-owner"
+  "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
+  wait "${pid}"; status=$?
+  [[ "${status}" -eq 1 ]] || { echo "stale release exited ${status}"; return 1; }
+  rg -q "session new .* only the holder may release it" "${out}" || return 1
+  [[ "$(sed -n '1p' "${clone}/.llzk-worktree-owner")" == new ]] || return 1
+  echo "queued release reread and preserved the replacement owner"
+}
+
+check_readers_reread_owner() {
+  local clone="$1" guard bin signals status_out require_out status_pid require_pid
+  local status_status require_status guard_fd guard_identity
+  guard="$(guard_of "${clone}")"
+  bin="${workdir}/flock-bin-readers"
+  signals="${workdir}/flock-signals-readers"
+  status_out="${workdir}/status-reread.out"
+  require_out="${workdir}/require-reread.out"
+  mkdir -p "${signals}"
+  make_signalling_flock "${bin}"
+  printf 'old\nold owner\n2026-01-01T00:00:00Z\n' > "${clone}/.llzk-worktree-owner"
+
+  exec {guard_fd}>>"${guard}" || return 1
+  guard_identity="$(path_identity "${guard}")" || return 1
+  "${real_flock}" --exclusive "${guard_fd}" || return 1
+  env PATH="${bin}:${PATH}" LLZK_REAL_FLOCK="${real_flock}" \
+    LLZK_EXPECTED_GUARD="${guard_identity}" LLZK_FLOCK_SIGNAL_DIR="${signals}" \
+    LLZK_SESSION=status-reader \
+    bash "$(lock_of "${clone}")" status >"${status_out}" 2>&1 &
+  status_pid=$!
+  env PATH="${bin}:${PATH}" LLZK_REAL_FLOCK="${real_flock}" \
+    LLZK_EXPECTED_GUARD="${guard_identity}" LLZK_FLOCK_SIGNAL_DIR="${signals}" \
+    LLZK_SESSION=old \
+    bash "$(lock_of "${clone}")" require >"${require_out}" 2>&1 &
+  require_pid=$!
+  if ! wait_for_flock_signal "${signals}/status-reader" "${status_pid}" \
+      || ! wait_for_flock_signal "${signals}/old" "${require_pid}"; then
+    "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
+    wait "${status_pid}" 2>/dev/null; wait "${require_pid}" 2>/dev/null
+    echo "a reader did not reach the transaction guard"; return 1
+  fi
+  printf 'new\nnew owner\n2026-02-02T00:00:00Z\n' > "${clone}/.llzk-worktree-owner"
+  "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
+  wait "${status_pid}"; status_status=$?
+  wait "${require_pid}"; require_status=$?
+  [[ "${status_status}" -eq 0 && "${require_status}" -eq 1 ]] || return 1
+  rg -q "worktree held by session new" "${status_out}" || return 1
+  rg -q "held by new" "${require_out}" || return 1
+  echo "queued status and require both read the post-guard owner"
+}
+
+check_flock_failure_preserves_owner() {
+  local clone="$1" bin out status before after
+  bin="${workdir}/flock-bin-failing"
+  out="${workdir}/flock-failing.out"
+  mkdir -p "${bin}"
+  cat > "${bin}/flock" <<'SHIM'
+#!/usr/bin/env bash
+exit 86
+SHIM
+  chmod +x "${bin}/flock"
+  printf 'owner\nexisting owner\n2026-01-01T00:00:00Z\n' > "${clone}/.llzk-worktree-owner"
+  before="$(sha256sum "${clone}/.llzk-worktree-owner" | cut -d' ' -f1)"
+  env PATH="${bin}:${PATH}" LLZK_SESSION=intruder \
+    bash "$(lock_of "${clone}")" reclaim "intrusion" --from owner >"${out}" 2>&1
+  status=$?
+  after="$(sha256sum "${clone}/.llzk-worktree-owner" | cut -d' ' -f1)"
+  [[ "${status}" -ne 0 && "${before}" == "${after}" ]] || return 1
+  rg -q "cannot acquire the worktree lock transaction guard" "${out}" || return 1
+  echo "failed flock left the owner record byte-identical"
+}
 
 clone="$(make_clone lock-unheld)"
 expect "require with no lock" 1 "does not hold the worktree lock" \
@@ -486,10 +724,42 @@ expect "reclaim --from takes an opaque lock" 0 "reclaiming a stale lock from ses
 expect "the reclaimer now holds it" 0 "worktree lock: held" \
   -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" require
 
+# R8. The owner record used to be a check-then-write convention with no
+# serialization. These controls hold the real guard before launching each
+# command and use a signalling flock shim to prove the command is queued at the
+# kernel boundary before the controller changes ownership.
+clone="$(make_clone lock-concurrent-claims)"
+expect "concurrent free-tree claims serialize" 0 "matched the sole winner" \
+  -- check_concurrent_claims "${clone}"
+
+clone="$(make_clone lock-reclaim-rereads)"
+expect "reclaim --from rereads after the transaction guard" 0 "preserved the replacement owner" \
+  -- check_reclaim_rereads_owner "${clone}"
+
+clone="$(make_clone lock-release-rereads)"
+expect "release rereads after the transaction guard" 0 "preserved the replacement owner" \
+  -- check_release_rereads_owner "${clone}"
+
+clone="$(make_clone lock-readers-reread)"
+expect "status and require read after the transaction guard" 0 "both read the post-guard owner" \
+  -- check_readers_reread_owner "${clone}"
+
+clone="$(make_clone lock-flock-failure)"
+expect "a failed flock preserves the owner record" 0 "byte-identical" \
+  -- check_flock_failure_preserves_owner "${clone}"
+
 # Reclaiming a tree you already hold is a relabel, not a displacement: there is
 # no stale owner to announce.
+clone="$(make_clone lock-reclaim-self)"
+env LLZK_SESSION=tester bash "$(lock_of "${clone}")" claim "the first thing" >/dev/null
 expect "reclaiming your own lock does not announce a stale owner" 0 "worktree claimed by session tester" \
   -- env LLZK_SESSION=tester bash "$(lock_of "${clone}")" reclaim "a second thing"
+
+clone="$(make_clone lock-release-stale-numeric)"
+printf '999999\na stale session\n2026-01-01T00:00:00Z\n' \
+  > "${clone}/.llzk-worktree-owner"
+expect "a non-holder cannot release a stale numeric lock" 1 "only the holder may release it" \
+  -- env LLZK_SESSION=intruder bash "$(lock_of "${clone}")" release
 
 clone="$(make_clone lock-release)"
 env LLZK_SESSION=owner bash "$(lock_of "${clone}")" claim "the owner" >/dev/null

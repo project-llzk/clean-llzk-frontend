@@ -33,6 +33,7 @@ bash scripts/llzk/worktree-lock.sh status                 # who owns it
 bash scripts/llzk/worktree-lock.sh claim "S23 X1 closure" # take it, or find out who has it
 bash scripts/llzk/worktree-lock.sh require                # assert before writing
 bash scripts/llzk/worktree-lock.sh reclaim "S24"          # take one whose owner is gone
+bash scripts/llzk/worktree-lock.sh reclaim "S24" --from '<opaque-owner-id>'
 bash scripts/llzk/worktree-lock.sh release                # give it back
 ```
 
@@ -41,8 +42,19 @@ session recognises its own lock from any subshell. Liveness **fails closed**: an
 owner that cannot be checked counts as live, because treating "cannot tell" as
 "dead" is the failure this guards against. A stale lock — a numeric session
 leader that is provably gone — is *reported* and taken only by `reclaim`, never
-by `claim`. A genuinely stuck lock is cleared by deleting
-`.llzk-worktree-owner`, which is a deliberate act and gitignored.
+by `claim`. For an opaque owner, inspect `status`, confirm the recorded session
+is finished, and use the exact `reclaim --from` form printed by the refusal.
+Do not delete the owner record or transaction guard directly.
+
+Every command above takes an exclusive, short-lived transaction lock on the
+persistent `.llzk-worktree-owner.guard` inode before it reads the owner and
+holds that kernel `flock` through its decision and any owner-record replacement
+or removal. This serializes cooperating claim/reclaim/release/status/require
+invocations; the guard is not the long-lived ownership claim and is not retained
+across `e2e.sh`. Never delete or replace the guard file. A process exit releases
+its kernel lock automatically, while an owner record left by an interrupted
+session deliberately remains for explicit recovery. The command fails closed
+if the util-linux `flock` executable is unavailable; see `PINS.md`.
 
 ## Set `LLZK_SESSION` if you are an agent session
 
@@ -80,8 +92,14 @@ LLZK_SESSION=S24 bash scripts/llzk/e2e.sh
 This is discoverable rather than remembered: `require`'s refusal names
 `LLZK_SESSION` and prints the identity it computed for the current process.
 
-It is advisory. It cannot stop a determined writer and does not try. It makes
-ownership visible and checkable, which is the same treatment
+It is advisory. Direct owner-file mutation, deletion or replacement of the
+guard, reusing another activity's `LLZK_SESSION`, or simply ignoring this
+script can bypass it. A matching `reclaim --from` is also an explicit operator
+override, including when the named activity is actually still live. Among
+cooperating calls, however, the transaction guard prevents two free-tree claims
+from both succeeding and prevents an earlier `--from` value from displacing a
+holder that arrived before the reclaimer acquired the guard. The mechanism
+makes ownership visible and checkable, which is the same treatment
 `Config.unsafeWithTables` got in S22: the unsafe path stays available, and
 becomes loud.
 
