@@ -1,0 +1,214 @@
+== check-pins.sh ==
+ok   no upstream remote
+ok   wrong upstream URL
+ok   pinned upstream base absent
+ok   pinned Clean overlay absent
+ok   Clean overlay unrelated to upstream base
+ok   Clean overlay is not a direct child
+ok   unexpected extra Clean overlay path
+ok   unexpected Clean overlay status
+ok   HEAD not descended from overlay
+ok   toolchain mismatch
+ok   a change to Clean's core is caught
+ok   an uncommitted change to Clean's core is caught
+ok   a committed post-overlay Xor32 change is caught
+ok   an uncommitted post-overlay Xor32 change is caught
+ok   happy path
+
+== check-actions-pinned.sh ==
+ok   a missing grep dependency fails with a named diagnostic
+ok   a missing sha256sum dependency fails with a named diagnostic
+ok   the exact repository workflow manifest is accepted
+ok   a workflow content mutation breaks the exact manifest
+ok   a workflow hashing failure breaks the exact manifest
+ok   a hidden workflow addition breaks the exact manifest
+ok   a nested workflow addition breaks the exact manifest
+ok   a renamed workflow breaks the exact manifest
+ok   a workflow-shaped symlink breaks the exact manifest
+ok   a workflow directory with no action references fails closed
+ok   a mutable action tag is caught
+ok   immutable and local actions are accepted
+ok   an action line-scan grep failure is not treated as no match
+ok   a hidden workflow cannot escape action policy
+ok   a hidden workflow cannot escape runner policy
+ok   a secondary grep failure is not treated as no match
+ok   a moving hosted runner label is caught
+ok   an implicit self-hosted job is caught
+ok   an explicitly gated self-hosted job is accepted
+ok   a hosted benchmark entry point also requires opt-in
+ok   a non-read-only workflow token is caught
+ok   a moving Rust toolchain is caught
+ok   an LLZK CI build without the trusted binary-cache boundary is caught
+ok   the repository workflows satisfy the action policy
+
+== check-confinement.sh ==
+ok   unsafeWithTables outside its modules
+ok   lowerRecognized outside its modules
+ok   compileSource outside its modules
+ok   compileSourceVerified is not confined
+ok   a docstring mention is not a call site
+ok   a comment does not hide a call site below it
+ok   a -- inside a string does not blank the rest of the file
+ok   confinement happy path
+
+== worktree-lock.sh ==
+ok   require with no lock
+ok   require while another session holds it
+ok   claim while another session holds it
+ok   reclaim while an opaque holder is recorded
+ok   require as the holder
+ok   reclaim while the holder is provably live
+ok   claim does not silently take a stale lock
+ok   status reports a stale lock as reclaimable
+ok   reclaim takes a stale lock, and says so
+ok   claim names --from for an opaque owner
+ok   status reports an opaque owner as undecidable
+ok   bare reclaim refuses an opaque owner, and says how
+ok   reclaim --from refuses the wrong owner
+ok   reclaim --from takes an opaque lock
+ok   the reclaimer now holds it
+ok   concurrent free-tree claims serialize
+ok   reclaim --from rereads after the transaction guard
+ok   release rereads after the transaction guard
+ok   status and require read after the transaction guard
+ok   a failed flock preserves the owner record
+ok   reclaiming your own lock does not announce a stale owner
+ok   a non-holder cannot release a stale numeric lock
+ok   only the holder may release
+ok   the holder may release
+
+== lib.sh tool checks ==
+ok   LLZK_OPT unset
+ok   tool not executable
+ok   wrong LLZK version
+ok   right LLZK version
+ok   witgen from another install
+
+== lib.sh discriminate self-tests ==
+ok   llzk-opt self-test catches a permissive shim
+ok   llzk-opt self-test catches a roundtrip-only permissive shim
+ok   llzk-opt self-test catches a no-op roundtrip flag
+ok   llzk-opt self-test catches a product-only permissive shim
+ok   llzk-opt self-test catches a root-permissive product shim
+ok   llzk-witgen self-test catches a permissive shim
+ok   strict widest self-test independently requires three witness cells
+ok   strict widest self-test independently requires three full outputs
+ok   strict widest self-test independently requires three public outputs
+ok   llzk-witgen self-test rejects an unknown discriminator mode
+ok   llzk-opt self-test catches a parser with no LLZK verifier
+ok   llzk-witgen self-test catches a stub execution engine
+ok   llzk-witgen self-test catches a permissive public scope
+ok   out0-only checker accepts its correct public baseline
+ok   out0-only checker rejects the public field it checks
+ok   out0-only checker demonstrably ignores a middle public mutation
+ok   llzk-witgen self-test catches a checker that validates only out0
+ok   w0-only checker accepts its correct full-witness baseline
+ok   w0-only checker rejects the witness cell it checks
+ok   w0-only checker demonstrably ignores a middle witness-cell mutation
+ok   llzk-witgen self-test catches a checker that validates only w0
+ok   full out0-only checker accepts its correct full-witness baseline
+ok   full out0-only checker rejects the output field it checks
+ok   full out0-only checker demonstrably ignores a middle output mutation
+ok   full-witness self-test catches a checker that validates only out0
+ok   witness discriminator uses numeric first middle and last positions
+ok   Xor32 raw generator produces the exact old full and public results
+ok   Xor32 raw generator rejects a wrong input layout
+ok   Xor32 raw generator rejects a baseline that is not narrowed
+ok   Xor32 raw generator rejects a raw/narrowed collision
+ok   Xor32 raw generator rejects a nondecimal input
+ok   Xor32 raw generator rejects a boolean input
+ok   Xor32 raw generator rejects a lossy float input
+ok   Xor32 raw generator rejects a noncanonical input
+ok   Xor32 raw generator rejects a wrong full layout
+ok   Xor32 raw generator rejects full-witness input drift
+ok   Xor32 raw generator rejects a non-narrowed witness cell
+ok   Xor32 raw generator rejects a non-narrowed full output
+ok   Xor32 raw generator rejects a wrong public layout
+ok   exhaustive discriminator requires an output count
+ok   exhaustive discriminator rejects a zero output count
+ok   sampled discriminator rejects exhaustive-only arguments
+ok   exhaustive discriminator rejects a one-sided alternate
+ok   exhaustive discriminator rejects a public-only alternate
+ok   exhaustive discriminator rejects a wrong full-output layout
+ok   exhaustive discriminator rejects a wrong public-output layout
+ok   exhaustive discriminator rejects full/public baseline disagreement
+ok   exhaustive discriminator rejects alternate key-set drift
+ok   exhaustive discriminator rejects an alternate with a no-op output
+ok   exhaustive discriminator rejects alternate input drift
+ok   exhaustive discriminator rejects alternate signal-key drift
+ok   exhaustive discriminator rejects alternate full/public disagreement
+ok   exhaustive Xor discriminator accepts an honest content-aware checker
+ok   full out1-omitting checker accepts its baseline
+ok   full out1-omitting checker rejects out0
+ok   full out1-omitting checker demonstrably ignores out1
+ok   exhaustive discriminator catches a full checker that omits out1
+ok   public out1-omitting checker accepts its baseline
+ok   public out1-omitting checker rejects out0
+ok   public out1-omitting checker demonstrably ignores out1
+ok   exhaustive discriminator catches a public checker that omits out1
+ok   raw-full-accepting checker accepts its baseline
+ok   raw-full-accepting checker rejects an individual output mutation
+ok   raw-full-accepting checker demonstrably accepts the raw witness
+ok   exhaustive discriminator catches a checker that accepts the raw full witness
+ok   raw-public-accepting checker accepts its baseline
+ok   raw-public-accepting checker rejects an individual output mutation
+ok   raw-public-accepting checker demonstrably accepts the raw output
+ok   exhaustive discriminator catches a checker that accepts the raw public output
+ok   full path-specializing checker accepts its baseline
+ok   full path-specializing checker rejects an individual mutation
+ok   full path-specializing checker rejects only the predictable raw path
+ok   PID-derived non-raw path catches the full path-specializing checker
+ok   public path-specializing checker accepts its baseline
+ok   public path-specializing checker rejects an individual mutation
+ok   public path-specializing checker rejects only the predictable raw path
+ok   PID-derived non-raw path catches the public path-specializing checker
+ok   BLAKE exhaustive interface reaches every exact key
+ok   BLAKE exhaustive interface mutation log is complete
+ok   BLAKE partial checker accepts its baseline
+ok   BLAKE partial checker demonstrably ignores w42
+ok   BLAKE exhaustive interface catches a checker that ignores w42
+ok   BLAKE exhaustive interface requires an input count
+ok   BLAKE exhaustive interface rejects a zero witness count
+ok   BLAKE exhaustive interface rejects a nonnumeric output count
+ok   BLAKE exhaustive interface rejects an empty tenth and nonempty eleventh argument
+ok   BLAKE exhaustive interface uses a valid positive input count
+ok   BLAKE exhaustive interface uses a valid positive witness count
+ok   BLAKE exhaustive interface uses a valid positive output count
+ok   BLAKE exhaustive interface rejects a zero input count
+ok   BLAKE exhaustive interface rejects a nonnumeric input count
+ok   BLAKE exhaustive interface rejects a missing witness count
+ok   BLAKE exhaustive interface rejects a nonnumeric witness count
+ok   BLAKE exhaustive interface rejects a missing output count
+ok   BLAKE exhaustive interface rejects a zero output count
+ok   BLAKE exhaustive interface rejects an extra argument
+ok   BLAKE exhaustive interface rejects missing-w95
+ok   BLAKE exhaustive interface rejects extra-w96
+ok   BLAKE exhaustive interface rejects malformed-w01
+ok   BLAKE exhaustive interface rejects missing-out63
+ok   BLAKE exhaustive interface rejects extra-public-out64
+ok   BLAKE exhaustive interface rejects missing-arg71
+ok   BLAKE exhaustive interface rejects extra-arg72
+ok   BLAKE exhaustive interface rejects full-input-drift
+ok   BLAKE exhaustive interface rejects full-public-disagree
+ok   BLAKE exhaustive interface rejects boolean-signal
+ok   BLAKE exhaustive interface rejects float-public
+ok   BLAKE exhaustive interface rejects noncanonical-input
+ok   widest public-output artifact is selected from emitted expectations
+ok   widest selector resolves equal widths deterministically
+ok   widest selector rejects a non-object public expectation
+ok   widest selector rejects a missing paired input
+ok   widest selector rejects a directory with no candidates
+ok   exact count accepts equality
+ok   exact count rejects a smaller value
+ok   exact count rejects a larger value
+ok   exact count rejects a non-natural value
+ok   e2e headline discriminator wiring is source pinned
+ok   e2e Xor32 source pin rejects unreachable discriminator calls
+ok   e2e Xor32 outside-wrapper fixture is valid shell
+ok   e2e Xor32 source pin rejects an unreachable wrapped block
+ok   e2e BLAKE3.G source pin rejects unreachable vector preflights
+ok   e2e BLAKE3.G outside-wrapper fixture is valid shell
+ok   e2e BLAKE3.G source pin rejects an unreachable wrapped block
+ok   e2e exact counts are literal source pins
+
+PASS: 201 error paths exercised

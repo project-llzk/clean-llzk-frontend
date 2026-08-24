@@ -35,7 +35,9 @@ public documentation and hygiene
   → S29 documentation and evidence closure (`c60d8363`, complete locally)
   → first frozen R8 candidate `c60d8363` rejected
   → replacement code candidate `193ec342` passes local R8
-  → explicit publication decision (not authorized)
+  → public bootstrap `03150549` exposes missing-ripgrep hosted-CI failure
+  → portability candidate `f6ef1331` passes both local matrices and review
+  → exact documentation-child push CI, then one exact-candidate dispatch
 ```
 
 This order joins the three goals that matter for publication. S25 removed the
@@ -53,9 +55,14 @@ BLAKE3.G `G 0 1 2 3` follows on `a3299ca0`. Documentary closure `c60d8363`
 became the first frozen R8 candidate and was rejected after independent review
 found a module-output theorem gap and claim/reproduction defects. Its replacement
 repair was sealed through code candidate `193ec342`, which passed both exact
-toolchain matrices and the restarted three-lane local R8. That result is not a
-publication action: organization CI, repository creation or transfer, and a
-push remain separately authorized steps.
+toolchain matrices and the restarted three-lane local R8. The organization
+repository was then bootstrapped and made intentionally Public by owner
+decision. Its exact `03150549` push run exposed the undeclared `rg` dependency.
+Direct-child recovery candidate `f6ef1331` removes all 17 runtime ripgrep calls
+from the two assurance scripts, binds the repository invocation to exact
+workflow bytes, and passed both matrices plus three independent reviews. It
+remains a local candidate until the separately authorized exact documentation
+push and exact-candidate dispatch both succeed in hosted CI.
 
 The corpus remains finite across cardinalities as well as constructors. A
 source-backed circuit with zero inputs is representable by the current Clean and

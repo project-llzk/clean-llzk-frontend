@@ -1,0 +1,43 @@
+    Finished `release` profile [optimized] target(s) in 0.03s
+     Running tests/fib_tests.rs (target/release/deps/fib_tests-18894d4cc106043c)
+    Finished `release` profile [optimized] target(s) in 0.03s
+     Running tests/fib_tests.rs (target/release/deps/fib_tests-18894d4cc106043c)
+
+running 1 test
+test test_lean_circuit_end_to_end ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.58s
+
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/lookup_negative_tests.rs (target/debug/deps/lookup_negative_tests-bfa5f21910f6d4d4)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.04s
+     Running tests/lookup_negative_tests.rs (target/debug/deps/lookup_negative_tests-bfa5f21910f6d4d4)
+
+running 2 tests
+test test_tampered_multiplicity_prover_table_debug - should panic ... ok
+test test_tampered_multiplicity_preprocessed_table_debug - should panic ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running tests/lookup_negative_tests.rs (target/release/deps/lookup_negative_tests-fb5ccc639bf2091b)
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running tests/lookup_negative_tests.rs (target/release/deps/lookup_negative_tests-fb5ccc639bf2091b)
+
+running 2 tests
+test test_tampered_multiplicity_prover_table_release ... ok
+test test_tampered_multiplicity_preprocessed_table_release ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running tests/femtocairo_tests.rs (target/release/deps/femtocairo_tests-02bcadd892c1e118)
+    Finished `release` profile [optimized] target(s) in 0.04s
+     Running tests/femtocairo_tests.rs (target/release/deps/femtocairo_tests-02bcadd892c1e118)
+
+running 2 tests
+test test_femtocairo_memory_e2e ... ok
+test test_femtocairo_e2e ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.14s
+

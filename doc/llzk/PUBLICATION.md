@@ -1,29 +1,26 @@
 # Organization publication settings
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 
-Status: prepared locally; no repository creation, transfer, push, or settings
-change is authorized by this document
+Status: intentionally Public bootstrap; hosted-CI portability recovery in
+progress; publication closure and settings changes remain incomplete
 
-This is the settings sheet for the final publication action. It makes D027's
-repository choice and the non-code parts of `PUBLIC-READINESS.md` reviewable
-before anybody changes GitHub state.
+This is the current-state and settings sheet for the organization repository.
+It records completed bootstrap facts separately from the narrow recovery now
+authorized and from later publication work that remains unauthorized.
 
 ## Repository identity
 
-Preferred destination: `project-llzk/clean-llzk-frontend`.
-
-The descriptive name makes this repository legible beside the organization's
-Circom, Halo2/PLONKish, Airbender, and Noir frontends. Preserving the GitHub fork
-badge by transferring the personal `clean` fork remains an alternative, but it
-must be chosen explicitly; this sheet does not decide or perform the transfer.
+Actual destination: `project-llzk/clean-llzk-frontend`, repository ID
+`1345370888`, with full selected history. The repository was created on
+2026-08-24 and its Public visibility is intentional by explicit owner decision.
 
 Proposed metadata:
 
 | Setting | Value |
 |---|---|
 | Description | Assurance-oriented Clean frontend for LLZK, implemented and checked in Lean 4 |
-| Visibility | Private bootstrap; controlled Public activation after exact-SHA CI |
+| Visibility | Public; keep Public |
 | Default branch | `main` |
 | Topics | `llzk`, `lean4`, `formal-verification`, `zero-knowledge`, `zkp`, `compiler`, `clean` |
 | Issues | Enabled |
@@ -32,8 +29,8 @@ Proposed metadata:
 | Discussions | Disabled initially; enable only with an owner and moderation plan |
 | Merge strategy | Squash merge; delete head branches after merge |
 
-The organization profile should add this entry under “Frontends” after the
-repository exists:
+The organization profile should add this entry under “Frontends” only after
+publication closure:
 
 ```markdown
 - [Clean](https://github.com/project-llzk/clean-llzk-frontend)
@@ -44,48 +41,32 @@ Clean entry, `project-llzk/llzk-lib` has no repository security policy, and its
 private vulnerability reporting is disabled. Do not assume organization-wide
 defaults supply either feature for this repository.
 
-`project-llzk` is currently on GitHub Free. GitHub provides
-[protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches)
-for this plan only on public repositories, while
-[private vulnerability reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting)
-is itself a public-repository feature. Therefore a private bootstrap cannot
-install the final protection first. The Free-plan path below bounds the
-activation interval and forbids any push during it. An upgrade to Team would
-permit protection while private, but is a separate cost and authorization, not
-an assumed prerequisite.
-
-The current CLI credential could read repository-level settings but could not
-read organization Actions policy or billing/minute allowance. Before creating
-the repository, an authorized operator must verify that policy and private-run
-capacity through an appropriately scoped credential or the organization UI.
-Failure to establish either is a stop condition, not permission to make the
-repository public early.
+`project-llzk` is currently on GitHub Free. Public visibility now permits the
+planned branch protection and
+[private vulnerability reporting](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting),
+but neither is enabled. Main is unprotected; Dependabot security updates,
+secret scanning, and push protection are also disabled. Those are exposed
+bootstrap boundaries, not implicit authorization to change settings during the
+portability recovery.
 
 ## Commit roles
 
-- `193ec342cb2aae9055c36f4f77d2a4fe23da7823` is the immutable code candidate
-  that passed both local matrices and R8.
-- Its reviewed documentation descendant is the proposed initial organization
-  `main`; it must include the final evidence rather than stopping at the code
-  candidate.
-- Any later publication-evidence merge is a distinct public tip. It does not
-  retroactively become the locally matrix-tested code candidate.
+- `193ec342cb2aae9055c36f4f77d2a4fe23da7823` remains the semantic R8 code
+  candidate and theorem/reproduction evidence authority.
+- `03150549adebd1ef4d83d1415bdcd117e9887493` is the exposed bootstrap `main`.
+- `f6ef1331ee860a2395d7058025da488e2553a390` is the tested hosted-portability
+  candidate C, the sole direct child of `03150549`.
+- C's reviewed documentation/evidence-only sole child D is the proposed
+  replacement `main`. D is not relabelled as the locally matrix-tested code SHA.
 
-Run all four organization jobs at exact `193ec342`, at the exact initial `main`,
-and at every later protected-main merge used for publication closure. A PR check
-on GitHub's synthetic merge revision, a squash-created replacement SHA, or a
-green parent is not evidence for any of those exact commits.
+Run all four organization jobs first on exact D through its automatic
+`event=push` run. Only if that attempt-1 run is wholly green may C be pushed as
+`r8-code-candidate-f6ef1331` and `ci.yml` dispatched once on that branch. Accept
+only `event=workflow_dispatch` with `head_sha=f6ef1331`; the separate main result
+must be its push-event run at exact D. A parent, rerun, synthetic merge revision,
+or job-name match without the exact SHA/event does not substitute.
 
-The exact code candidate is reached through dedicated branch
-`r8-code-candidate-193ec342`. `workflow_dispatch` takes a branch or tag rather
-than a raw SHA and the workflow must already exist on default `main`: push and
-verify initial `main`, push
-`193ec342:refs/heads/r8-code-candidate-193ec342`, verify that ref, then dispatch
-`ci.yml --ref r8-code-candidate-193ec342`. Accept only
-`event=workflow_dispatch` with `head_sha=193ec342`; the separate initial-main
-result must be its `push`-event run at that exact documentation SHA.
-
-## Default-branch protection
+## Desired default-branch protection (not yet authorized)
 
 Configure `main` with:
 
@@ -117,7 +98,7 @@ available to approve the later evidence PR; its author cannot approve it. If no
 qualified reviewer exists, publication pauses rather than weakening or
 bypassing the rule.
 
-## Security and Actions
+## Desired security and Actions state (not yet authorized)
 
 - Enable GitHub private vulnerability reporting before announcing the
   repository; `SECURITY.md` directs reporters to it.
@@ -142,60 +123,39 @@ bypassing the rule.
 
 ## Publication procedure
 
-Only after L0, S26, S28, promoted headline examples, and R8 are complete:
+Repository creation and the owner-directed Public visibility change are already
+facts. The currently authorized recovery is deliberately narrower than the
+remaining settings sheet:
 
-Sealing this document authorizes none of the actions below. One explicit user
-decision may authorize the complete enumerated packet, but it must name the
-descriptive-repository topology and cover repository creation, the local
-publication remote, both exact ref pushes, workflow dispatch, metadata,
-protection, security settings, public visibility, anonymous verification,
-organization-profile edit, the evidence PR/merge, and contingency return to
-Private if activation configuration fails. Any omitted action remains out of
-scope. An organization plan upgrade, billing change, Actions-policy change, or
-benchmark enablement always requires another explicit decision.
+1. Keep `CLEAN_BENCH_ENABLED` absent. Re-read Public visibility, exact remote
+   `main=03150549`, branches, runs, and the held local publication lock. Any
+   unexpected change is a stop.
+2. Seal one documentation/evidence-only sole child D of exact tested candidate
+   C=`f6ef1331`. Its diff must contain only `doc/llzk/` paths and preserved raw
+   evidence; the candidate worktree must be clean.
+3. Push D once with an explicit non-force fast-forward refspec to public `main`.
+   Read the ref back. Do not push C yet.
+4. Require one newly registered automatic CI run with repository
+   `project-llzk/clean-llzk-frontend`, `event=push`, `head_sha=D`, and
+   `run_attempt=1`. Accept it only if `build`, `llzk-harness`, `llzk-e2e`, and
+   `plonky3-backend` all conclude success. Bench Main should remain skipped.
+   A rerun, dispatch, parent result, duplicate attempt, or synthetic merge SHA
+   does not substitute; any failure stops the transaction.
+5. Only after step 4 succeeds, push exact C once to
+   `refs/heads/r8-code-candidate-f6ef1331` with a non-force refspec and read the
+   ref back. Dispatch `ci.yml --ref r8-code-candidate-f6ef1331` exactly once.
+6. Accept only the resulting `event=workflow_dispatch`, `head_sha=C`,
+   `run_attempt=1` suite with the same four successful jobs. Stop on any
+   mismatch, failure, duplicate, missing run, or external-state drift.
 
-1. Record the code-candidate SHA, reviewed documentation tip, and every accepted
-   external pin; choose new descriptive repository versus fork transfer
-   explicitly. Verify organization Actions policy, private-run capacity, and a
-   second qualified human reviewer.
-2. Create the authorized destination **private**, empty, and without a generated
-   README, license, or initial commit. Add a distinct local `publication` remote;
-   do not repurpose `origin` or `upstream`.
-3. Keep `CLEAN_BENCH_ENABLED` unset. Push complete history with explicit,
-   non-force immutable refspecs: the reviewed documentation tip to `main`, and
-   exact `193ec342` to `r8-code-candidate-193ec342`. Read both refs back.
-4. Accept the initial-main `push` run and the code-candidate `workflow_dispatch`
-   run only when all four jobs are green at their exact SHAs. Inspect repository,
-   event, head SHA, attempt, and check-run application, and retain the four
-   initial-main `{context, app_id}` bindings.
-5. While private, apply metadata and every security setting available on the
-   current plan. Reconfirm the allowed writers and exact `main` SHA, then freeze
-   all pushes for the activation transaction.
-6. On GitHub Free, change visibility to Public without announcement, immediately
-   install the app-bound branch protection described above, and enable private
-   vulnerability reporting. Re-read the protection, reporting state, visibility,
-   and `main` SHA; any change or failed setting stops the transaction before a
-   profile link. Do not push during this interval. If rollback to private was
-   authorized in the publication packet, immediately perform it, verify Private
-   visibility and the exact unchanged `main` SHA, keep the push freeze, record
-   the failure, and abort. If rollback was omitted or itself fails, leave the
-   repository unannounced and frozen, add no profile link, and escalate the
-   exact partial state. On Team or Enterprise, protection may instead be
-   installed and verified while private before the visibility change.
-7. Verify the README, security form, contribution links, badges, generated
-   showcase, visibility, protection, and CI anonymously. Only then add the
-   organization-profile link or announce publication.
-8. Record the repository URL, exact code candidate, initial-main CI run IDs,
-   protection, visibility, and security state in `CURRENT.md` and a publication
-   evidence file. Submit that closure as a protected PR with an independent
-   approval. After its squash merge, require the `push`-event four-job suite on
-   the resulting exact `main` SHA; PR checks on the synthetic merge revision do
-   not substitute.
-9. Treat that exact post-merge SHA and its GitHub check suite as terminal external
-   evidence. No in-repository file can contain its own commit SHA or post-merge
-   run ID; do not create another documentary child merely to name them.
+This packet authorizes no workflow edit, force push, rerun, visibility change,
+metadata/profile edit, organization-policy change, branch protection, security
+setting, benchmark enablement, or announcement. The repository remains Public.
+Those remaining closure items require a later explicit decision. The exact D
+push run and exact C dispatch are terminal GitHub evidence for this recovery;
+an in-repository file cannot contain its own commit SHA or subsequent run ID.
 
-## Post-publication verification
+## State verification
 
 The authorized operator should inspect, not infer, the resulting state:
 

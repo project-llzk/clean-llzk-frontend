@@ -12,14 +12,17 @@ updates require an explicit session and decision-log entry.
 | upstream VeIR | `a4e6194d5810a02d74f0094ff6014cda6db6d617` | Long-term Lean MLIR framework |
 | llzk-lean VeIR | `d899d95004d4bd988c8456d686c33b11a7a5eb4a` | Previously accepted differential harness pin |
 
-The conformance host must provide Bash, Python 3, and the util-linux `flock`
-command (or a compatible implementation). `worktree-lock.sh` fails closed
-without `flock`, because all owner-record reads and transitions must be
+The conformance host must provide Bash, Python 3, `grep`, `sha256sum`, and the
+util-linux `flock` command (or compatible implementations).
+`check-actions-pinned.sh` names `grep` and `sha256sum` and fails closed if either
+is absent; its repository invocation uses an exact workflow-content manifest
+before its secondary line-oriented grep tripwires. `worktree-lock.sh` fails
+closed without `flock`, because all owner-record reads and transitions must be
 serialized. G11 already uses Python for its e2e digest and now also uses portable
 `os.stat`/`os.fstat` descriptor-identity controls. Ubuntu 24.04 CI and the
-recorded review host provide these tools. A macOS/BSD reviewer must provision a
-compatible `flock` or use the documented Linux environment; no path silently
-falls back to an unlocked owner record.
+recorded review host provide these tools. A macOS/BSD reviewer must provision
+compatible commands or use the documented Linux environment; no path silently
+falls back to an unlocked owner record or an unchecked workflow policy.
 
 The accepted Clean overlay is a local, frontend-owned direct child of the
 upstream pin; it is not claimed to be published upstream. Its full U..K delta is
@@ -64,17 +67,19 @@ computation, parsing, round-trip, and pipeline admission; witgen still ignores
 `@constrain`, G10 runs no solver, and D017/formal LLZK semantics remain open.
 See `evidence/S29/blake3g-gates.txt`.
 
-R8 replacement compatibility recheck (checked 2026-08-24): exact code
-candidate `193ec342cb2aae9055c36f4f77d2a4fe23da7823` passed complete G0–G12
+Latest portability compatibility recheck (completed 2026-08-25): exact
+candidate `f6ef1331ee860a2395d7058025da488e2553a390` passed complete G0–G12
 matrices against both accepted LLZK `25fb3740ea3465c9129a06289297bb4f0554b7a5`
 and exact checked main `b5c110d1088e93d6786f66ec1e155be87bae755f`.
 Each run covered 17 corpus modules / 67 vectors, both witness backends and both
 output scopes, two renderer fixtures, 19/19 product-program admissions, 10 SMT
-lowerings / 9 declared exclusions, and 187 G11 controls. The accepted pin did
-not change. Raw transcripts, tool paths, hashes, normalized comparison, and
-the exact candidate attribution are in
-`evidence/R8-2026-08-23/FINAL-VERIFICATION.md`; the later documentation child is
-not relabelled as the matrix-tested code candidate.
+lowerings / 9 declared exclusions, and 201 G11 controls. The accepted pin did
+not change. Exact store paths, raw transcripts, hashes, normalized comparison,
+and candidate attribution are in `evidence/PUBLICATION-2026-08-24/`. The later
+documentation/evidence child is not relabelled as the matrix-tested candidate.
+The earlier theorem and false-green evidence remains bound to exact semantic R8
+candidate `193ec342` under `evidence/R8-2026-08-23/`; C changes none of its
+relevant source, backend, workflow, or Plonky3 trees.
 
 ## CI execution environment
 

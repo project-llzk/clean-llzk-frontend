@@ -1,6 +1,6 @@
 # Clean → LLZK current state
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 
 Active milestone: **public-ready Clean to LLZK release candidate** — make the
 repository suitable for an organization-owned home under `project-llzk`, with a
@@ -35,18 +35,33 @@ it on a stale/vacuous Plonky3 public command and `/tmp`-only evidence. Exact cod
 candidate `193ec342` closes that CI/readme false-green and passed both LLZK
 matrices, a local Rust/Cargo 1.96 Plonky3 1/2/2/2 command-block replay,
 theorem/output probes, and a restarted three-lane local R8. The workflow pins
-Rust 1.98; hosted organization CI and publication remain out of scope without
-separate authority.
+Rust 1.98.
 
-Exact next action: obtain an explicit publication decision for the reviewed
-post-R8 documentation descendant. The recommended topology is a new
-`project-llzk/clean-llzk-frontend` repository, bootstrapped privately with full
-history. Organization CI must run all four required jobs on exact R8 code
-candidate `193ec342` and on the reviewed documentation tip that becomes
-`main`; neither result is inherited from the local matrices. Public visibility,
-private vulnerability reporting, branch protection, and the organization
-profile remain separately authorized state changes described in
-`PUBLICATION.md`.
+Publication bootstrap began under explicit authority on 2026-08-24. Repository
+`project-llzk/clean-llzk-frontend` now exists with full history and is
+intentionally **Public** by owner decision. Its only branch is `main` at
+`03150549`; the first automatic CI run `32773834028` failed because hosted
+Ubuntu did not provide the undeclared `rg` command, and Bench Main run
+`32773834126` was correctly skipped. No candidate branch exists yet. The
+repository remains unprotected and private vulnerability reporting and the
+other security features named in `PUBLICATION.md` remain disabled; this is an
+exposed bootstrap state, not publication closure.
+
+Exact portability-recovery candidate
+`f6ef1331ee860a2395d7058025da488e2553a390` is the sole direct child of
+`03150549`. It removes all 17 executable ripgrep calls from the two authorized
+assurance scripts, makes `grep` and `sha256sum` explicit dependencies, and binds
+the repository invocation to an exact four-workflow path/content manifest. Both
+LLZK matrices, the Plonky3 1/2/2/2 block, normal and poison-ripgrep G11, and
+three independent post-seal lanes are green. Evidence is in
+`evidence/PUBLICATION-2026-08-24/`.
+
+Exact next action: seal the documentation/evidence-only child of `f6ef1331`,
+fast-forward that child once to public `main`, and require the new automatic
+push-event CI run to succeed at that exact SHA. Only then may exact `f6ef1331`
+be pushed as `r8-code-candidate-f6ef1331` and dispatched once. No rerun or
+parent result substitutes. Visibility, workflows, organization policy,
+security settings, profile, and benchmarks must not change in this recovery.
 
 Latest completed capability session: **S29 — source-visible XOR byte range and
 headline promotion**. Its first
@@ -175,10 +190,9 @@ external issue creation has occurred.
 
 Integration branch: `clean-to-llzk/integration`
 
-Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase H
-implementation sealed on `a3299ca0`; S29 documentation closure is `c60d8363`;
-that first frozen R8 candidate was rejected; replacement code candidate
-`193ec342` passed local R8)
+Active working branch: `clean-to-llzk/publication-portability-recovery`
+(`f6ef1331` is the tested hosted-CI portability candidate; its documentation
+child is being sealed for the fail-closed public-main transaction)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
@@ -190,10 +204,10 @@ Local integration state, reconciled 2026-08-22: `clean-to-llzk/integration` was
 fast-forwarded from stale R7 tip `97390fac` to audited baseline `9b46264c`; the
 feature branch starts at that exact commit. The local integration ref is 109
 commits ahead of the locally recorded fork ref. External publication state was
-last verified 2026-08-21: fork PR #1 was at `7ff51310`, with all four CI jobs
-green there. A public release candidate must put the branch, evidence, and CI
-on the same frozen commit. No push or other external change occurred during
-this reconciliation.
+recorded for the staging fork on 2026-08-21: fork PR #1 was at `7ff51310`, with
+all four CI jobs green there. That historical staging-fork state is distinct
+from the 2026-08-24 organization-repository state recorded above. No push or
+other external change occurred during the 2026-08-22 local reconciliation.
 
 Dependency state, updated 2026-08-22: Clean upstream provenance remains exactly
 `0e53b9f2`. S29 adopts reviewed direct-child overlay `3d086f32`, whose only
@@ -335,12 +349,14 @@ on the frozen candidate must establish anonymous cache access and the actual
 runtime.
 
 The earlier staging-fork snapshot made its then-current gates green locally and
-on a runner. Exact code candidate `193ec342` is green locally on both LLZK
-toolchains; it has not run in organization CI. Only G0–G12 are gated in the
-prepared workflow, and §11 still reserves organization publication for an
-explicit decision. The earlier staging-fork PR described in this section had
-such authorization; this local R8 did not authorize a push or organization
-publication.
+on a runner. Exact semantic R8 candidate `193ec342` is green locally on both
+LLZK toolchains but did not run in organization CI. The organization repository
+now exists publicly at bootstrap tip `03150549`; its first CI run failed solely
+on the undeclared ripgrep dependency. Exact recovery candidate `f6ef1331` has
+passed both local matrices and independent review but remains unpushed while its
+documentation child is prepared. This recovery authorizes only the exact
+push/CI/branch/dispatch sequence in `PUBLICATION.md`, not publication closure or
+any settings change.
 
 ## State
 
@@ -499,22 +515,30 @@ publication.
   missing durable closure. Exact code candidate `193ec342` repaired it and
   passed both matrices plus the restarted three-lane local R8. Evidence is in
   `evidence/R8-2026-08-23/`.
+- Completed locally: **hosted-CI portability recovery C**. Exact direct-child
+  candidate `f6ef1331` replaces all 17 undeclared ripgrep invocations in the two
+  assurance scripts and closes the YAML-grammar boundary for the repository
+  invocation with an exact workflow manifest. Both LLZK matrices, Plonky3
+  1/2/2/2, poison-ripgrep G11 at 201, and three post-seal reviews passed. It is
+  not yet a hosted result; see `evidence/PUBLICATION-2026-08-24/`.
 - Blocked: none.
 
 ## Last green gates
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete two-toolchain run: exact clean R8 code candidate
-`193ec342cb2aae9055c36f4f77d2a4fe23da7823`; see
-`evidence/R8-2026-08-23/FINAL-VERIFICATION.md`. All G0–G12 passed against
+Latest complete two-toolchain run: exact clean portability-recovery candidate
+`f6ef1331ee860a2395d7058025da488e2553a390`; see
+`evidence/PUBLICATION-2026-08-24/README.md`. All G0–G12 passed against
 accepted LLZK `25fb3740` and checked LLZK main `b5c110d1`: 17 modules, 67
 vectors, G9 on all 11 source-backed corpus modules (the other six are registry
-modules and G9 is N/A), 19 admissions, measured aggregate SMT 10/9, and 187 G11
-control cases. BLAKE3G remains the widest interface. The current R8 probe has no
-`sorryAx`; the theorem remains conditional and D017 remains open. Historical
-S29 probes remain evidence for their pinned old commits rather than current-API
-replay claims.
+modules and G9 is N/A), 19 admissions, and measured aggregate SMT 10/9. G11
+grew from 187 controls in the inherited R8 evidence to 201 in the portability
+run. BLAKE3G remains the widest interface. C changes no theorem or backend tree;
+the exact `193ec342` R8 probe has no `sorryAx` and transfers unchanged rather
+than being claimed as a new reproduction. The theorem remains conditional and
+D017 remains open. Historical S29 probes remain evidence for their pinned old
+commits rather than current-API replay claims.
 
 | Gate | Result |
 |---|---|
@@ -529,7 +553,7 @@ replay claims.
 | G8 fail closed | PASS — exact negative fixtures include the new bound, shift-count, dynamic-operand, index, and oversized-`bitsOf` refusals, plus tool-version rejection |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission for all 11 source-backed corpus modules; the other six of 17 are registry modules and G9 is N/A (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 19 |
-| G11 the harness's own control cases | PASS — 187, including positive baselines, serialized lock/core/policy controls, exact flagged-optimizer controls, Xor32 raw/output attacks, whole-e2e reachability mutations, and BLAKE3.G exact-layout/content-aware controls |
+| G11 the harness's own control cases | PASS — 201, including positive baselines, serialized lock/core/policy controls, exact flagged-optimizer controls, Xor32 raw/output attacks, whole-e2e reachability mutations, BLAKE3.G exact-layout/content-aware controls, nested workflow-manifest rejection, forced hash failure, and primary/secondary grep error propagation |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |

@@ -1,8 +1,8 @@
 # Public-readiness milestone
 
-Updated: 2026-08-24
+Updated: 2026-08-25
 
-Status: local frozen candidate passed R8; publication authorization pending
+Status: public bootstrap active; fail-closed hosted-CI recovery locally green
 
 Target: a frozen release-candidate commit suitable for an organization-owned
 repository under `project-llzk`
@@ -21,12 +21,21 @@ publication-stage check. Complete durable evidence is under
 `evidence/R8-2026-08-23/`. The evidence/status child is not relabelled as the
 matrix-tested candidate.
 
-Publication keeps three identities distinct: `193ec342` is the immutable local
-R8 code candidate; a reviewed documentation descendant is the proposed initial
-organization `main`; and any post-publication evidence merge is a later public
-tip. All four organization jobs must run on exact `193ec342`, on the initial
-`main`, and again on any later protected-main merge. None of those hosted results
-is inferred from a parent or from the local matrices.
+Repository `project-llzk/clean-llzk-frontend` was created with full history and
+is intentionally Public by owner decision. Its only branch remains `main` at
+bootstrap tip `03150549`. Automatic CI run `32773834028` failed because hosted
+Ubuntu lacked the undeclared `rg` command; Bench Main `32773834126` was skipped
+as intended. The repository is currently unprotected and the planned security
+features remain disabled, so public existence is not publication closure.
+
+Recovery keeps four identities distinct: `193ec342` is the semantic R8
+candidate; `03150549` is the exposed bootstrap tip; `f6ef1331` is the locally
+matrix-tested portability candidate; and its documentation/evidence-only child
+is the proposed replacement `main`. All four organization CI jobs must succeed
+on the exact documentation child before `f6ef1331` is pushed under its
+SHA-labelled branch and dispatched once. Neither hosted result is inferred from
+a parent or from the local matrices. Local recovery evidence is under
+`evidence/PUBLICATION-2026-08-24/`.
 
 ## Outcome
 
@@ -38,10 +47,11 @@ The repository should be credible to three audiences at once:
 - a formal-methods reviewer should be able to locate the exact theorem, trusted
   boundary, negative tests, and open gaps behind every headline.
 
-Creating the organization repository, pushing branches, or changing repository
-settings is a separate publication action. This milestone ends at a reviewed,
-green, locally frozen release candidate unless publication is explicitly
-authorized.
+The repository-creation and Public-visibility steps have occurred. Pushing the
+two exact authorized refs is in progress under a fail-closed recovery packet;
+repository/organization settings, workflows, profile, benchmarks, and further
+publication actions remain outside it. This milestone is not complete merely
+because the repository is publicly readable.
 
 ## Acceptance criteria
 
@@ -138,7 +148,9 @@ P0 public documentation and repository hygiene
   -> S29 documentation and evidence closure (`c60d8363`, complete locally)
   -> first frozen R8 candidate rejected
   -> replacement code candidate `193ec342` passes local R8
-  -> explicit publication decision
+  -> public bootstrap `03150549` exposes missing-ripgrep CI failure
+  -> portability candidate `f6ef1331` passes local qualification and review
+  -> exact documentation-child push CI, then exact-candidate dispatch
 ```
 
 S25 was intentionally isolated from capability work: its green bump says the
@@ -153,8 +165,10 @@ instance, and adversarial gates are complete on `06b80f2f`; exact BLAKE3.G
 `G 0 1 2 3` is complete on `a3299ca0`. Documentary closure `c60d8363` completed
 S29 and became the first frozen candidate; R8 rejected it. A replacement must
 be sealed and the full frozen-tree review restarted before any publication
-decision. That requirement is now met locally by exact code candidate
-`193ec342`; organization CI and publication still require separate authority.
+decision. That requirement was met locally by exact code candidate `193ec342`.
+The later public bootstrap exposed a hosted portability defect; direct-child
+`f6ef1331` is its reviewed local repair. Hosted recovery remains unproved until
+the two exact-SHA CI runs complete.
 
 ## Current scorecard
 
@@ -172,33 +186,26 @@ decision. That requirement is now met locally by exact code candidate
 | Headline bitwise examples end to end | complete locally | Xor32 is promoted on `06b80f2f`; exact BLAKE3.G `G 0 1 2 3` is promoted on `a3299ca0`; both have fixed independent outputs, concrete conditional theorem instances, and full external matrices |
 | Renderer round-trip assurance | strengthened locally | A5 plus the 2026-08-22 audit: complete constraint/member/parameter readback, public-output checks, and mutation regressions; final G0-G12 result recorded in the audit report |
 | Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |
-| Final frozen-tree review | complete locally | exact code candidate `193ec342`; both matrices, theorem/output probes, Plonky3 1/2/2/2 block, and three independent lanes; `evidence/R8-2026-08-23/` |
-| Organization access | available | active `project-llzk` admin and unused preferred repository name verified read-only 2026-08-24 |
-| Publication | not authorized | separate final action |
+| Final semantic frozen-tree review | complete locally | exact code candidate `193ec342`; both matrices, theorem/output probes, Plonky3 1/2/2/2 block, and three independent lanes; `evidence/R8-2026-08-23/` |
+| Hosted-CI portability recovery | complete locally; hosted checks pending | exact direct-child `f6ef1331`; both matrices, Plonky3 1/2/2/2, normal/poison G11 at 201, and three post-seal lanes; `evidence/PUBLICATION-2026-08-24/` |
+| Organization repository | exposed bootstrap | intentionally Public at `03150549`; first CI failed on missing `rg`; unprotected and security features disabled |
+| Publication closure | incomplete | exact documentation-child push CI and exact-candidate dispatch are authorized next; settings/profile/security changes are not |
 
 ## Publication checklist
 
 Once every acceptance criterion above is met:
 
-1. Choose transfer versus a new `project-llzk/clean-llzk-frontend` repository;
-   prefer the descriptive repository unless preserving GitHub's fork relation is
-   an explicit requirement.
-2. Record exact code candidate `193ec342`, the reviewed documentation tip, and
-   every external pin without conflating their roles.
-3. After explicit authorization, create the destination privately and push the
-   complete history with explicit immutable refspecs. Do not repurpose `origin`
-   or `upstream`, squash the history, or enable self-hosted benchmarking.
-4. Require all four organization jobs on exact `193ec342` and exact proposed
-   `main`; inspect event, repository, head SHA, attempt, and check-run app rather
-   than accepting names alone.
-5. Verify organization Actions policy/private-run capacity and a second qualified
-   reviewer. On the current GitHub Free plan, run the bootstrap CI privately,
-   freeze writers and `main`, then make the repository public without
-   announcement and immediately install app-bound protection plus private
-   vulnerability reporting. Reverify the unchanged `main` SHA before continuing.
-6. Verify links, security reporting, settings, and CI anonymously before adding
-   the organization-profile link or announcing publication.
-7. Merge the resulting publication evidence through protected `main` with an
-   independent approval, then require the same four `push`-event jobs on the
-   exact post-squash SHA. Keep that GitHub record as terminal evidence rather
-   than creating an infinite chain of self-naming documentation commits.
+1. Preserve the exact roles of semantic R8 candidate `193ec342`, bootstrap
+   `03150549`, portability candidate `f6ef1331`, and its documentation child.
+2. Fast-forward the documentation child once to public `main` with a non-force
+   explicit refspec. Require the newly registered automatic push-event CI run,
+   attempt 1, to have that exact head SHA and all four jobs successful.
+3. Only after step 2 succeeds, push exact `f6ef1331` to
+   `r8-code-candidate-f6ef1331`, verify the ref, and dispatch `ci.yml` once.
+   Require exact event, repository, head SHA, attempt, and four successful jobs.
+4. Stop on any failure, duplicate attempt, mismatch, unexpected remote change,
+   or missing run. Never force-push or substitute a parent/rerun result.
+5. Treat branch protection, private vulnerability reporting, security settings,
+   metadata, and organization-profile work as a later explicitly authorized
+   closure. Until then, describe the repository as publicly exposed but not
+   publication-complete.
