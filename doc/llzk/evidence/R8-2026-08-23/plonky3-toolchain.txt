@@ -1,0 +1,20 @@
+rustc 1.96.0 (ac68faa20 2026-05-25)
+binary: rustc
+commit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96
+commit-date: 2026-05-25
+host: x86_64-unknown-linux-gnu
+release: 1.96.0
+LLVM version: 22.1.2
+cargo 1.96.0 (30a34c682 2026-05-25)
+release: 1.96.0
+commit-hash: 30a34c6821b57de0aaec83a901aca39f88f6778c
+commit-date: 2026-05-25
+host: x86_64-unknown-linux-gnu
+libgit2: 1.9.2 (sys:0.20.4 vendored)
+libcurl: 8.19.0-DEV (sys:0.4.87+curl-8.19.0 vendored ssl:OpenSSL/3.5.4)
+ssl: OpenSSL 3.5.4 30 Sep 2025
+os: Pop!_OS 24.4.0 (noble) [64-bit]
+e34c614139579dcbc9b2196189067bfe7ea9931ca582635ca632f64de04a16dc  backends/plonky3/Cargo.toml
+4bc460170008964e35646cb9e3fd296ed9d7c03c470712533302a15e5f9f1b3e  backends/plonky3/Cargo.lock
+5bbccdb4b6da9cb5c3522d07e5b988f10ebcbc11c094915ef28b9f95346af9ef  .github/workflows/ci.yml
+988183dca0de9d9240402f0d0086050b64db9d081347c90dc6b2800181c4204d  backends/plonky3/readme.md

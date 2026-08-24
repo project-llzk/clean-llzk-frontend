@@ -1,0 +1,168 @@
+G4/G10a exact false-green reproduction
+vulnerable helper commit: 4248ddfcb58537c32b633687d1e1ba2a24fddd10
+repaired candidate commit: 193ec342cb2aae9055c36f4f77d2a4fe23da7823
+LLVM (http://llvm.org/):
+  LLVM version 20.1.8
+  Optimized build.
+
+LLZK (https://github.com/project-llzk/llzk-lib):
+  LLZK version 3.0.0
+d0cca2d1e1d89f4b387995a5f1ab487de05af2c70d42912f1abc2ae870675ae4  /tmp/clean-llzk-r8-4248ddfc/scripts/llzk/lib.sh
+48c2c39ca5a50c2b49e8defc9c8415ccd809e9bca63f85dd34ef0aa82d3274c5  /home/alh/LLZK/clean-llzk-frontend/scripts/llzk/lib.sh
+b7f822011ea4f1ddc9ceaecf64c8905be2c9f1da3fd75e1a1bb834f8d150a5d4  /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+d2b022ab930dd7648e895aeb0a85aada74881ecafaebdd7308a3852fe56e7866  /tmp/llzk-r8-flag-repro/invalid-llzk.llzk
+a2da8b37193bfe9ae41a77a8443156c5fa3cf7bd5860b52ba7d3b177d6172a46  /tmp/llzk-r8-flag-repro/roundtrip-canary.llzk
+f6b84498abefd6d90b5f6b31d2955adc61fd095989fab6841b1b3c6b67e0f762  /tmp/llzk-r8-flag-repro/wrong-root.llzk
+7906348c7fb0858f1a9e960fa083d06b35d9aae737bcba42fa2480ef67eb9cf5  /tmp/llzk-r8-flag-repro/roundtrip-only-permissive
+aff36007075d91a7eeb7605f1420d3400a8249a0d9ae37b9819a704f46e74a9e  /tmp/llzk-r8-flag-repro/product-only-permissive
+e65674e368c8eb0e1520c977c6b9890cdeee689faacf7ad2de232e7ba330c41e  /tmp/llzk-r8-flag-repro/roundtrip-strip-only-real
+6df44d010f0e547fdb3bab112a6fd4c181012f2c84b53b83fa0f5103f648400c  /tmp/llzk-r8-flag-repro/product-root-permissive-real
+
+[G4 real tool rejects invalid LLZK under roundtrip]
+$ /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt --verify-roundtrip /tmp/llzk-r8-flag-repro/invalid-llzk.llzk -o /dev/null
+| /tmp/llzk-r8-flag-repro/invalid-llzk.llzk:2:3: error: 'struct.def' op must define either only a non-derived "@product" function, or both non-derived "@compute" and "@constrain" functions; found "@compute", missing "@constrain"
+|   struct.def @Main {
+|   ^
+| /tmp/llzk-r8-flag-repro/invalid-llzk.llzk:2:3: note: see current operation:
+| "struct.def"() <{sym_name = "Main"}> ({
+|   "function.def"() <{function_type = () -> !struct.type<@Main>, sym_name = "compute"}> ({
+|     %0 = "struct.new"() : () -> !struct.type<@Main>
+|     "function.return"(%0) : (!struct.type<@Main>) -> ()
+|   }) {function.allow_witness} : () -> ()
+| }) : () -> ()
+exit status: 1
+
+[G4 simple flagged-success wrapper accepts the same invalid LLZK]
+$ /tmp/llzk-r8-flag-repro/roundtrip-only-permissive --verify-roundtrip /tmp/llzk-r8-flag-repro/invalid-llzk.llzk -o /dev/null
+exit status: 0
+
+[G4 real tool accepts the canary under plain verification]
+$ /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt /tmp/llzk-r8-flag-repro/roundtrip-canary.llzk -o /dev/null
+exit status: 0
+
+[G4 real tool rejects the canary under roundtrip]
+$ /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt --verify-roundtrip /tmp/llzk-r8-flag-repro/roundtrip-canary.llzk -o /dev/null
+| loc("-":3:45): error: expected '>'
+| /tmp/llzk-r8-flag-repro/roundtrip-canary.llzk:1:1: error: 'builtin.module' op failed to parse textual content back, cannot verify round-trip.
+|
+| module {
+| ^
+| /tmp/llzk-r8-flag-repro/roundtrip-canary.llzk:1:1: note: see current operation:
+| "builtin.module"() ({
+|   "smt.solver"() ({
+|     "smt.set_info"() <{key = #smt.keyword<:a-b>, value = "x"}> : () -> ()
+|     "smt.yield"() : () -> ()
+|   }) : () -> ()
+| }) : () -> ()
+| loc("#smt.keyword<:a-b>":1:16): error: expected '>'
+| /tmp/llzk-r8-flag-repro/roundtrip-canary.llzk:1:1: error: 'builtin.module' op failed to parse bytecode content back, cannot verify round-trip.
+|
+| module {
+| ^
+| /tmp/llzk-r8-flag-repro/roundtrip-canary.llzk:1:1: note: see current operation:
+| "builtin.module"() ({
+|   "smt.solver"() ({
+|     "smt.set_info"() <{key = #smt.keyword<:a-b>, value = "x"}> : () -> ()
+|     "smt.yield"() : () -> ()
+|   }) : () -> ()
+| }) : () -> ()
+exit status: 1
+
+[G4 flag-strip wrapper falsely accepts the roundtrip canary]
+$ /tmp/llzk-r8-flag-repro/roundtrip-strip-only-real --verify-roundtrip /tmp/llzk-r8-flag-repro/roundtrip-canary.llzk -o /dev/null
+exit status: 0
+
+[vulnerable helper is green with simple G4 wrapper]
+$ env LLZK_OPT=/tmp/llzk-r8-flag-repro/roundtrip-only-permissive bash -c source\ \"\$1\"\;\ require_llzk_opt_discriminates\ \"\$2\"\ \"\$3\" _ /tmp/clean-llzk-r8-4248ddfc/scripts/llzk/lib.sh /tmp/llzk-r8-repro-vulnerable-round-simple /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+| llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file and on well-formed MLIR that is not valid LLZK
+exit status: 0
+
+[current helper is red with simple G4 wrapper]
+$ env LLZK_OPT=/tmp/llzk-r8-flag-repro/roundtrip-only-permissive bash -c source\ \"\$1\"\;\ require_llzk_opt_discriminates\ \"\$2\"\ \"\$3\" _ /home/alh/LLZK/clean-llzk-frontend/scripts/llzk/lib.sh /tmp/llzk-r8-repro-current-round-simple /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+| error: llzk-opt round-trip self-test: /tmp/llzk-r8-flag-repro/roundtrip-only-permissive accepted a file that is not MLIR under --verify-roundtrip, so G4 is not checking anything.
+exit status: 1
+
+[vulnerable helper is green with G4 flag-strip wrapper]
+$ env LLZK_OPT=/tmp/llzk-r8-flag-repro/roundtrip-strip-only-real bash -c source\ \"\$1\"\;\ require_llzk_opt_discriminates\ \"\$2\"\ \"\$3\" _ /tmp/clean-llzk-r8-4248ddfc/scripts/llzk/lib.sh /tmp/llzk-r8-repro-vulnerable-round-strip /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+| llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file and on well-formed MLIR that is not valid LLZK
+exit status: 0
+
+[current helper is red with G4 flag-strip wrapper]
+$ env LLZK_OPT=/tmp/llzk-r8-flag-repro/roundtrip-strip-only-real bash -c source\ \"\$1\"\;\ require_llzk_opt_discriminates\ \"\$2\"\ \"\$3\" _ /home/alh/LLZK/clean-llzk-frontend/scripts/llzk/lib.sh /tmp/llzk-r8-repro-current-round-strip /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+| error: llzk-opt round-trip self-test: /tmp/llzk-r8-flag-repro/roundtrip-strip-only-real accepted the plain-valid round-trip canary under --verify-roundtrip. The accepted LLZK 3.0 tool rejects this current parser/printer boundary, so --verify-roundtrip may have been ignored.
+exit status: 1
+
+[G10a real tool accepts wrong-root control under full inlining alone]
+$ /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt --llzk-full-inlining /tmp/llzk-r8-flag-repro/wrong-root.llzk -o /dev/null
+exit status: 0
+
+[G10a real tool rejects wrong-root control under product pipeline]
+$ /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt --llzk-full-inlining --llzk-product-program /tmp/llzk-r8-flag-repro/wrong-root.llzk -o /dev/null
+| /tmp/llzk-r8-flag-repro/wrong-root.llzk:1:1: error: could not find root struct "Main"
+| module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Renamed>} {
+| ^
+| /tmp/llzk-r8-flag-repro/wrong-root.llzk:1:1: note: see current operation:
+| "builtin.module"() ({
+|   "struct.def"() <{sym_name = "Renamed"}> ({
+|     "struct.member"() <{signal, sym_name = "w0", type = !felt.type<"babybear">}> : () -> ()
+|     "struct.member"() <{sym_name = "out0", type = !felt.type<"babybear">}> {llzk.pub} : () -> ()
+|     "function.def"() <{arg_attrs = [{function.arg_name = "arg0"}, {function.arg_name = "arg1"}], function_type = (!felt.type<"babybear">, !felt.type<"babybear">) -> !struct.type<@Renamed>, sym_name = "compute"}> ({
+|     ^bb0(%arg3: !felt.type<"babybear">, %arg4: !felt.type<"babybear">):
+|       %7 = "struct.new"() : () -> !struct.type<@Renamed>
+|       %8 = "felt.mul"(%arg3, %arg4) : (!felt.type<"babybear">, !felt.type<"babybear">) -> !felt.type<"babybear">
+|       "struct.writem"(%7, %8) <{member_name = @w0}> : (!struct.type<@Renamed>, !felt.type<"babybear">) -> ()
+|       "struct.writem"(%7, %8) <{member_name = @out0}> : (!struct.type<@Renamed>, !felt.type<"babybear">) -> ()
+|       "function.return"(%7) : (!struct.type<@Renamed>) -> ()
+|     }) {function.allow_witness} : () -> ()
+|     "function.def"() <{arg_attrs = [{}, {function.arg_name = "arg0"}, {function.arg_name = "arg1"}], function_type = (!struct.type<@Renamed>, !felt.type<"babybear">, !felt.type<"babybear">) -> (), sym_name = "constrain"}> ({
+|     ^bb0(%arg0: !struct.type<@Renamed>, %arg1: !felt.type<"babybear">, %arg2: !felt.type<"babybear">):
+|       %0 = "felt.const"() <{value = #felt<const 2013265920 : <"babybear">> : !felt.type<"babybear">}> : () -> !felt.type<"babybear">
+|       %1 = "felt.const"() <{value = #felt<const 0 : <"babybear">> : !felt.type<"babybear">}> : () -> !felt.type<"babybear">
+|       %2 = "struct.readm"(%arg0) <{mapOpGroupSizes = array<i32>, member_name = @w0, numDimsPerMap = array<i32>}> : (!struct.type<@Renamed>) -> !felt.type<"babybear">
+|       %3 = "felt.mul"(%arg1, %arg2) : (!felt.type<"babybear">, !felt.type<"babybear">) -> !felt.type<"babybear">
+|       %4 = "felt.mul"(%3, %0) : (!felt.type<"babybear">, !felt.type<"babybear">) -> !felt.type<"babybear">
+|       %5 = "felt.add"(%2, %4) : (!felt.type<"babybear">, !felt.type<"babybear">) -> !felt.type<"babybear">
+|       "constrain.eq"(%5, %1) : (!felt.type<"babybear">, !felt.type<"babybear">) -> ()
+|       %6 = "struct.readm"(%arg0) <{mapOpGroupSizes = array<i32>, member_name = @out0, numDimsPerMap = array<i32>}> : (!struct.type<@Renamed>) -> !felt.type<"babybear">
+|       "constrain.eq"(%6, %2) : (!felt.type<"babybear">, !felt.type<"babybear">) -> ()
+|       "function.return"() : () -> ()
+|     }) {function.allow_constraint} : () -> ()
+|   }) : () -> ()
+| }) {llzk.lang = "clean", llzk.main = !struct.type<@Renamed>} : () -> ()
+exit status: 1
+
+[G10a simple product-success wrapper accepts the same wrong root]
+$ /tmp/llzk-r8-flag-repro/product-only-permissive --llzk-full-inlining --llzk-product-program /tmp/llzk-r8-flag-repro/wrong-root.llzk -o /dev/null
+exit status: 0
+
+[vulnerable helper is green with simple G10a wrapper]
+$ env LLZK_OPT=/tmp/llzk-r8-flag-repro/product-only-permissive bash -c source\ \"\$1\"\;\ require_llzk_opt_discriminates\ \"\$2\"\ \"\$3\" _ /tmp/clean-llzk-r8-4248ddfc/scripts/llzk/lib.sh /tmp/llzk-r8-repro-vulnerable-product-simple /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+| llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file and on well-formed MLIR that is not valid LLZK
+exit status: 0
+
+[current helper is red with simple G10a wrapper]
+$ env LLZK_OPT=/tmp/llzk-r8-flag-repro/product-only-permissive bash -c source\ \"\$1\"\;\ require_llzk_opt_discriminates\ \"\$2\"\ \"\$3\" _ /home/alh/LLZK/clean-llzk-frontend/scripts/llzk/lib.sh /tmp/llzk-r8-repro-current-product-simple /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+| error: llzk-opt product self-test: the admitted artifact did not materialize product IR, so --llzk-product-program may have been ignored
+exit status: 1
+
+[fabricating/root-permissive wrapper produces positive markers]
+$ /tmp/llzk-r8-flag-repro/product-root-permissive-real --llzk-full-inlining --llzk-product-program /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk -o /tmp/llzk-r8-flag-repro/fabricated-product.llzk
+exit status: 0
+3ded3a05efdd7766df0eda338cad72b9931c43bc8ecfcd9ab4eab5de65d53195  /tmp/llzk-r8-flag-repro/fabricated-product.llzk
+| function.def @product()
+| product_source = "compute"
+| product_source = "constrain"
+
+[fabricating/root-permissive wrapper falsely accepts wrong root]
+$ /tmp/llzk-r8-flag-repro/product-root-permissive-real --llzk-full-inlining --llzk-product-program /tmp/llzk-r8-flag-repro/wrong-root.llzk -o /dev/null
+exit status: 0
+
+[vulnerable helper is green with fabricating/root-permissive G10a wrapper]
+$ env LLZK_OPT=/tmp/llzk-r8-flag-repro/product-root-permissive-real bash -c source\ \"\$1\"\;\ require_llzk_opt_discriminates\ \"\$2\"\ \"\$3\" _ /tmp/clean-llzk-r8-4248ddfc/scripts/llzk/lib.sh /tmp/llzk-r8-repro-vulnerable-product-root /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+| llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file and on well-formed MLIR that is not valid LLZK
+exit status: 0
+
+[current helper is red with fabricating/root-permissive G10a wrapper]
+$ env LLZK_OPT=/tmp/llzk-r8-flag-repro/product-root-permissive-real bash -c source\ \"\$1\"\;\ require_llzk_opt_discriminates\ \"\$2\"\ \"\$3\" _ /home/alh/LLZK/clean-llzk-frontend/scripts/llzk/lib.sh /tmp/llzk-r8-repro-current-product-root /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+| error: llzk-opt product self-test: /tmp/llzk-r8-flag-repro/product-root-permissive-real accepted a plain-valid LLZK module whose root is not @Main under --llzk-product-program, so G10a is not checking its analysis pipeline.
+exit status: 1

@@ -1,0 +1,34 @@
+module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
+  struct.def @Main {
+    struct.member @w0 : !felt.type<"babybear"> {signal}
+    struct.member @out0 : !felt.type<"babybear"> {llzk.pub}
+
+    function.def @compute(
+      %v0: !felt.type<"babybear"> {function.arg_name = "arg0"},
+      %v1: !felt.type<"babybear"> {function.arg_name = "arg1"}
+    ) -> !struct.type<@Main> {
+      %v2 = struct.new : !struct.type<@Main>
+      %v3 = felt.mul %v0, %v1 : !felt.type<"babybear">, !felt.type<"babybear">
+      struct.writem %v2[@w0] = %v3 : !struct.type<@Main>, !felt.type<"babybear">
+      struct.writem %v2[@out0] = %v3 : !struct.type<@Main>, !felt.type<"babybear">
+      function.return %v2 : !struct.type<@Main>
+    }
+
+    function.def @constrain(
+      %v0: !struct.type<@Main>,
+      %v1: !felt.type<"babybear"> {function.arg_name = "arg0"},
+      %v2: !felt.type<"babybear"> {function.arg_name = "arg1"}
+    ) {
+      %v3 = struct.readm %v0[@w0] : !struct.type<@Main>, !felt.type<"babybear">
+      %v4 = felt.const 0 : !felt.type<"babybear">
+      %v5 = felt.const 2013265920 : !felt.type<"babybear">
+      %v6 = felt.mul %v1, %v2 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v7 = felt.mul %v5, %v6 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v8 = felt.add %v3, %v7 : !felt.type<"babybear">, !felt.type<"babybear">
+      constrain.eq %v8, %v4 : !felt.type<"babybear">, !felt.type<"babybear">
+      %v9 = struct.readm %v0[@out0] : !struct.type<@Main>, !felt.type<"babybear">
+      constrain.eq %v9, %v3 : !felt.type<"babybear">, !felt.type<"babybear">
+      function.return
+    }
+  }
+}

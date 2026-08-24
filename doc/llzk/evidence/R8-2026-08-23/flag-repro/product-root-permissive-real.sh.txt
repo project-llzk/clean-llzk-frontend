@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+product=false
+output=""
+next_is_output=false
+for argument in "$@"; do
+  if ${next_is_output}; then
+    output="${argument}"
+    next_is_output=false
+    continue
+  fi
+  [[ "${argument}" == "-o" ]] && { next_is_output=true; continue; }
+  [[ "${argument}" == "--llzk-product-program" ]] && product=true
+done
+if ${product}; then
+  if [[ -n "${output}" && "${output}" != "/dev/null" ]]; then
+    printf '%s\n' \
+      'function.def @product()' \
+      'product_source = "compute"' \
+      'product_source = "constrain"' > "${output}"
+  fi
+  exit 0
+fi
+exec /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt "$@"

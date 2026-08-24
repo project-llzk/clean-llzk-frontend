@@ -1,6 +1,6 @@
 # R8 frozen-candidate review and repair
 
-Status: **in progress; no candidate has passed R8**
+Status: **R8 passed locally on code candidate `193ec342`; publication is not authorized**
 
 The first frozen candidate was documentation closure commit `c60d8363`, a
 direct child of S29 implementation commit `a3299ca0`. Independent soundness,
@@ -135,23 +135,63 @@ rejected the candidate on the owner-record race and stale lifecycle text above.
 The matrix log remained only in `/tmp`, so it is not durable acceptance
 evidence and is not cited as such.
 
-The live replacement repair now serializes every cooperating lock command on a
-separate persistent per-worktree `flock` guard, atomically replaces complete
-three-line owner records, and requires exact owner identity for every release.
-Six deterministic G11 controls queue claims, reclaim, release, status, and
-require behind an externally held guard, make a failed kernel lock preserve the
-owner byte-for-byte, and close the stale-numeric release path. The focused
-working-diff check is `PASS: 187 error paths`; that result is pre-seal repair
-evidence, not candidate evidence. D037 records the platform prerequisite,
+The transaction repair was sealed at
+`4819f6edd040ede1f347a1853ee97df20eb6484c`. It serializes every cooperating
+lock command on a separate persistent per-worktree `flock` guard, atomically
+replaces complete three-line owner records, and requires exact owner identity
+for every release. Six deterministic G11 controls queue claims, reclaim,
+release, status, and require behind an externally held guard, make a failed
+kernel lock preserve the owner byte-for-byte, and close the stale-numeric
+release path. D037 records the platform prerequisite,
 transaction/ownership distinction, and residual advisory bypasses.
+
+Both exact LLZK matrices passed on clean `4819f6ed`, but R8 did not accept it.
+The formal documentation/public-readiness lane found a live Plonky3 README link
+to nonexistent `tests/clean_air.rs`, a test filter naming no current test, and a
+placeholder URL. The same libtest substring-filter pattern was present in the
+required CI job and exits zero on no matches. The independent evidence lane also
+refused `/tmp`-only matrix and false-green records under `GATES.md`'s durability
+rule. These were candidate findings, not waivers.
+
+The non-vacuity repair was sealed as exact code candidate
+`193ec342cb2aae9055c36f4f77d2a4fe23da7823`, the sole child of `4819f6ed`.
+Its two-file diff points the README at `tests/fib_tests.rs`, removes the
+placeholder, and makes the README and every Plonky3 CI group assert the exact
+registered inventory and names before running the complete target with
+`--include-ignored`. This closes zero-match, substring, wrong-target,
+unexpected-count, and ignored-test greens. The exact candidate replay passed
+one Fibonacci, two debug-negative, two release-negative, and two FemtoCairo
+tests locally under Rust/Cargo 1.96.0. The workflow pins Rust 1.98.0; its hosted
+organization run remains a publication-stage check, not a result claimed here.
+
+Both full G0–G12 matrices then passed on exact clean `193ec342`: 187 G11 paths,
+17 corpus modules, 67 vectors, both modes of the pinned witness executable and
+both output scopes, two renderer fixtures, G9 on 11 source-backed modules with
+six registry entries N/A, 19/19 product admissions, and exact SMT split 10/9.
+Accepted-pin and checked-main raw transcripts are tracked here. Their only raw
+differences are the two tool store paths and Lean's replay-progress counter;
+after the complete recorded normalization they are byte-identical. The focused
+soundness build, current module-output probe, exact G4/G10a vulnerable-parent
+reproduction, and sealed Plonky3 block also pass with complete commands,
+statuses, inputs, and outputs in [`FINAL-VERIFICATION.md`](FINAL-VERIFICATION.md).
 
 The raw nine-declaration output is captured in `axioms.txt`.
 `moduleOutput_eq_of_compile` depends only on `propext`, `Classical.choice`, and
 `Quot.sound`. The concrete wrappers retain their previously documented
 Babybear/native proof facts; no printed closure contains `sorryAx`.
 
-This file does not claim a replacement-candidate R8 pass and does not authorize
-publication. After the transaction repair is independently reviewed and sealed,
-its exact clean candidate must pass both LLZK toolchain matrices and a full
-frozen-tree R8 review restarted from the beginning before either an R8 pass or
-publication can be claimed.
+Three independent lanes restarted from fresh detached clean worktree
+`/tmp/clean-llzk-r8-193ec342-lanef`. They reviewed theorem/output soundness,
+gate reachability and evidence, and public documentation/governance. Their blind
+records preceded the first control-set opening on the prior frozen candidate;
+the exact-`193ec342` restart re-audited the candidate and its delta with those
+controls already known. All final candidate findings were repaired;
+[`FORMAL-REVIEW.md`](FORMAL-REVIEW.md) records the final GO dispositions and
+the honest S4, generic table-identity, and D017 limits.
+
+This closes the local frozen-candidate R8 milestone on code candidate
+`193ec342`. The later evidence/status commit is a documentation-only child and
+is not retroactively described as the matrix-tested candidate. No branch was
+pushed, no repository was created or transferred, and no organization setting
+was changed. Publication and organization-repository CI remain a separate
+explicitly authorized decision.

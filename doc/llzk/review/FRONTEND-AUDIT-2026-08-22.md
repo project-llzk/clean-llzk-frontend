@@ -7,8 +7,9 @@
 > module assignment's ordered public `@out{j}` members. The replacement repair
 > introduces `moduleOutput` and `moduleOutput_eq_of_compile` and changes every
 > generic/concrete theorem conclusion accordingly. See the
-> [R8 repair evidence](../evidence/R8-2026-08-23/README.md). No replacement
-> candidate has yet passed R8.
+> [R8 repair evidence](../evidence/R8-2026-08-23/README.md). Later replacement
+> code candidate `193ec342` passed the restarted local R8; this dated document
+> remains the pre-R8 audit and is not itself that verdict.
 
 ## Verdict
 

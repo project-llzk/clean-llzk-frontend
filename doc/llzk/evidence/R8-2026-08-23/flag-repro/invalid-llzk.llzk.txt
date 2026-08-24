@@ -1,0 +1,8 @@
+module attributes {llzk.lang = "clean", llzk.main = !struct.type<@Main>} {
+  struct.def @Main {
+    function.def @compute() -> !struct.type<@Main> {
+      %v0 = struct.new : !struct.type<@Main>
+      function.return %v0 : !struct.type<@Main>
+    }
+  }
+}

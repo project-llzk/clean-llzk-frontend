@@ -1,0 +1,557 @@
+worktree lock: held
+
+== G11: harness error paths ==
+== check-pins.sh ==
+ok   no upstream remote
+ok   wrong upstream URL
+ok   pinned upstream base absent
+ok   pinned Clean overlay absent
+ok   Clean overlay unrelated to upstream base
+ok   Clean overlay is not a direct child
+ok   unexpected extra Clean overlay path
+ok   unexpected Clean overlay status
+ok   HEAD not descended from overlay
+ok   toolchain mismatch
+ok   a change to Clean's core is caught
+ok   an uncommitted change to Clean's core is caught
+ok   a committed post-overlay Xor32 change is caught
+ok   an uncommitted post-overlay Xor32 change is caught
+ok   happy path
+
+== check-actions-pinned.sh ==
+ok   a mutable action tag is caught
+ok   immutable and local actions are accepted
+ok   a moving hosted runner label is caught
+ok   an implicit self-hosted job is caught
+ok   an explicitly gated self-hosted job is accepted
+ok   a hosted benchmark entry point also requires opt-in
+ok   a non-read-only workflow token is caught
+ok   a moving Rust toolchain is caught
+ok   an LLZK CI build without the trusted binary-cache boundary is caught
+ok   the repository workflows satisfy the action policy
+
+== check-confinement.sh ==
+ok   unsafeWithTables outside its modules
+ok   lowerRecognized outside its modules
+ok   compileSource outside its modules
+ok   compileSourceVerified is not confined
+ok   a docstring mention is not a call site
+ok   a comment does not hide a call site below it
+ok   a -- inside a string does not blank the rest of the file
+ok   confinement happy path
+
+== worktree-lock.sh ==
+ok   require with no lock
+ok   require while another session holds it
+ok   claim while another session holds it
+ok   reclaim while an opaque holder is recorded
+ok   require as the holder
+ok   reclaim while the holder is provably live
+ok   claim does not silently take a stale lock
+ok   status reports a stale lock as reclaimable
+ok   reclaim takes a stale lock, and says so
+ok   claim names --from for an opaque owner
+ok   status reports an opaque owner as undecidable
+ok   bare reclaim refuses an opaque owner, and says how
+ok   reclaim --from refuses the wrong owner
+ok   reclaim --from takes an opaque lock
+ok   the reclaimer now holds it
+ok   concurrent free-tree claims serialize
+ok   reclaim --from rereads after the transaction guard
+ok   release rereads after the transaction guard
+ok   status and require read after the transaction guard
+ok   a failed flock preserves the owner record
+ok   reclaiming your own lock does not announce a stale owner
+ok   a non-holder cannot release a stale numeric lock
+ok   only the holder may release
+ok   the holder may release
+
+== lib.sh tool checks ==
+ok   LLZK_OPT unset
+ok   tool not executable
+ok   wrong LLZK version
+ok   right LLZK version
+ok   witgen from another install
+
+== lib.sh discriminate self-tests ==
+ok   llzk-opt self-test catches a permissive shim
+ok   llzk-opt self-test catches a roundtrip-only permissive shim
+ok   llzk-opt self-test catches a no-op roundtrip flag
+ok   llzk-opt self-test catches a product-only permissive shim
+ok   llzk-opt self-test catches a root-permissive product shim
+ok   llzk-witgen self-test catches a permissive shim
+ok   strict widest self-test independently requires three witness cells
+ok   strict widest self-test independently requires three full outputs
+ok   strict widest self-test independently requires three public outputs
+ok   llzk-witgen self-test rejects an unknown discriminator mode
+ok   llzk-opt self-test catches a parser with no LLZK verifier
+ok   llzk-witgen self-test catches a stub execution engine
+ok   llzk-witgen self-test catches a permissive public scope
+ok   out0-only checker accepts its correct public baseline
+ok   out0-only checker rejects the public field it checks
+ok   out0-only checker demonstrably ignores a middle public mutation
+ok   llzk-witgen self-test catches a checker that validates only out0
+ok   w0-only checker accepts its correct full-witness baseline
+ok   w0-only checker rejects the witness cell it checks
+ok   w0-only checker demonstrably ignores a middle witness-cell mutation
+ok   llzk-witgen self-test catches a checker that validates only w0
+ok   full out0-only checker accepts its correct full-witness baseline
+ok   full out0-only checker rejects the output field it checks
+ok   full out0-only checker demonstrably ignores a middle output mutation
+ok   full-witness self-test catches a checker that validates only out0
+ok   witness discriminator uses numeric first middle and last positions
+ok   Xor32 raw generator produces the exact old full and public results
+ok   Xor32 raw generator rejects a wrong input layout
+ok   Xor32 raw generator rejects a baseline that is not narrowed
+ok   Xor32 raw generator rejects a raw/narrowed collision
+ok   Xor32 raw generator rejects a nondecimal input
+ok   Xor32 raw generator rejects a boolean input
+ok   Xor32 raw generator rejects a lossy float input
+ok   Xor32 raw generator rejects a noncanonical input
+ok   Xor32 raw generator rejects a wrong full layout
+ok   Xor32 raw generator rejects full-witness input drift
+ok   Xor32 raw generator rejects a non-narrowed witness cell
+ok   Xor32 raw generator rejects a non-narrowed full output
+ok   Xor32 raw generator rejects a wrong public layout
+ok   exhaustive discriminator requires an output count
+ok   exhaustive discriminator rejects a zero output count
+ok   sampled discriminator rejects exhaustive-only arguments
+ok   exhaustive discriminator rejects a one-sided alternate
+ok   exhaustive discriminator rejects a public-only alternate
+ok   exhaustive discriminator rejects a wrong full-output layout
+ok   exhaustive discriminator rejects a wrong public-output layout
+ok   exhaustive discriminator rejects full/public baseline disagreement
+ok   exhaustive discriminator rejects alternate key-set drift
+ok   exhaustive discriminator rejects an alternate with a no-op output
+ok   exhaustive discriminator rejects alternate input drift
+ok   exhaustive discriminator rejects alternate signal-key drift
+ok   exhaustive discriminator rejects alternate full/public disagreement
+ok   exhaustive Xor discriminator accepts an honest content-aware checker
+ok   full out1-omitting checker accepts its baseline
+ok   full out1-omitting checker rejects out0
+ok   full out1-omitting checker demonstrably ignores out1
+ok   exhaustive discriminator catches a full checker that omits out1
+ok   public out1-omitting checker accepts its baseline
+ok   public out1-omitting checker rejects out0
+ok   public out1-omitting checker demonstrably ignores out1
+ok   exhaustive discriminator catches a public checker that omits out1
+ok   raw-full-accepting checker accepts its baseline
+ok   raw-full-accepting checker rejects an individual output mutation
+ok   raw-full-accepting checker demonstrably accepts the raw witness
+ok   exhaustive discriminator catches a checker that accepts the raw full witness
+ok   raw-public-accepting checker accepts its baseline
+ok   raw-public-accepting checker rejects an individual output mutation
+ok   raw-public-accepting checker demonstrably accepts the raw output
+ok   exhaustive discriminator catches a checker that accepts the raw public output
+ok   full path-specializing checker accepts its baseline
+ok   full path-specializing checker rejects an individual mutation
+ok   full path-specializing checker rejects only the predictable raw path
+ok   PID-derived non-raw path catches the full path-specializing checker
+ok   public path-specializing checker accepts its baseline
+ok   public path-specializing checker rejects an individual mutation
+ok   public path-specializing checker rejects only the predictable raw path
+ok   PID-derived non-raw path catches the public path-specializing checker
+ok   BLAKE exhaustive interface reaches every exact key
+ok   BLAKE exhaustive interface mutation log is complete
+ok   BLAKE partial checker accepts its baseline
+ok   BLAKE partial checker demonstrably ignores w42
+ok   BLAKE exhaustive interface catches a checker that ignores w42
+ok   BLAKE exhaustive interface requires an input count
+ok   BLAKE exhaustive interface rejects a zero witness count
+ok   BLAKE exhaustive interface rejects a nonnumeric output count
+ok   BLAKE exhaustive interface rejects an empty tenth and nonempty eleventh argument
+ok   BLAKE exhaustive interface uses a valid positive input count
+ok   BLAKE exhaustive interface uses a valid positive witness count
+ok   BLAKE exhaustive interface uses a valid positive output count
+ok   BLAKE exhaustive interface rejects a zero input count
+ok   BLAKE exhaustive interface rejects a nonnumeric input count
+ok   BLAKE exhaustive interface rejects a missing witness count
+ok   BLAKE exhaustive interface rejects a nonnumeric witness count
+ok   BLAKE exhaustive interface rejects a missing output count
+ok   BLAKE exhaustive interface rejects a zero output count
+ok   BLAKE exhaustive interface rejects an extra argument
+ok   BLAKE exhaustive interface rejects missing-w95
+ok   BLAKE exhaustive interface rejects extra-w96
+ok   BLAKE exhaustive interface rejects malformed-w01
+ok   BLAKE exhaustive interface rejects missing-out63
+ok   BLAKE exhaustive interface rejects extra-public-out64
+ok   BLAKE exhaustive interface rejects missing-arg71
+ok   BLAKE exhaustive interface rejects extra-arg72
+ok   BLAKE exhaustive interface rejects full-input-drift
+ok   BLAKE exhaustive interface rejects full-public-disagree
+ok   BLAKE exhaustive interface rejects boolean-signal
+ok   BLAKE exhaustive interface rejects float-public
+ok   BLAKE exhaustive interface rejects noncanonical-input
+ok   widest public-output artifact is selected from emitted expectations
+ok   widest selector resolves equal widths deterministically
+ok   widest selector rejects a non-object public expectation
+ok   widest selector rejects a missing paired input
+ok   widest selector rejects a directory with no candidates
+ok   exact count accepts equality
+ok   exact count rejects a smaller value
+ok   exact count rejects a larger value
+ok   exact count rejects a non-natural value
+ok   e2e headline discriminator wiring is source pinned
+ok   e2e Xor32 source pin rejects unreachable discriminator calls
+ok   e2e Xor32 outside-wrapper fixture is valid shell
+ok   e2e Xor32 source pin rejects an unreachable wrapped block
+ok   e2e BLAKE3.G source pin rejects unreachable vector preflights
+ok   e2e BLAKE3.G outside-wrapper fixture is valid shell
+ok   e2e BLAKE3.G source pin rejects an unreachable wrapped block
+ok   e2e exact counts are literal source pins
+
+PASS: 187 error paths exercised
+
+== CI dependency pins ==
+action pin check: PASS (15 immutable action reference(s))
+
+== G12: the gate-skipping entry points are confined ==
+confinement:
+  ok  Config.unsafeWithTables
+  ok  the G9-skipping entry points
+confinement check: every gate-skipping entry point is confined
+
+== G0: state and pins ==
+Clean upstream: 0e53b9f2d05f06defa2aa0a859f549b611583f10
+Clean overlay:  3d086f32a71d17cbddfb46c0dea63cd36c8aa552
+overlay:        exact reviewed Xor32 delta
+core after K:   byte-identical outside Clean/Backend/LLZK (plus the two registration files)
+HEAD:       193ec342cb2aae9055c36f4f77d2a4fe23da7823
+upstream:   git@github.com:Verified-zkEVM/clean.git
+toolchain:  leanprover/lean4:v4.32.2
+pin check:  PASS
+
+== tools ==
+LLZK_OPT: /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-opt
+  LLZK version 3.0.0
+LLZK_WITGEN: /nix/store/xlf4j9a1r756c8m6s7b7f88s8rqq7j58-llzk-release-3.0.0/bin/llzk-witgen
+  version: not self-reported; provenance from LLZK_OPT (same installation)
+
+== G1: Lean ==
+Checking for consecutive empty lines in Lean files...
+
+✓ No consecutive empty lines found.
+Build completed successfully (1876 jobs).
+⚠ [1733/1784] Replayed Clean.Utils.Test.TestCircuitProofStart
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:17:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:29:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:40:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:49:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:58:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:71:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:88:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:129:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:157:0: declaration uses `sorry`
+warning: Clean/Utils/Test/TestCircuitProofStart.lean:183:0: declaration uses `sorry`
+Build completed successfully (1811 jobs).
+
+== G2: emit the corpus ==
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Multiply.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Decompose.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/LowByte.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Bits8.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/And8.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Xor32.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/BLAKE3G.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Addition8FullCarry.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Passthrough.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/ConstOut.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/CopyCell.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_babybear.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_mersenne31.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_koalabear.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_goldilocks.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_bn254.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/Square_grumpkin.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/syntax/Demo.llzk
+wrote /home/alh/LLZK/clean-llzk-frontend/.lake/llzk/syntax/Empty.llzk
+17 corpus module(s), 67 input vector(s), 2 renderer fixture(s)
+G9: 11 of 17 corpus module(s) have a Clean source; for each, the emitted @constrain is the same constraint system and the emitted @compute computes the same witnesses. The other 6 are the registry conformance entries, built from a `Recognized` with no Clean circuit behind them, so G9 does not apply to them
+
+== harness self-test ==
+-- on Addition8FullCarry
+llzk-witgen self-test: both backends and both scopes green on expected JSON, red on every available first/middle/last probe (positions can coincide; empty groups are skipped)
+llzk-opt self-test: plain and round-trip green on an emitted artifact and red on non-MLIR/invalid LLZK; round-trip flag distinguished by a plain-positive canary; product pipeline green on the artifact and red on a full-inlining-valid non-Main root
+-- on Xor32
+llzk-witgen self-test: both backends and both scopes green on expected JSON, red on every available first/middle/last probe (positions can coincide; empty groups are skipped)
+llzk-opt self-test: plain and round-trip green on an emitted artifact and red on non-MLIR/invalid LLZK; round-trip flag distinguished by a plain-positive canary; product pipeline green on the artifact and red on a full-inlining-valid non-Main root
+-- widest interface: BLAKE3G
+llzk-witgen self-test: both backends and both scopes green on expected JSON, red on distinct first/middle/last witness-cell, full-output, and public-output perturbations
+llzk-opt self-test: plain and round-trip green on an emitted artifact and red on non-MLIR/invalid LLZK; round-trip flag distinguished by a plain-positive canary; product pipeline green on the artifact and red on a full-inlining-valid non-Main root
+
+== Xor32 exhaustive output and narrowing self-test ==
+-- compute-only vector 7
+llzk-witgen self-test: both backends and both scopes green on expected JSON, red on first/middle/last witness cells and every one of 4 full/public outputs
+-- compute-only vector 8
+llzk-witgen self-test: both backends and both scopes green on expected JSON, red on first/middle/last witness cells and every one of 4 full/public outputs
+-- compute-only vector 9
+llzk-witgen self-test: both backends and both scopes green on expected JSON, red on first/middle/last witness cells and every one of 4 full/public outputs plus alternate expectations
+
+== BLAKE3.G exhaustive interface self-test ==
+llzk-witgen self-test: both backends and both scopes green on exact 72-input/96-witness/64-output JSON, red on every witness cell and every full/public output
+
+== Addition8FullCarry ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 3 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 3 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 4 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 4 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 5 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 5 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 6 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 6 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 7 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 7 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 8 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 8 (full witness + public)
+   ok
+== And8 ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt bitwise/shift operations are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 3 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 3 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 4 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 4 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 5 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 5 (full witness + public)
+   ok
+== BLAKE3G ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 3 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 3 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 4 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 4 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 5 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 5 (full witness + public)
+   ok
+== Bits8 ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt bitwise/shift operations are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 3 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 3 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 4 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 4 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 5 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 5 (full witness + public)
+   ok
+== ConstOut ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+   ok
+== CopyCell ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+   ok
+== Decompose ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 3 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 3 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 4 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 4 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 5 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 5 (full witness + public)
+   ok
+== LowByte ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt bitwise/shift operations are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 3 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 3 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 4 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 4 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 5 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 5 (full witness + public)
+   ok
+== Multiply ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 3 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 3 (full witness + public)
+   ok
+== Passthrough ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+   ok
+== Square_babybear ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+   ok
+== Square_bn254 ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+   ok
+== Square_goldilocks ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+   ok
+== Square_grumpkin ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+   ok
+== Square_koalabear ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+   ok
+== Square_mersenne31 ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+   ok
+== Xor32 ==
+-- G3: parse and verify
+-- G4: round trip
+-- G10: LLZK analysis pipeline
+   G10b: out of scope — felt bitwise/shift operations are marked illegal by --llzk-to-smt-no-cf
+-- G5/G7: interpreter vs Clean, vector 0 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 0 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 1 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 1 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 2 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 2 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 3 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 3 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 4 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 4 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 5 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 5 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 6 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 6 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 7 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 7 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 8 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 8 (full witness + public)
+-- G5/G7: interpreter vs Clean, vector 9 (full witness + public)
+-- G6/G7: execution engine vs Clean, vector 9 (full witness + public)
+   ok
+
+== renderer fixtures ==
+-- G3/G4: Demo
+-- G10: Demo
+   G10b: out of scope — felt.uintdiv/felt.umod are marked illegal by --llzk-to-smt-no-cf
+-- G3/G4: Empty
+-- G10: Empty
+   G10b: out of scope — the module declares no felt type, so the pass cannot deduce a prime field
+
+PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
+  17 corpus module(s), 67 input vector(s), both witgen backends,
+  full-witness and public output scopes.
+  2 renderer fixture(s), syntax only.
+  G8 and G9 are carried inside G1 and G2: the rejection fixtures by
+  'lake build CleanTests', the constraint comparison by both that and the
+  emitter, which refuses to write a circuit whose constraints disagree.
+  G10a: all 17 + 2 module(s) admitted by --llzk-product-program.
+  G10b: 10 module(s) lowered to SMT, 9 out of scope for a declared reason.
+
+G9 is not a property of this corpus: both halves of it -- @constrain against
+the circuit's constraints, and @compute against its witness programs -- are
+preconditions of emission, so no module obtained through LLZK.compile or
+LLZK.emit leaves this backend without them.
+
+That is narrower than 'no module', and the difference is on screen above.
+The six Square_* entries are built from a hand-written Recognized with no
+Clean circuit behind them, so there is nothing for G9 to compare against and
+EmitMain reports them as none rather than as passing. G12 keeps the entry
+points that skip G9 out of ordinary code. This banner used to say 'no module
+leaves this backend without them', which is false for the six source-free
+modules in today's seventeen-module corpus (R5d).
+
+What remains beyond that is doc/llzk/GAPS.md -- above all D017, the reading
+of LLZK's own semantics: that felt.add is +, constrain.in is membership, and
+felt.umod reads its operands as canonical representatives. The @compute half
+of that reading is what the 67 vectors above test, on both LLZK
+witness backends. The @constrain half has no executor in this toolchain and so no
+empirical check at all. G10 shows the modules are admissible to LLZK's
+analysis pipeline; it runs no solver.

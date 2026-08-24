@@ -1,0 +1,25 @@
+# Working directory: backends/plonky3
+set -euo pipefail
+
+fib_list="$(cargo test --release --test fib_tests -- --list)"
+test "$(awk '/: test$/ { count++ } END { print count+0 }' <<<"${fib_list}")" -eq 1
+grep -Fx 'test_lean_circuit_end_to_end: test' <<<"${fib_list}" >/dev/null
+cargo test --release --test fib_tests -- --include-ignored --nocapture
+
+negative_debug_list="$(cargo test --test lookup_negative_tests -- --list)"
+test "$(awk '/: test$/ { count++ } END { print count+0 }' <<<"${negative_debug_list}")" -eq 2
+grep -Fx 'test_tampered_multiplicity_preprocessed_table_debug: test' <<<"${negative_debug_list}" >/dev/null
+grep -Fx 'test_tampered_multiplicity_prover_table_debug: test' <<<"${negative_debug_list}" >/dev/null
+cargo test --test lookup_negative_tests -- --include-ignored
+
+negative_release_list="$(cargo test --release --test lookup_negative_tests -- --list)"
+test "$(awk '/: test$/ { count++ } END { print count+0 }' <<<"${negative_release_list}")" -eq 2
+grep -Fx 'test_tampered_multiplicity_preprocessed_table_release: test' <<<"${negative_release_list}" >/dev/null
+grep -Fx 'test_tampered_multiplicity_prover_table_release: test' <<<"${negative_release_list}" >/dev/null
+cargo test --release --test lookup_negative_tests -- --include-ignored
+
+femtocairo_list="$(cargo test --release --test femtocairo_tests -- --list)"
+test "$(awk '/: test$/ { count++ } END { print count+0 }' <<<"${femtocairo_list}")" -eq 2
+grep -Fx 'test_femtocairo_e2e: test' <<<"${femtocairo_list}" >/dev/null
+grep -Fx 'test_femtocairo_memory_e2e: test' <<<"${femtocairo_list}" >/dev/null
+cargo test --release --test femtocairo_tests -- --include-ignored --nocapture

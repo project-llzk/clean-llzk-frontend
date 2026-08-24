@@ -56,7 +56,8 @@ For reproducibility and review:
   is the completed pre-R8 frontend audit; its dated R8 erratum records why its
   later first frozen candidate was rejected.
 - [`evidence/R8-2026-08-23/README.md`](evidence/R8-2026-08-23/README.md)
-  records the live repair/review round. No replacement candidate has passed yet.
+  records the completed replacement repair and local R8 pass on exact code
+  candidate `193ec342`; publication remains a separate decision.
 - [`review/`](review/) contains adversarial findings and dispositions.
 - [`evidence/`](evidence/) contains captured gate and probe results.
 - [`sessions/`](sessions/) is the historical execution record; it is not the
@@ -81,13 +82,13 @@ repository root:
 )
 ```
 
-The last pre-R8 historical S29 Phase-H result on clean implementation commit
-`a3299ca0` is (the banner below is retained verbatim as historical output):
+The local R8 result on exact clean code candidate `193ec342` is:
 
 ```text
 PASS: G0 G1 G2 G3 G4 G5 G6 G7 G8 G9 G10 G11 G12
-17 circuit(s), 67 input vector(s), both witgen backends,
-full-witness and public output scopes
+17 corpus module(s), 67 input vector(s), both witgen backends,
+full-witness and public output scopes; 2 renderer fixtures;
+G10a 19/19, G10b 10 lowered / 9 declared out of scope, G11 187
 ```
 
 For historical comparison, the Phase-X result on `06b80f2f` was:

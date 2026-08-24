@@ -30,8 +30,13 @@ and claim/reproduction defects. Replacement docs candidate `beb2f54d` was also
 rejected on 2026-08-24: its accepted-pin diagnostic matrix was green, but the
 independent attached-tree documentation/concurrency audit found stale lock
 instructions and an unserialized compare-and-displace race. The transaction-lock
-repair and a full R8 restart are in progress; no candidate has passed R8 and
-publication remains out of scope.
+repair was sealed at `4819f6ed`; despite two green matrices, formal R8 rejected
+it on a stale/vacuous Plonky3 public command and `/tmp`-only evidence. Exact code
+candidate `193ec342` closes that CI/readme false-green and passed both LLZK
+matrices, a local Rust/Cargo 1.96 Plonky3 1/2/2/2 command-block replay,
+theorem/output probes, and a restarted three-lane local R8. The workflow pins
+Rust 1.98; hosted organization CI and publication remain out of scope without
+separate authority.
 
 Latest completed capability session: **S29 — source-visible XOR byte range and
 headline promotion**. Its first
@@ -87,7 +92,7 @@ proves the whole-list invariant: the representative map preserves the value of
 every circuit variable. The existing copy-chain and non-copy red controls remain
 green; theorem evidence is in `evidence/A7/`. This feature branch has not been
 pushed; commit `a32593bf` was subsequently integrated into the audited baseline
-and is ancestral to the current branch and live replacement repair. Full G0-G12
+and is ancestral to the current branch and R8 replacement candidate. Full G0-G12
 passed on that clean commit: 12 modules, 33 vectors through both witness
 backends, 2 renderer fixtures, G10a 14/14, and G10b 10 lowered / 4 declared out
 of scope.
@@ -162,7 +167,8 @@ Integration branch: `clean-to-llzk/integration`
 
 Active working branch: `clean-to-llzk/s29-xor-range-contract` (Phase H
 implementation sealed on `a3299ca0`; S29 documentation closure is `c60d8363`;
-that first frozen R8 candidate was rejected and its repair is in progress)
+that first frozen R8 candidate was rejected; replacement code candidate
+`193ec342` passed local R8)
 
 Integration commit: `9b46264c59ed69af24817cb4b2cfdb7ebcfb4629`
 
@@ -318,9 +324,13 @@ own commit, so the expected duration reduction is not evidence; organization CI
 on the frozen candidate must establish anonymous cache access and the actual
 runtime.
 
-What is still true: every gate in the table below is green on one machine *and*
-on a runner, but only G0–G12 are gated in CI; §11 still reserves publishing for
-an explicit decision, which was given.
+The earlier staging-fork snapshot made its then-current gates green locally and
+on a runner. Exact code candidate `193ec342` is green locally on both LLZK
+toolchains; it has not run in organization CI. Only G0–G12 are gated in the
+prepared workflow, and §11 still reserves organization publication for an
+explicit decision. The earlier staging-fork PR described in this section had
+such authorization; this local R8 did not authorize a push or organization
+publication.
 
 ## State
 
@@ -474,24 +484,27 @@ an explicit decision, which was given.
   scopes/backends, and 177 G11 control cases. Documentary closure HD
   `c60d8363` became the first frozen R8 candidate; R8 rejected it. Later
   candidate `beb2f54d` passed one diagnostic matrix but failed the independent
-  attached-tree lock/documentation audit. The replacement repair has not passed
-  the two-toolchain matrices or restarted R8 from a new clean seal.
+  attached-tree lock/documentation audit. Transaction candidate `4819f6ed`
+  passed both matrices but formal R8 found the live Plonky3 zero-test filter and
+  missing durable closure. Exact code candidate `193ec342` repaired it and
+  passed both matrices plus the restarted three-lane local R8. Evidence is in
+  `evidence/R8-2026-08-23/`.
 - Blocked: none.
 
 ## Last green gates
 
 Evidence under `doc/llzk/evidence/`.
 
-Latest complete two-toolchain run: clean S29 BLAKE3.G implementation commit
-`a3299ca06576b81586ddbe56a9de711e12f1a8cd`; see
-`evidence/S29/blake3g.md` and `evidence/S29/blake3g-gates.txt`. All G0–G12
-passed against accepted LLZK `25fb3740` and checked LLZK main `b5c110d1`: 17
-modules, 67 vectors, G9 on all 11 source-backed corpus modules (the other six of
-17 are registry modules and G9 is N/A), 19 admissions, measured aggregate SMT
-10/9, and 177 G11 control cases.
-BLAKE3G is the widest interface. Its committed probe has no `sorryAx` and names
-all seven axioms in its inherited closure; the theorem remains conditional and
-D017 remains open.
+Latest complete two-toolchain run: exact clean R8 code candidate
+`193ec342cb2aae9055c36f4f77d2a4fe23da7823`; see
+`evidence/R8-2026-08-23/FINAL-VERIFICATION.md`. All G0–G12 passed against
+accepted LLZK `25fb3740` and checked LLZK main `b5c110d1`: 17 modules, 67
+vectors, G9 on all 11 source-backed corpus modules (the other six are registry
+modules and G9 is N/A), 19 admissions, measured aggregate SMT 10/9, and 187 G11
+control cases. BLAKE3G remains the widest interface. The current R8 probe has no
+`sorryAx`; the theorem remains conditional and D017 remains open. Historical
+S29 probes remain evidence for their pinned old commits rather than current-API
+replay claims.
 
 | Gate | Result |
 |---|---|
@@ -506,7 +519,7 @@ D017 remains open.
 | G8 fail closed | PASS — exact negative fixtures include the new bound, shift-count, dynamic-operand, index, and oversized-`bitsOf` refusals, plus tool-version rejection |
 | G9 the emitted `@constrain` **and** `@compute` are the circuit's | PASS — both preconditions of emission for all 11 source-backed corpus modules; the other six of 17 are registry modules and G9 is N/A (D018, D020) |
 | G10a LLZK analysis pipeline admits the module | PASS — all 19 |
-| G11 the harness's own control cases | PASS — 177, including positive baselines, lock/core/policy controls, Xor32 raw/output attacks, whole-e2e reachability mutations, and BLAKE3.G exact-layout/content-aware controls |
+| G11 the harness's own control cases | PASS — 187, including positive baselines, serialized lock/core/policy controls, exact flagged-optimizer controls, Xor32 raw/output attacks, whole-e2e reachability mutations, and BLAKE3.G exact-layout/content-aware controls |
 | G12 reads code, not comments | PASS — A2; a docstring naming an entry point is no longer a call site, so the allowlist shrank rather than grew |
 | G9 compares types | PASS — A4; both readers check every `Ty` against the configured field, and array types exactly against the global read. Was `GAPS.md` §6 |
 | G12 every gate-skipping entry point is confined | PASS |
@@ -679,7 +692,8 @@ not write it. What remains sorts into five tracks. S28 and its post-completion
 review are accepted; S29 Phase B, Xor32 Phase X, and BLAKE3.G Phase H are
 complete. This documentation-only closure completes S29; next select and freeze
 one candidate, then begin R8. That selection subsequently produced `c60d8363`;
-R8 rejected it, and the repair/restart is now in progress.
+R8 rejected it. The replacement chain culminated in exact code candidate
+`193ec342`, which passed the restarted local R8; publication is still separate.
 
 **The two milestones, stated in the grant's terms.** Milestone 1 — one Clean
 circuit compiled through the whole LLZK pipeline, validated end to end — is
@@ -827,8 +841,8 @@ commit**, and **S29 Phase B has completed the witness-visible Xor32/BLAKE3.G
 range contract on `7a0f209c`**. **Xor32 promotion is complete on `06b80f2f`,
 and exact BLAKE3.G promotion on `a3299ca0`;** this documentation-only closure
 completes S29. The first frozen R8 candidate `c60d8363` was rejected; repair and
-a full R8 restart are in progress, while the witness-IR loop increment remains
-later. S27
+a full R8 restart completed on replacement code candidate `193ec342`, while the
+witness-IR loop increment remains later. S27
 remains returned for re-scoping (R7-09).
 
 The assurance track's A5 renderer and A7 copy-canonicalisation items are now

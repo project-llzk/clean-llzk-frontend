@@ -1,8 +1,8 @@
 # Public-readiness milestone
 
-Updated: 2026-08-23
+Updated: 2026-08-24
 
-Status: active
+Status: local frozen candidate passed R8; publication authorization pending
 
 Target: a frozen release-candidate commit suitable for an organization-owned
 repository under `project-llzk`
@@ -13,9 +13,13 @@ matrix on both the accepted LLZK pin and exact checked LLZK main `b5c110d1`.
 The later Phase-H implementation `a3299ca0` also passes both exact toolchains.
 The first frozen R8 candidate `c60d8363` was selected and independently reviewed
 on 2026-08-23, then rejected after the review found a module-output theorem gap
-and claim/reproduction defects. Repair and a full R8 restart are in progress;
-no candidate has passed R8.
-Live repair/review evidence is under `evidence/R8-2026-08-23/`.
+and claim/reproduction defects. Exact replacement code candidate `193ec342`
+passed both LLZK matrices, a local Rust/Cargo 1.96 replay of the repaired
+Plonky3 CI command block, theorem/output probes, and the restarted three-lane
+local R8 on 2026-08-24. The workflow's pinned Rust 1.98 hosted run remains a
+publication-stage check. Complete durable evidence is under
+`evidence/R8-2026-08-23/`. The evidence/status child is not relabelled as the
+matrix-tested candidate.
 
 ## Outcome
 
@@ -123,7 +127,8 @@ P0 public documentation and repository hygiene
   -> S29 proved witness-visible range contract for XOR (done locally)
   -> P1 Xor32 and BLAKE3.G promotions (done locally)
   -> S29 documentation and evidence closure (`c60d8363`, complete locally)
-  -> first frozen R8 candidate rejected; repair and full R8 restart in progress
+  -> first frozen R8 candidate rejected
+  -> replacement code candidate `193ec342` passes local R8
   -> explicit publication decision
 ```
 
@@ -139,14 +144,15 @@ instance, and adversarial gates are complete on `06b80f2f`; exact BLAKE3.G
 `G 0 1 2 3` is complete on `a3299ca0`. Documentary closure `c60d8363` completed
 S29 and became the first frozen candidate; R8 rejected it. A replacement must
 be sealed and the full frozen-tree review restarted before any publication
-decision.
+decision. That requirement is now met locally by exact code candidate
+`193ec342`; organization CI and publication still require separate authority.
 
 ## Current scorecard
 
 | Area | State | Evidence or next action |
 |---|---|---|
 | Stage-1 vertical slice | complete locally | G0-G12 plus the checked showcase on `b16bb83e`; fork CI is behind this branch |
-| Public landing page and document map | complete locally | commit `109083ab`; final review still required |
+| Public landing page and document map | complete locally | commit `109083ab`; included in the final local R8 review on `193ec342` |
 | Checked public example showcase | complete locally | `EXAMPLES.md`; generated from the corpus, enforced by G1, and updated with promoted Xor32 and BLAKE3.G on `a3299ca0` |
 | Security and organization settings | prepared locally | commit `29ba5ec2`; activation still requires publication authority |
 | CI supply-chain policy | complete locally | commit `9b809e32` had 53 controls; the audit baseline added the public-scope discriminator as control 54; immutable action SHAs and fixed Ubuntu/Rust/Nix-cache inputs; organization CI still required on the frozen SHA |
@@ -157,7 +163,7 @@ decision.
 | Headline bitwise examples end to end | complete locally | Xor32 is promoted on `06b80f2f`; exact BLAKE3.G `G 0 1 2 3` is promoted on `a3299ca0`; both have fixed independent outputs, concrete conditional theorem instances, and full external matrices |
 | Renderer round-trip assurance | strengthened locally | A5 plus the 2026-08-22 audit: complete constraint/member/parameter readback, public-output checks, and mutation regressions; final G0-G12 result recorded in the audit report |
 | Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |
-| Final frozen-tree review | in progress; first candidate rejected | repair, seal a replacement, and restart R8 from the beginning |
+| Final frozen-tree review | complete locally | exact code candidate `193ec342`; both matrices, theorem/output probes, Plonky3 1/2/2/2 block, and three independent lanes; `evidence/R8-2026-08-23/` |
 | Organization access | available | active `project-llzk` admin verified 2026-08-21 |
 | Publication | not authorized | separate final action |
 

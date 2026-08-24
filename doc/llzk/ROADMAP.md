@@ -34,7 +34,8 @@ public documentation and hygiene
   → end-to-end Xor32 (`06b80f2f`) and BLAKE3.G (`a3299ca0`) (complete locally)
   → S29 documentation and evidence closure (`c60d8363`, complete locally)
   → first frozen R8 candidate `c60d8363` rejected
-  → replacement repair, seal, and full R8 restart (in progress)
+  → replacement code candidate `193ec342` passes local R8
+  → explicit publication decision (not authorized)
 ```
 
 This order joins the three goals that matter for publication. S25 removed the
@@ -51,9 +52,10 @@ Xor32 is promoted through the external-tool corpus on `06b80f2f`; exact
 BLAKE3.G `G 0 1 2 3` follows on `a3299ca0`. Documentary closure `c60d8363`
 became the first frozen R8 candidate and was rejected after independent review
 found a module-output theorem gap and claim/reproduction defects. Its replacement
-repair is being hardened now; release readiness is reached only after that
-replacement is sealed and passes a full R8 restart, not merely because
-`LLZK.compile` succeeds or both examples carry pre-R8 evidence.
+repair was sealed through code candidate `193ec342`, which passed both exact
+toolchain matrices and the restarted three-lane local R8. That result is not a
+publication action: organization CI, repository creation or transfer, and a
+push remain separately authorized steps.
 
 The initial implementation lives under:
 
