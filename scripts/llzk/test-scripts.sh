@@ -26,6 +26,7 @@ set -uo pipefail   # not -e: this script runs commands that are meant to fail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/../.." && pwd)"
 real_flock="$(command -v flock || true)"
+real_grep="$(command -v grep || true)"
 workdir="$(mktemp -d)"
 trap 'rm -rf "${workdir}"' EXIT
 
@@ -239,6 +240,106 @@ expect "happy path" 0 "pin check:  PASS" \
 echo
 echo "== check-actions-pinned.sh =="
 
+mkdir -p "${workdir}/no-grep-bin"
+expect "a missing grep dependency fails with a named diagnostic" 1 \
+  "required command not found: grep" \
+  -- env PATH="${workdir}/no-grep-bin" /bin/bash \
+    "${script_dir}/check-actions-pinned.sh" "${repo_root}/.github/workflows"
+
+mkdir -p "${workdir}/grep-only-bin"
+ln -s "${real_grep}" "${workdir}/grep-only-bin/grep"
+expect "a missing sha256sum dependency fails with a named diagnostic" 1 \
+  "required command not found: sha256sum" \
+  -- env PATH="${workdir}/grep-only-bin" /bin/bash \
+    "${script_dir}/check-actions-pinned.sh" "${repo_root}/.github/workflows"
+
+make_manifest_repo() {
+  local root="$1"
+  mkdir -p "${root}/scripts/llzk" "${root}/.github/workflows"
+  cp "${script_dir}/check-actions-pinned.sh" "${root}/scripts/llzk/"
+  cp "${repo_root}/.github/workflows/bench-command.yml" \
+    "${repo_root}/.github/workflows/bench-main.yml" \
+    "${repo_root}/.github/workflows/bench.yml" \
+    "${repo_root}/.github/workflows/ci.yml" \
+    "${root}/.github/workflows/"
+}
+
+make_manifest_repo "${workdir}/manifest-exact"
+expect "the exact repository workflow manifest is accepted" 0 \
+  "15 immutable action reference" \
+  -- bash "${workdir}/manifest-exact/scripts/llzk/check-actions-pinned.sh" \
+    "${workdir}/manifest-exact/.github/workflows"
+
+make_manifest_repo "${workdir}/manifest-content"
+cat >> "${workdir}/manifest-content/.github/workflows/ci.yml" <<'YAML'
+# byte-changing but semantically inert mutation
+YAML
+expect "a workflow content mutation breaks the exact manifest" 1 \
+  "workflow manifest mismatch: content changed for 'ci.yml'" \
+  -- bash "${workdir}/manifest-content/scripts/llzk/check-actions-pinned.sh" \
+    "${workdir}/manifest-content/.github/workflows"
+
+make_manifest_repo "${workdir}/manifest-hash-error"
+mkdir -p "${workdir}/sha-failure-bin"
+cat > "${workdir}/sha-failure-bin/sha256sum" <<'SHIM'
+#!/usr/bin/env bash
+exit 2
+SHIM
+chmod +x "${workdir}/sha-failure-bin/sha256sum"
+expect "a workflow hashing failure breaks the exact manifest" 1 \
+  "workflow manifest mismatch: cannot hash 'bench-command.yml'" \
+  -- env PATH="${workdir}/sha-failure-bin:${PATH}" \
+    bash "${workdir}/manifest-hash-error/scripts/llzk/check-actions-pinned.sh" \
+    "${workdir}/manifest-hash-error/.github/workflows"
+
+make_manifest_repo "${workdir}/manifest-hidden-extra"
+cat > "${workdir}/manifest-hidden-extra/.github/workflows/.attack.yml" <<'YAML'
+jobs: { attack: { runs-on: ubuntu-latest, steps: [{ uses: actions/checkout@v4 }] } }
+YAML
+expect "a hidden workflow addition breaks the exact manifest" 1 \
+  "workflow manifest mismatch: unexpected path '.attack.yml'" \
+  -- bash "${workdir}/manifest-hidden-extra/scripts/llzk/check-actions-pinned.sh" \
+    "${workdir}/manifest-hidden-extra/.github/workflows"
+
+make_manifest_repo "${workdir}/manifest-nested-extra"
+mkdir -p "${workdir}/manifest-nested-extra/.github/workflows/nested"
+cp "${workdir}/manifest-nested-extra/.github/workflows/ci.yml" \
+  "${workdir}/manifest-nested-extra/.github/workflows/nested/attack.yml"
+expect "a nested workflow addition breaks the exact manifest" 1 \
+  "workflow manifest mismatch: unexpected path 'nested/attack.yml'" \
+  -- bash "${workdir}/manifest-nested-extra/scripts/llzk/check-actions-pinned.sh" \
+    "${workdir}/manifest-nested-extra/.github/workflows"
+
+make_manifest_repo "${workdir}/manifest-missing"
+mv "${workdir}/manifest-missing/.github/workflows/bench-main.yml" \
+  "${workdir}/manifest-missing/.github/workflows/renamed.yml"
+expect "a renamed workflow breaks the exact manifest" 1 \
+  "workflow manifest mismatch: missing path 'bench-main.yml'" \
+  -- bash "${workdir}/manifest-missing/scripts/llzk/check-actions-pinned.sh" \
+    "${workdir}/manifest-missing/.github/workflows"
+
+make_manifest_repo "${workdir}/manifest-symlink"
+ln -s ci.yml "${workdir}/manifest-symlink/.github/workflows/.attack.yaml"
+expect "a workflow-shaped symlink breaks the exact manifest" 1 \
+  "workflow manifest mismatch: nonregular path '.attack.yaml'" \
+  -- bash "${workdir}/manifest-symlink/scripts/llzk/check-actions-pinned.sh" \
+    "${workdir}/manifest-symlink/.github/workflows"
+
+mkdir -p "${workdir}/actions-no-references"
+cat > "${workdir}/actions-no-references/ci.yml" <<'YAML'
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - run: echo no-external-action
+YAML
+expect "a workflow directory with no action references fails closed" 1 \
+  "no action references found" \
+  -- bash "${script_dir}/check-actions-pinned.sh" \
+    "${workdir}/actions-no-references"
+
 mkdir -p "${workdir}/actions-mutable"
 cat > "${workdir}/actions-mutable/ci.yml" <<'YAML'
 permissions:
@@ -265,6 +366,75 @@ jobs:
 YAML
 expect "immutable and local actions are accepted" 0 "2 immutable action reference" \
   -- bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-pinned"
+
+mkdir -p "${workdir}/grep-lines-failure-bin"
+cat > "${workdir}/grep-lines-failure-bin/grep" <<'SHIM'
+#!/usr/bin/env bash
+if [[ " $* " == *" -anE "* ]]; then
+  exit 2
+fi
+exec "${LLZK_REAL_GREP}" "$@"
+SHIM
+chmod +x "${workdir}/grep-lines-failure-bin/grep"
+expect "an action line-scan grep failure is not treated as no match" 1 \
+  "grep failed while scanning" \
+  -- env PATH="${workdir}/grep-lines-failure-bin:${PATH}" \
+    LLZK_REAL_GREP="${real_grep}" \
+    bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-pinned"
+
+mkdir -p "${workdir}/actions-hidden-workflow"
+cat > "${workdir}/actions-hidden-workflow/ci.yml" <<'YAML'
+permissions:
+  contents: read
+jobs:
+  visible:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+YAML
+cat > "${workdir}/actions-hidden-workflow/.attack.yml" <<'YAML'
+jobs:
+  hidden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+YAML
+expect "a hidden workflow cannot escape action policy" 1 \
+  "mutable action reference" \
+  -- bash "${script_dir}/check-actions-pinned.sh" \
+    "${workdir}/actions-hidden-workflow"
+expect "a hidden workflow cannot escape runner policy" 1 \
+  "moving hosted runner label" \
+  -- bash "${script_dir}/check-actions-pinned.sh" \
+    "${workdir}/actions-hidden-workflow"
+
+# A search error in an optional policy scan must not be mistaken for an honest
+# no-match. The shim delegates every other invocation so this reaches the
+# secondary self-hosted scan after successfully finding the pinned action. Its
+# nested filename also proves that recursive enumeration does not parse spaces
+# or colons out of a `file:line:text` stream.
+mkdir -p "${workdir}/actions-grep-error/nested"
+cat > "${workdir}/actions-grep-error/nested/work flow:guard.yaml" <<'YAML'
+jobs:
+  test:
+    if: vars.CLEAN_BENCH_ENABLED == 'true'
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+YAML
+mkdir -p "${workdir}/grep-failure-bin"
+cat > "${workdir}/grep-failure-bin/grep" <<'SHIM'
+#!/usr/bin/env bash
+if [[ " $* " == *" self-hosted "* ]]; then
+  exit 2
+fi
+exec "${LLZK_REAL_GREP}" "$@"
+SHIM
+chmod +x "${workdir}/grep-failure-bin/grep"
+expect "a secondary grep failure is not treated as no match" 2 \
+  "grep failed while scanning" \
+  -- env PATH="${workdir}/grep-failure-bin:${PATH}" LLZK_REAL_GREP="${real_grep}" \
+    bash "${script_dir}/check-actions-pinned.sh" "${workdir}/actions-grep-error"
 
 mkdir -p "${workdir}/actions-moving-runner"
 cat > "${workdir}/actions-moving-runner/ci.yml" <<'YAML'
@@ -520,7 +690,7 @@ check_concurrent_claims() {
   lines="$(wc -l < "${clone}/.llzk-worktree-owner" | tr -d ' ')"
   [[ "${owner}" == "${winner}" ]] || { echo "winner ${winner}, record ${owner}"; return 1; }
   [[ "${lines}" == 3 ]] || { echo "owner record has ${lines} lines"; return 1; }
-  rg -q "held by session ${winner}" "${loser}" || return 1
+  grep -Fq -- "held by session ${winner}" "${loser}" || return 1
   git -C "${clone}" check-ignore -q .llzk-worktree-owner.guard || return 1
   git -C "${clone}" check-ignore -q .llzk-worktree-owner.new.control || return 1
   owner_inode_before="$(path_identity "${clone}/.llzk-worktree-owner")" || return 1
@@ -563,7 +733,7 @@ check_reclaim_rereads_owner() {
   "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
   wait "${pid}"; status=$?
   [[ "${status}" -eq 1 ]] || { echo "stale reclaim exited ${status}"; return 1; }
-  rg -q -- "--from old does not match the recorded owner new" "${out}" || return 1
+  grep -Fq -- "--from old does not match the recorded owner new" "${out}" || return 1
   [[ "$(sed -n '1p' "${clone}/.llzk-worktree-owner")" == new ]] || return 1
   echo "queued reclaim reread and preserved the replacement owner"
 }
@@ -595,7 +765,7 @@ check_release_rereads_owner() {
   "${real_flock}" --unlock "${guard_fd}"; exec {guard_fd}>&-
   wait "${pid}"; status=$?
   [[ "${status}" -eq 1 ]] || { echo "stale release exited ${status}"; return 1; }
-  rg -q "session new .* only the holder may release it" "${out}" || return 1
+  grep -Eq -- "session new .* only the holder may release it" "${out}" || return 1
   [[ "$(sed -n '1p' "${clone}/.llzk-worktree-owner")" == new ]] || return 1
   echo "queued release reread and preserved the replacement owner"
 }
@@ -636,8 +806,8 @@ check_readers_reread_owner() {
   wait "${status_pid}"; status_status=$?
   wait "${require_pid}"; require_status=$?
   [[ "${status_status}" -eq 0 && "${require_status}" -eq 1 ]] || return 1
-  rg -q "worktree held by session new" "${status_out}" || return 1
-  rg -q "held by new" "${require_out}" || return 1
+  grep -Fq -- "worktree held by session new" "${status_out}" || return 1
+  grep -Fq -- "held by new" "${require_out}" || return 1
   echo "queued status and require both read the post-guard owner"
 }
 
@@ -658,7 +828,7 @@ SHIM
   status=$?
   after="$(sha256sum "${clone}/.llzk-worktree-owner" | cut -d' ' -f1)"
   [[ "${status}" -ne 0 && "${before}" == "${after}" ]] || return 1
-  rg -q "cannot acquire the worktree lock transaction guard" "${out}" || return 1
+  grep -Fq -- "cannot acquire the worktree lock transaction guard" "${out}" || return 1
   echo "failed flock left the owner record byte-identical"
 }
 
@@ -2104,7 +2274,7 @@ expect "e2e exact counts are literal source pins" 0 "" \
          LLZK_EXPECTED_VECTORS=67 \
          LLZK_EXPECTED_FIXTURES=2
        do
-         rg --fixed-strings --line-regexp "readonly ${assignment}" "$1/e2e.sh" >/dev/null \
+         grep -Fqx -- "readonly ${assignment}" "$1/e2e.sh" >/dev/null \
            || exit 1
        done
      ' _ "${script_dir}"
