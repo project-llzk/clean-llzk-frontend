@@ -305,14 +305,25 @@ G11 runs *first* in `e2e.sh`, though it is numbered last: a broken check would
 silently weaken everything below it.
 
 Each case asserts an exit status **and** a message substring. Status alone would
-have passed the defect that motivated the gate — exit 127 is non-zero. Two of
-the cases are the negative direction of
-`require_llzk_opt_discriminates` and `require_llzk_witgen_discriminates`, whose
-positive direction ran on the real tools every time while the direction that
-matters ran never.
+have passed the defect that motivated the gate — exit 127 is non-zero. Several
+cases exercise the negative directions of `require_llzk_opt_discriminates` and
+`require_llzk_witgen_discriminates`; their positive directions ran on the real
+tools every time while the directions that matter once ran never.
 
-There are now 177 cases. The witness controls reject a permissive shim, a stub
-execution backend, a checker permissive for public output, and three
+There are now 181 cases. The `llzk-opt` controls separately reject a wholly
+permissive shim, a parser with no LLZK verifier, flag-selective G4/G10a shims,
+and a subtler wrapper which strips `--verify-roundtrip` while delegating to
+honest plain verification. The round-trip discriminator deliberately uses a
+plain-positive/current-roundtrip-negative LLZK 3.0 parser/printer canary; a
+future tool fix requires a reviewed replacement canary. The product
+discriminator requires materialized `@product` IR with compute/constrain
+provenance, then requires its non-`Main` control to survive full inlining before
+the product pass rejects it. These finite public controls falsify the named
+vacuous and accidentally flag-stripping wrappers; they cannot prevent a
+purpose-built wrapper from recognizing every published canary. Exact tool pin
+and provenance checks remain part of the trust boundary. The witness controls
+reject a permissive shim, a stub execution backend, a checker permissive for
+public output, and three
 content-aware partial checkers: public `out0` only, full-witness `w0` plus all
 outputs, and full-witness all cells plus `out0`. Each partial checker is first
 shown green on its baseline, red on a checked field, and falsely green on an

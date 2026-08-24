@@ -559,6 +559,157 @@ expect "llzk-opt self-test catches a permissive shim" 1 "accepted a file that is
        bash -c 'source "$1/lib.sh"; require_llzk_opt_discriminates "$2" "$3"' \
        _ "${script_dir}" "${workdir}" "${workdir}/dummy.llzk"
 
+# These wrappers isolate flag-specific vacuity while preserving enough earlier
+# behavior to reach the intended discriminator. Before R8, the original G4 and
+# G10a variants passed require_llzk_opt_discriminates because it exercised only
+# plain llzk-opt; either flagged gate could therefore be green without running.
+cat > "${workdir}/shim/llzk-opt-roundtrip-permissive" <<'SHIM'
+#!/usr/bin/env bash
+roundtrip=false
+product=false
+input=""
+for argument in "$@"; do
+  [[ "${argument}" == "--verify-roundtrip" ]] && roundtrip=true
+  [[ "${argument}" == "--llzk-product-program" ]] && product=true
+  [[ -f "${argument}" ]] && input="${argument}"
+done
+${roundtrip} && exit 0
+if ${product}; then
+  grep -q '@NotMain' "${input}" && exit 1
+  exit 0
+fi
+grep -q '^this is not MLIR' "${input}" && exit 1
+if grep -q 'function.def @compute' "${input}" \
+    && ! grep -q 'function.def @constrain' "${input}"; then
+  exit 1
+fi
+exit 0
+SHIM
+chmod +x "${workdir}/shim/llzk-opt-roundtrip-permissive"
+expect "llzk-opt self-test catches a roundtrip-only permissive shim" 1 \
+  "accepted a file that is not MLIR under --verify-roundtrip" \
+  -- env LLZK_OPT="${workdir}/shim/llzk-opt-roundtrip-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_opt_discriminates "$2" "$3"' \
+       _ "${script_dir}" "${workdir}" "${workdir}/dummy.llzk"
+
+# This wrapper is subtler: it gives --verify-roundtrip exactly the same honest
+# parse-and-verify behavior as a plain invocation. Positive, non-MLIR, and
+# invalid-LLZK probes therefore all have the expected status, but no round trip
+# occurs. Only a plain-positive/roundtrip-negative canary distinguishes it.
+cat > "${workdir}/shim/llzk-opt-roundtrip-noop" <<'SHIM'
+#!/usr/bin/env bash
+product=false
+input=""
+for argument in "$@"; do
+  [[ "${argument}" == "--llzk-product-program" ]] && product=true
+  [[ -f "${argument}" ]] && input="${argument}"
+done
+if ${product}; then
+  grep -q '@NotMain' "${input}" && exit 1
+  exit 0
+fi
+grep -q '^this is not MLIR' "${input}" && exit 1
+if grep -q 'function.def @compute' "${input}" \
+    && ! grep -q 'function.def @constrain' "${input}"; then
+  exit 1
+fi
+exit 0
+SHIM
+chmod +x "${workdir}/shim/llzk-opt-roundtrip-noop"
+expect "llzk-opt self-test catches a no-op roundtrip flag" 1 \
+  "accepted the plain-valid round-trip canary under --verify-roundtrip" \
+  -- env LLZK_OPT="${workdir}/shim/llzk-opt-roundtrip-noop" \
+       bash -c 'source "$1/lib.sh"; require_llzk_opt_discriminates "$2" "$3"' \
+       _ "${script_dir}" "${workdir}" "${workdir}/dummy.llzk"
+
+cat > "${workdir}/shim/llzk-opt-product-permissive" <<'SHIM'
+#!/usr/bin/env bash
+roundtrip=false
+product=false
+input=""
+for argument in "$@"; do
+  [[ "${argument}" == "--verify-roundtrip" ]] && roundtrip=true
+  [[ "${argument}" == "--llzk-product-program" ]] && product=true
+  [[ -f "${argument}" ]] && input="${argument}"
+done
+if ${roundtrip}; then
+  grep -q '^this is not MLIR' "${input}" && exit 1
+  if grep -q 'function.def @compute' "${input}" \
+      && ! grep -q 'function.def @constrain' "${input}"; then
+    exit 1
+  fi
+  grep -q 'smt.set_info ":a-b"' "${input}" && exit 1
+  exit 0
+fi
+${product} && exit 0
+grep -q '^this is not MLIR' "${input}" && exit 1
+if grep -q 'function.def @compute' "${input}" \
+    && ! grep -q 'function.def @constrain' "${input}"; then
+  exit 1
+fi
+exit 0
+SHIM
+chmod +x "${workdir}/shim/llzk-opt-product-permissive"
+expect "llzk-opt self-test catches a product-only permissive shim" 1 \
+  "did not materialize product IR" \
+  -- env LLZK_OPT="${workdir}/shim/llzk-opt-product-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_opt_discriminates "$2" "$3"' \
+       _ "${script_dir}" "${workdir}" "${workdir}/dummy.llzk"
+
+# A more capable product shim can fake the new output-shape check. It still has
+# to discriminate the product command's semantic precondition rather than
+# accepting a plain-valid non-Main root. This keeps the independent negative
+# direction live even as the positive direction becomes more exact.
+cat > "${workdir}/shim/llzk-opt-product-root-permissive" <<'SHIM'
+#!/usr/bin/env bash
+roundtrip=false
+product=false
+input=""
+output=""
+next_is_output=false
+for argument in "$@"; do
+  if ${next_is_output}; then
+    output="${argument}"
+    next_is_output=false
+    continue
+  fi
+  [[ "${argument}" == "-o" ]] && { next_is_output=true; continue; }
+  [[ "${argument}" == "--verify-roundtrip" ]] && roundtrip=true
+  [[ "${argument}" == "--llzk-product-program" ]] && product=true
+  [[ -f "${argument}" ]] && input="${argument}"
+done
+if ${roundtrip}; then
+  grep -q '^this is not MLIR' "${input}" && exit 1
+  if grep -q 'function.def @compute' "${input}" \
+      && ! grep -q 'function.def @constrain' "${input}"; then
+    exit 1
+  fi
+  grep -q 'smt.set_info ":a-b"' "${input}" && exit 1
+  exit 0
+fi
+if ${product}; then
+  if [[ -n "${output}" && "${output}" != "/dev/null" ]]; then
+    printf '%s\n' \
+      'function.def @product()' \
+      'product_source = "compute"' \
+      'product_source = "constrain"' > "${output}"
+  fi
+  exit 0
+fi
+grep -q '^this is not MLIR' "${input}" && exit 1
+if grep -q 'function.def @compute' "${input}" \
+    && ! grep -q 'function.def @constrain' "${input}"; then
+  exit 1
+fi
+exit 0
+SHIM
+chmod +x "${workdir}/shim/llzk-opt-product-root-permissive"
+expect "llzk-opt self-test catches a root-permissive product shim" 1 \
+  "accepted a plain-valid LLZK module whose root is not @Main" \
+  -- env LLZK_OPT="${workdir}/shim/llzk-opt-product-root-permissive" \
+       bash -c 'source "$1/lib.sh"; require_llzk_opt_discriminates "$2" "$3"' \
+       _ "${script_dir}" "${workdir}" "${workdir}/dummy.llzk"
+
 # An llzk-witgen that exits 0 unconditionally, so --check-output never fails.
 cat > "${workdir}/shim/llzk-witgen-permissive" <<'SHIM'
 #!/usr/bin/env bash

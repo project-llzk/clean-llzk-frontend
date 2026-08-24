@@ -483,9 +483,28 @@ llzk_require_exact_count() {
 # satisfied require_llzk_tools and made G3, G4 and G10 all vacuous while e2e.sh
 # printed PASS (R4b-2).
 #
-# Runs llzk-opt three times: once on a real emitted artifact, which must verify;
-# once on a file that is not MLIR at all, which must not; and once on a module
-# that is well-formed MLIR and invalid *LLZK*, which must not either.
+# Exercises the exact command families used by the gates, rather than assuming
+# that discrimination in plain verification implies discrimination under a
+# pass flag. A wrapper can delegate every plain invocation to the real tool but
+# exit zero only for `--verify-roundtrip` or `--llzk-product-program`; that made
+# G4 or G10a vacuous while this helper stayed green (R8).
+#
+# Plain verification and `--verify-roundtrip` each get a real emitted positive,
+# a non-MLIR negative, and a well-formed-MLIR/invalid-LLZK negative. Those three
+# have the same accept/reject partition, so they cannot distinguish a wrapper
+# which merely strips `--verify-roundtrip` and delegates to plain verification.
+# A fourth canary is therefore plain-positive and roundtrip-negative: the
+# accepted LLZK 3.0 tool parses an SMT keyword containing a hyphen, but its
+# current printer emits a generic keyword spelling which neither its textual nor
+# bytecode round-trip parser accepts. This deliberately pins that behavior; a
+# future tool which closes the parser/printer bug needs a reviewed replacement
+# canary, not a silent deletion of the check.
+#
+# The product pipeline gets a real emitted positive and a negative which is
+# deliberately stronger than malformed input: a plain-valid LLZK module whose
+# root is not the literal `@Main` required by `--llzk-product-program`.
+# Full inlining alone must accept that control, isolating the product pass as the
+# reason the combined command rejects it.
 #
 # The third probe is R5d's D-2, and it matters more than it sounds. With only the
 # first two, any generic MLIR parser passes this self-test -- and that is not
@@ -504,6 +523,9 @@ require_llzk_opt_discriminates() {
   local tag; tag="$(basename -- "${artifact}" .llzk).$$"
   local garbage="${workdir}/llzk-opt-selftest-${tag}.notmlir"
   local nonllzk="${workdir}/llzk-opt-selftest-${tag}.llzk"
+  local roundtrip_canary="${workdir}/llzk-opt-selftest-${tag}.roundtrip-canary.llzk"
+  local wrongroot="${workdir}/llzk-opt-selftest-${tag}.wrong-root.llzk"
+  local product_output="${workdir}/llzk-opt-selftest-${tag}.product.llzk"
 
   "${LLZK_OPT}" "${artifact}" -o /dev/null >/dev/null 2>&1 \
     || llzk_fail "llzk-opt self-test: ${artifact} does not verify; every later green would be \
@@ -531,9 +553,77 @@ LLZKEOF
 running LLZK's verifier, so G3, G4 and G10 are green without checking anything."
   fi
 
-  rm -f "${garbage}" "${nonllzk}"
-  echo "llzk-opt self-test: green on an emitted artifact, red on a non-MLIR file \
-and on well-formed MLIR that is not valid LLZK"
+  "${LLZK_OPT}" --verify-roundtrip "${artifact}" -o /dev/null >/dev/null 2>&1 \
+    || llzk_fail "llzk-opt round-trip self-test: ${artifact} does not round-trip; every G4 green \
+would be meaningless"
+  if "${LLZK_OPT}" --verify-roundtrip "${garbage}" -o /dev/null >/dev/null 2>&1; then
+    llzk_fail "llzk-opt round-trip self-test: ${LLZK_OPT} accepted a file that is not MLIR under \
+--verify-roundtrip, so G4 is not checking anything."
+  fi
+  if "${LLZK_OPT}" --verify-roundtrip "${nonllzk}" -o /dev/null >/dev/null 2>&1; then
+    llzk_fail "llzk-opt round-trip self-test: ${LLZK_OPT} accepted well-formed MLIR that is not \
+valid LLZK under --verify-roundtrip, so G4 is not running LLZK's verifier."
+  fi
+
+  cat > "${roundtrip_canary}" <<'LLZKEOF'
+module {
+  smt.solver () : () -> () {
+    smt.set_info ":a-b" "x"
+    smt.yield
+  }
+}
+LLZKEOF
+  "${LLZK_OPT}" "${roundtrip_canary}" -o /dev/null >/dev/null 2>&1 \
+    || llzk_fail "llzk-opt round-trip self-test: the round-trip canary is not plain-valid"
+  if "${LLZK_OPT}" --verify-roundtrip "${roundtrip_canary}" \
+       -o /dev/null >/dev/null 2>&1; then
+    llzk_fail "llzk-opt round-trip self-test: ${LLZK_OPT} accepted the plain-valid round-trip \
+canary under --verify-roundtrip. The accepted LLZK 3.0 tool rejects this current \
+parser/printer boundary, so --verify-roundtrip may have been ignored."
+  fi
+
+  cat > "${wrongroot}" <<'LLZKEOF'
+module attributes {llzk.lang = "clean", llzk.main = !struct.type<@NotMain>} {
+  struct.def @NotMain {
+    function.def @compute() -> !struct.type<@NotMain> {
+      %v0 = struct.new : !struct.type<@NotMain>
+      function.return %v0 : !struct.type<@NotMain>
+    }
+    function.def @constrain(%self: !struct.type<@NotMain>) {
+      function.return
+    }
+  }
+}
+LLZKEOF
+  "${LLZK_OPT}" "${wrongroot}" -o /dev/null >/dev/null 2>&1 \
+    || llzk_fail "llzk-opt product self-test: the wrong-root control is not plain-valid LLZK"
+  "${LLZK_OPT}" --llzk-full-inlining "${wrongroot}" \
+    -o /dev/null >/dev/null 2>&1 \
+    || llzk_fail "llzk-opt product self-test: the wrong-root control did not survive full \
+inlining, so its combined-pipeline rejection would not isolate --llzk-product-program"
+  "${LLZK_OPT}" --llzk-full-inlining --llzk-product-program \
+    "${artifact}" -o "${product_output}" >/dev/null 2>&1 \
+    || llzk_fail "llzk-opt product self-test: ${artifact} is not admitted; every G10a green would \
+be meaningless"
+  [[ -s "${product_output}" ]] \
+    || llzk_fail "llzk-opt product self-test: the admitted artifact did not materialize product \
+IR, so --llzk-product-program may have been ignored"
+  grep -Eq 'function\.def @product\(' "${product_output}" \
+    && grep -q 'product_source = "compute"' "${product_output}" \
+    && grep -q 'product_source = "constrain"' "${product_output}" \
+    || llzk_fail "llzk-opt product self-test: the admitted artifact lacks the generated @product \
+function or its compute/constrain provenance, so --llzk-product-program may have been ignored"
+  if "${LLZK_OPT}" --llzk-full-inlining --llzk-product-program \
+       "${wrongroot}" -o /dev/null >/dev/null 2>&1; then
+    llzk_fail "llzk-opt product self-test: ${LLZK_OPT} accepted a plain-valid LLZK module whose \
+root is not @Main under --llzk-product-program, so G10a is not checking its analysis pipeline."
+  fi
+
+  rm -f "${garbage}" "${nonllzk}" "${roundtrip_canary}" "${wrongroot}" \
+    "${product_output}"
+  echo "llzk-opt self-test: plain and round-trip green on an emitted artifact and red on \
+non-MLIR/invalid LLZK; round-trip flag distinguished by a plain-positive canary; product \
+pipeline green on the artifact and red on a full-inlining-valid non-Main root"
 }
 
 # llzk_smt_declared_reason LOGFILE
