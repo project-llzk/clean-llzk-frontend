@@ -1,5 +1,12 @@
 # R8 formal frozen-tree review
 
+Post-review documentary correction (2026-08-24): publication preflight found
+that the original S4 disposition below gave the wrong reason for the remaining
+zero-input case. Clean and the frontend both represent input size zero; the
+case is untested, not rejected by construction. The corrected wording and the
+active `GAPS.md` entry preserve that boundary without changing the reviewed
+code candidate or claiming new coverage.
+
 Review target: exact code candidate
 `193ec342cb2aae9055c36f4f77d2a4fe23da7823` in fresh detached worktree
 `/tmp/clean-llzk-r8-193ec342-lanef`. The worktree was clean before and after
@@ -104,8 +111,9 @@ private-reporting activation, settings change, or publication authorization.
 - S3 is closed: both `Demo` and `Empty` renderer fixtures reach G3, G4, and G10.
 - S4 is partially closed and honestly bounded: empty member/parameter,
   zero-witness, zero-output, and no-constraint shapes are covered; a true
-  zero-input source circuit remains a recorded Stage-2 limitation because the
-  current source construction requires positive input size.
+  zero-input source circuit is representable by the current construction but
+  remains untested in the checked-source corpus. This finite-coverage boundary
+  is recorded in `GAPS.md` rather than counted as an unsupported capability.
 - S5 is closed by `Passthrough` and `ConstOut` corpus entries.
 - S6 is closed: neither `Ty` nor `Value` derives `Inhabited`.
 
@@ -116,11 +124,11 @@ surface, and an input/member/witness/output cardinality grid.
 
 ## Accepted boundaries and final disposition
 
-The generic caller-selected table-identity gap (D012) and absence of formal LLZK
-semantics or a constraint executor (D017) remain open and prominent. G10 admits
-and lowers modules but runs no solver. `llzk-witgen` checks computation and does
-not execute `@constrain`. S4's zero-input remainder is not silently counted as
-covered.
+The generic caller-selected table-identity gap (D012), the untested zero-input
+checked-source path, and the absence of formal LLZK semantics or a constraint
+executor (D017) remain open and prominent. G10 admits and lowers modules but
+runs no solver. `llzk-witgen` checks computation and does not execute
+`@constrain`. S4's zero-input remainder is not silently counted as covered.
 
 Final disposition: all three independent lanes GO on exact code candidate
 `193ec342`. This is a local frozen-candidate R8 result, not publication

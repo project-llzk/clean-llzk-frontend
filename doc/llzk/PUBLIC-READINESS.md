@@ -21,6 +21,13 @@ publication-stage check. Complete durable evidence is under
 `evidence/R8-2026-08-23/`. The evidence/status child is not relabelled as the
 matrix-tested candidate.
 
+Publication keeps three identities distinct: `193ec342` is the immutable local
+R8 code candidate; a reviewed documentation descendant is the proposed initial
+organization `main`; and any post-publication evidence merge is a later public
+tip. All four organization jobs must run on exact `193ec342`, on the initial
+`main`, and again on any later protected-main merge. None of those hosted results
+is inferred from a parent or from the local matrices.
+
 ## Outcome
 
 The repository should be credible to three audiences at once:
@@ -49,8 +56,10 @@ authorized.
   personal fork. Historical evidence may retain exact paths when provenance
   requires them.
 - The branch records the accepted upstream Clean revision and every reviewed
-  local Clean overlay separately, has a clean worktree, contains no generated
-  build products, and publishes every commit selected for the release candidate.
+  local Clean overlay separately, has a clean worktree, and contains no
+  generated build products. The authorized publication must push the selected
+  history in full rather than squash-importing it, so those provenance objects
+  and the evidence descendants remain reachable.
 - Licensing and upstream Clean attribution remain intact. **Prepared locally:**
   `PUBLICATION.md` specifies the repository description, topics, branch
   protection, required checks, and security settings; `CONTRIBUTING.md`, the PR
@@ -164,7 +173,7 @@ decision. That requirement is now met locally by exact code candidate
 | Renderer round-trip assurance | strengthened locally | A5 plus the 2026-08-22 audit: complete constraint/member/parameter readback, public-output checks, and mutation regressions; final G0-G12 result recorded in the audit report |
 | Copy-canonicalisation invariant | complete locally | A7; both theorems and G0-G12 green on `a32593bf` |
 | Final frozen-tree review | complete locally | exact code candidate `193ec342`; both matrices, theorem/output probes, Plonky3 1/2/2/2 block, and three independent lanes; `evidence/R8-2026-08-23/` |
-| Organization access | available | active `project-llzk` admin verified 2026-08-21 |
+| Organization access | available | active `project-llzk` admin and unused preferred repository name verified read-only 2026-08-24 |
 | Publication | not authorized | separate final action |
 
 ## Publication checklist
@@ -174,11 +183,22 @@ Once every acceptance criterion above is met:
 1. Choose transfer versus a new `project-llzk/clean-llzk-frontend` repository;
    prefer the descriptive repository unless preserving GitHub's fork relation is
    an explicit requirement.
-2. Record the release-candidate commit and all external pins.
-3. Create or transfer only after explicit authorization, then apply the
-   description, topics, protection, security, and Actions settings in
-   `PUBLICATION.md`.
-4. Push the frozen commit and require organization-repository CI on that exact
-   SHA.
-5. Add the LLZK organization-profile link, then verify links, security reporting,
-   badges, settings, and CI from an anonymous browser session.
+2. Record exact code candidate `193ec342`, the reviewed documentation tip, and
+   every external pin without conflating their roles.
+3. After explicit authorization, create the destination privately and push the
+   complete history with explicit immutable refspecs. Do not repurpose `origin`
+   or `upstream`, squash the history, or enable self-hosted benchmarking.
+4. Require all four organization jobs on exact `193ec342` and exact proposed
+   `main`; inspect event, repository, head SHA, attempt, and check-run app rather
+   than accepting names alone.
+5. Verify organization Actions policy/private-run capacity and a second qualified
+   reviewer. On the current GitHub Free plan, run the bootstrap CI privately,
+   freeze writers and `main`, then make the repository public without
+   announcement and immediately install app-bound protection plus private
+   vulnerability reporting. Reverify the unchanged `main` SHA before continuing.
+6. Verify links, security reporting, settings, and CI anonymously before adding
+   the organization-profile link or announcing publication.
+7. Merge the resulting publication evidence through protected `main` with an
+   independent approval, then require the same four `push`-event jobs on the
+   exact post-squash SHA. Keep that GitHub record as terminal evidence rather
+   than creating an infinite chain of self-naming documentation commits.

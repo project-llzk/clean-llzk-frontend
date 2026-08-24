@@ -280,9 +280,9 @@ Every other `NExpr` shape stays rejected. The general treatment — `NExpr.val` 
 needs an index bounds policy and LLZK interpreter support that do not exist yet,
 and is deliberately not an implicit backlog item.
 
-## D012 — Table rows are trusted registry input, for now
+## D012 — Table rows are proved; generic circuit identity remains caller-selected
 
-**Status:** accepted, with a recorded follow-up
+**Status:** original row-trust assumption discharged; residual generic identity gap accepted
 **Date:** 2026-08-01
 **Enacted by:** S06
 
@@ -362,11 +362,14 @@ emitted `constrain.in %Bytes, %x` asserts. S28 states the same relation over an
 ordered array of field values and instantiates it at `And8`. Everything between
 them is a theorem.
 
-So what is left is not "the rows are trusted". It is D017's reading of
-`constrain.in` as membership, which is a statement about LLZK, and the same
-assumption every other emitted operation carries. The follow-up about naming
-`ByteTable`'s `StaticTable` is no longer blocking anything; it would be a
-tidiness change.
+For a correctly selected table certificate, the remaining row-membership
+semantic assumption is D017's reading of `constrain.in` as membership, the same
+LLZK assumption every other emitted operation carries. Separately, the generic
+caller-selected identity gap at lines 340–349 remains open: the compiler cannot
+demand that the certified table is the circuit's original erased table. Neither
+residue means that the exported row bytes themselves are trusted. The follow-up
+about naming `ByteTable`'s `StaticTable` is no longer blocking anything; it would
+be a tidiness change.
 
 `ExportTable.ofStatic` is the mitigation: where a `StaticTable` is still in
 scope, the rows are computed from its own `row` function and cannot disagree
@@ -1115,10 +1118,11 @@ the Circom, Halo2/PLONKish, Airbender, and Noir frontends.
 Moving early would have made repository ownership look settled while the code
 still rested on a stale Clean base, had only one proved headline example in the
 full external-tool corpus, and left the renderer's constraint-only statements
-with one line of defense. S25 and A5 have since closed the first and third
-conditions; the impactful-example and final-review requirements remain.
-Repository transfer is therefore still an exit action, not a way to create the
-milestone.
+with one line of defense. S25 and A5 closed the first and third conditions;
+S29's Xor32/BLAKE3.G promotions and exact candidate `193ec342`'s restarted R8
+closed the impactful-example and final-review requirements. Repository creation
+or transfer remains an explicitly authorized exit action rather than evidence
+used to create the milestone.
 
 The release candidate must satisfy `PUBLIC-READINESS.md`: current upstream
 Clean alignment, an explicit review of the moving LLZK pin, an end-to-end
@@ -1520,7 +1524,7 @@ which discriminate executable narrowing from the old raw XOR.
 
 **Date:** 2026-08-23
 
-**Enacted by:** replacement repair after R8 rejected `c60d8363`
+**Enacted by:** `4248ddfcb58537c32b633687d1e1ba2a24fddd10`; final replacement code candidate `193ec342`
 
 The pre-repair `spec_of_compile` accepted an assignment `outs` for the emitted
 component's public `@out{j}` members and assumed all reader-extracted equalities,
@@ -1547,8 +1551,9 @@ axiom to the output bridge. It still relies on D017 for the meaning of rendered
 LLZK and proves only the soundness direction for assignments satisfying the
 reader-extracted module constraints. Exact application and axiom probes are in
 `evidence/R8-2026-08-23/`. Because this repair followed a frozen-candidate
-rejection, the replacement must pass both full matrices and a restarted R8;
-the earlier candidate's green evidence is not inherited.
+rejection, its descendant replacement did not inherit the earlier candidate's
+green evidence: exact code candidate `193ec342` passed both full matrices and a
+restarted three-lane R8 on 2026-08-24.
 
 ## D037 — Serialize advisory owner-record transactions on a persistent guard
 
@@ -1556,7 +1561,7 @@ the earlier candidate's green evidence is not inherited.
 
 **Date:** 2026-08-24
 
-**Enacted by:** replacement repair after R8 rejected `beb2f54d`
+**Enacted by:** `4819f6edd040ede1f347a1853ee97df20eb6484c`; retained by final code candidate `193ec342`
 
 D024 said a copied `reclaim --from` value could not displace a holder which
 arrived later. That was false in the enacted shell script: comparison and owner

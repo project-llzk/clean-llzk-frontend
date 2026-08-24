@@ -187,7 +187,8 @@ records preceded the first control-set opening on the prior frozen candidate;
 the exact-`193ec342` restart re-audited the candidate and its delta with those
 controls already known. All final candidate findings were repaired;
 [`FORMAL-REVIEW.md`](FORMAL-REVIEW.md) records the final GO dispositions and
-the honest S4, generic table-identity, and D017 limits.
+the corrected S4 boundary (a representable but untested zero-input checked
+source), generic table-identity gap, and D017 limit.
 
 This closes the local frozen-candidate R8 milestone on code candidate
 `193ec342`. The later evidence/status commit is a documentation-only child and

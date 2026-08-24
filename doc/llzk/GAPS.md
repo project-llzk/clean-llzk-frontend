@@ -12,12 +12,15 @@ that is only implicit is a surprise.
 
 Ordered by how much a reader would be misled by not knowing.
 
-## 1. Lookup table rows are asserted by the caller, not checked
+## 1. Generic table identity remains caller-selected
 
-`Config.tables` carries `ExportTable`s — names and rows. Nothing in the compiler
-can check that those rows are the rows of the Clean `Table` the circuit looks
+`CertifiedConfig` carries exported names and ordered rows together with
+certificates for caller-selected Clean tables. Nothing in the generic compiler
+can check that the selected table is the table the circuit originally looked
 into, because `Clean.Circuit.Lookup` stores a `RawTable`, which has already
-erased the `Table` and kept only a `Contains` predicate. This is D012.
+erased that identity and kept only a name, arity, and `Contains` predicate. This
+is the residual D012 gap. The rows themselves are proved for every current
+export and are not a trusted byte array.
 
 The consequence, which R5a and R5c found independently: compiling
 `Addition8FullCarry` with a 512-row `@Bytes` succeeds, and the emitted module
@@ -416,6 +419,15 @@ they do not execute those constraints.
   successful supported checked `Source` emission. The six `Square_*` registry
   entries have no Clean source, so G9 does not apply to them at all, and
   `EmitMain` reports them as such rather than as passing.
+- **A zero-input checked source is representable but untested.** `ProvableType.size`
+  may be zero; `Source.ofFormalCircuit`, parameter construction, and
+  `Entry.ofSource` impose no positive-size guard. The corpus covers empty
+  members/parameters through the renderer fixture, zero-witness and constant
+  outputs through `Passthrough`/`ConstOut`, and zero outputs through checked
+  shapes, but it contains no source-backed circuit with `size Input = 0`.
+  Therefore the matrix is not evidence for that cardinality. This is a finite
+  coverage boundary, not a frontend refusal or a claim that Clean cannot
+  construct such a circuit.
 
 ## What is *not* on this list
 

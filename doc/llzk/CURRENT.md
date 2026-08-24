@@ -38,6 +38,16 @@ theorem/output probes, and a restarted three-lane local R8. The workflow pins
 Rust 1.98; hosted organization CI and publication remain out of scope without
 separate authority.
 
+Exact next action: obtain an explicit publication decision for the reviewed
+post-R8 documentation descendant. The recommended topology is a new
+`project-llzk/clean-llzk-frontend` repository, bootstrapped privately with full
+history. Organization CI must run all four required jobs on exact R8 code
+candidate `193ec342` and on the reviewed documentation tip that becomes
+`main`; neither result is inherited from the local matrices. Public visibility,
+private vulnerability reporting, branch protection, and the organization
+profile remain separately authorized state changes described in
+`PUBLICATION.md`.
+
 Latest completed capability session: **S29 — source-visible XOR byte range and
 headline promotion**. Its first
 commit is decision and process only: D035 selects executable `% 256` narrowing,
@@ -538,16 +548,20 @@ rather than notes about it:
   one-cell `w0`–`w95` mutation in full scope and every one-member
   `out0`–`out63` mutation in both scopes; inputs are layout, canonicality, and
   association checked, not individually mutated;
-- G3, G4 and G10, by `require_llzk_opt_discriminates`, which requires `llzk-opt`
-  to reject a non-MLIR file *and* a well-formed MLIR module that is invalid LLZK
-  — a shim answering only `--version` used to make all three vacuous while the
-  harness printed PASS (R4b-2), and the non-MLIR probe alone was satisfied by any
-  generic MLIR parser, which LLZK 3.0.0 itself demonstrates by accepting a module
-  containing no LLZK at all (R5d);
+- G3, G4 and G10, by `require_llzk_opt_discriminates`: plain verification
+  rejects both non-MLIR input and well-formed non-LLZK MLIR; exact
+  `--verify-roundtrip` rejects a parser/printer canary that plain verification
+  accepts; and exact full-inlining/product-program verification must materialize
+  compute/constrain-derived product IR before rejecting a surviving non-`Main`
+  root. G11 independently defeats wholly permissive, plain-parser-only,
+  roundtrip-flag-stripping, product-no-output, and root-permissive shims. These
+  finite public canaries falsify the named substitutions but cannot prevent a
+  purpose-built wrapper from recognizing every published input; immutable tool
+  provenance remains part of the boundary;
 - G9, by `Test/Constraints.lean`, which perturbs the Clean side six ways and
   pins that the comparison goes red for each;
-- G10a, by the control in `evidence/S08-S15/controls.txt`: a module whose root is
-  not `@Main` fails it;
+- G10a, by the exact product materialization/provenance checks and non-`Main`
+  root control above;
 - G10b, by exact acceptance and declared-refusal totals: this catches either an
   unbalanced new refusal or a permissive new acceptance; compensating
   per-artifact swaps remain visible in the named logs rather than hidden by a

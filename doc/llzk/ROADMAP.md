@@ -57,6 +57,11 @@ toolchain matrices and the restarted three-lane local R8. That result is not a
 publication action: organization CI, repository creation or transfer, and a
 push remain separately authorized steps.
 
+The corpus remains finite across cardinalities as well as constructors. A
+source-backed circuit with zero inputs is representable by the current Clean and
+frontend APIs but has not been exercised; `GAPS.md` records that boundary. It is
+not a hidden refusal and is not silently included in the R8 coverage claim.
+
 The initial implementation lives under:
 
 ```text
@@ -337,3 +342,6 @@ file.
   inspection-only premise in GAPS item 8.
 - **The corpus is chosen, not exhaustive.** `Addition8FullCarry` is now tested
   outside its `Assumptions` (three of its nine vectors, S19).
+  No source-backed corpus entry has zero inputs, although the construction
+  supports `ProvableType.size = 0`; this is the S4 finite-coverage boundary in
+  `GAPS.md`, not an unsupported capability.

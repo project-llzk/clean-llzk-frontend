@@ -64,6 +64,18 @@ computation, parsing, round-trip, and pipeline admission; witgen still ignores
 `@constrain`, G10 runs no solver, and D017/formal LLZK semantics remain open.
 See `evidence/S29/blake3g-gates.txt`.
 
+R8 replacement compatibility recheck (checked 2026-08-24): exact code
+candidate `193ec342cb2aae9055c36f4f77d2a4fe23da7823` passed complete G0–G12
+matrices against both accepted LLZK `25fb3740ea3465c9129a06289297bb4f0554b7a5`
+and exact checked main `b5c110d1088e93d6786f66ec1e155be87bae755f`.
+Each run covered 17 corpus modules / 67 vectors, both witness backends and both
+output scopes, two renderer fixtures, 19/19 product-program admissions, 10 SMT
+lowerings / 9 declared exclusions, and 187 G11 controls. The accepted pin did
+not change. Raw transcripts, tool paths, hashes, normalized comparison, and
+the exact candidate attribution are in
+`evidence/R8-2026-08-23/FINAL-VERIFICATION.md`; the later documentation child is
+not relabelled as the matrix-tested code candidate.
+
 ## CI execution environment
 
 Workflow dependencies are repository inputs too. `scripts/llzk/check-actions-pinned.sh`
